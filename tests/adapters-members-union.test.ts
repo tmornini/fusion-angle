@@ -1,5 +1,6 @@
 import {
     assert,
+    assertEquals,
     assertRejects,
     assertStrictEquals,
     assertThrows,
@@ -15,10 +16,14 @@ import {
     IN_PROCESS_ORIGIN,
     inPageContext,
     inProcessFetch,
+    recordedContext,
 } from './in-page-facade.ts';
 import { createHttpFacade } from '../client/http-facade.ts';
 import { handleRequest } from '../api/api.ts';
-import { apiRequest } from './http-fixtures.ts';
+import {
+    apiRequest,
+    invitationLatched,
+} from './http-fixtures.ts';
 import { createAppClient } from
     '../web-app/app/client.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -30,6 +35,7 @@ import {
     memberName,
     MEMBER_WITHOUT_PII_NAME,
     fillHumanMemberProfile,
+    queryMembershipEntities,
 } from '../client/members-union.ts';
 import {
     isHumanMember,
@@ -39,7 +45,10 @@ import type {
     MemberId,
     Member,
     MembershipEntity,
+    MembershipReadEntity,
 } from '../shared/types.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
 import {
@@ -610,6 +619,75 @@ Deno.test(
                 isAIMember(m) && m.idForLink() === aiId
             ),
             'a removed AI is not a roster row',
+        );
+    }),
+);
+
+// ── queryMembershipEntities ─────────
+
+// The answer differs by state only if the state reaches
+// the server: one Kestrel is seated, the other removed.
+Deno.test(
+    'queryMembershipEntities sends ?state= and keeps answer'
+    + ' order',
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        const organization = 'AjdvjuECVZEgZoFajaIEkg';
+        const typo = generateIdentifier();
+        const exact = generateIdentifier();
+        const gone = generateIdentifier();
+        await seedHumanMember(db, typo, 'Kestral Moss');
+        await seedHumanMember(db, exact, 'Kestrel Moss');
+        await seedHumanMember(db, gone, 'Kestrel Gone');
+        const token = await organizationToken();
+        const removed = await handleRequest(
+            db, await invitationLatched(db, apiRequest({
+                method: 'PUT',
+                path: '/organizations/' + organization
+                    + '/invitations/'
+                    + membershipNameOf(organization, gone),
+                token,
+                body: { state: 'removed', at: nowUtc() },
+            })),
+        );
+        assertStrictEquals(removed.status, 200);
+        await removed.body?.cancel();
+        const { ctx, sent } = recordedContext(db, token);
+        const idsOf = (
+            parts: readonly HttpMessage<MembershipReadEntity>[],
+        ) => parts.map((part) => part.body().toValue().id);
+        assertEquals(
+            idsOf(await queryMembershipEntities(
+                ctx, 'kestrel', 'accepted',
+            )),
+            [
+                membershipNameOf(organization, exact),
+                membershipNameOf(organization, typo),
+            ],
+        );
+        assertEquals(
+            idsOf(await queryMembershipEntities(
+                ctx, 'kestrel', 'removed',
+            )),
+            [membershipNameOf(organization, gone)],
+        );
+        assertEquals(
+            sent.map((row) => [row.method, row.path, row.body]),
+            [
+                [
+                    'QUERY',
+                    '/api/organizations/' + organization
+                        + '/memberships/',
+                    '{"q":"kestrel"}',
+                ],
+                [
+                    'QUERY',
+                    '/api/organizations/' + organization
+                        + '/memberships/',
+                    '{"q":"kestrel"}',
+                ],
+            ],
         );
     }),
 );

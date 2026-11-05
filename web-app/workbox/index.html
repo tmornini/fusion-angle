@@ -1,13 +1,27 @@
 <div class="workspace">
-    <div class="page-header">
+    <div class="page-header workbox-header">
         <div>
             <h1 class="page-title">
                 Workbox
             </h1>
         </div>
+        <div class="search-wrapper search-wrapper-wide">
+            <span
+                class="search-icon"
+                id="workbox-search-icon"
+            ></span>
+            <input
+                id="workbox-search"
+                type="search"
+                class="input search-input"
+                placeholder="Search work orders..."
+                aria-label="Search work orders"
+            />
+        </div>
         <div
-            class="flex flex-wrap
-                items-center gap-3"
+            class="workbox-header-actions flex
+                flex-wrap items-center gap-3"
+            id="workbox-header-actions"
         >
             <div class="dropdown">
                 <button

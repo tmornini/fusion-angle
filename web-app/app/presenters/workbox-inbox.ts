@@ -68,6 +68,12 @@ const EMPTY_COPY: Record<InboxListKind, string> = {
     archivedByMe: 'No work orders archived by me',
 };
 
+// What narrows a painted list: nothing, or the search
+// text whose QUERY answer the list holds.
+export type InboxFilter =
+    | { readonly kind: 'none' }
+    | { readonly kind: 'matched'; readonly text: string };
+
 export interface InboxLists {
     available: InboxItem[];
     claimed: InboxItem[];
@@ -131,13 +137,16 @@ function buildUnplacedRow(
 export class WorkboxInboxPresenter {
     readonly #items: readonly InboxItem[];
     readonly #kind: InboxListKind;
+    readonly #filter: InboxFilter;
 
     constructor(
         items: readonly InboxItem[],
         kind: InboxListKind,
+        filter: InboxFilter,
     ) {
         this.#items = items;
         this.#kind = kind;
+        this.#filter = filter;
     }
 
     renderList(
@@ -146,7 +155,7 @@ export class WorkboxInboxPresenter {
         if (this.#items.length === 0) {
             setHtml(container, html`<p
                 class="text-muted"
-            >${EMPTY_COPY[this.#kind]}</p>`);
+            >${this.#emptyCopy()}</p>`);
             return;
         }
         setHtml(container, html`${
@@ -154,6 +163,13 @@ export class WorkboxInboxPresenter {
                 i => this.#buildRow(i),
             )
         }`);
+    }
+
+    #emptyCopy(): string {
+        return this.#filter.kind === 'matched'
+            ? 'No work orders match “'
+                + this.#filter.text + '”'
+            : EMPTY_COPY[this.#kind];
     }
 
     #buildRow(
@@ -282,7 +298,10 @@ function byPosition(
     return a.position - b.position;
 }
 
-export function buildInboxItems(
+// Each work order into the list its membership rules name,
+// in the order given: a QUERY answer keeps its best match
+// first.
+export function partitionInboxItems(
     workOrders: readonly WorkOrder[],
     activeClaimsByWo:
         ReadonlyMap<Id, ActiveClaim>,
@@ -310,9 +329,22 @@ export function buildInboxItems(
         }
         available.push(toItem(wo));
     }
+    return { available, claimed, archivedByMe };
+}
+
+export function buildInboxItems(
+    workOrders: readonly WorkOrder[],
+    activeClaimsByWo:
+        ReadonlyMap<Id, ActiveClaim>,
+    currentMemberId: Id,
+): InboxLists {
+    const lists = partitionInboxItems(
+        workOrders, activeClaimsByWo, currentMemberId,
+    );
     return {
-        available: available.toSorted(byAtAsc),
-        claimed: claimed.toSorted(byPosition),
-        archivedByMe: archivedByMe.toSorted(byAtDesc),
+        available: lists.available.toSorted(byAtAsc),
+        claimed: lists.claimed.toSorted(byPosition),
+        archivedByMe:
+            lists.archivedByMe.toSorted(byAtDesc),
     };
 }

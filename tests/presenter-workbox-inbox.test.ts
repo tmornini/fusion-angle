@@ -4,6 +4,7 @@ import {
 } from '@std/assert';
 import {
     WorkboxInboxPresenter,
+    type InboxFilter,
     type InboxItem,
 } from
     '../web-app/app/presenters/workbox-inbox.ts';
@@ -30,10 +31,12 @@ function placed(
     };
 }
 
+const NO_FILTER: InboxFilter = { kind: 'none' };
+
 function capture(
     items: readonly InboxItem[],
-    kind: 'available' | 'claimed' | 'archivedByMe'
-        = 'available',
+    kind: 'available' | 'claimed' | 'archivedByMe',
+    filter: InboxFilter,
 ): string {
     let html = '';
     const container = {
@@ -41,7 +44,7 @@ function capture(
             html = value;
         },
     };
-    new WorkboxInboxPresenter(items, kind)
+    new WorkboxInboxPresenter(items, kind, filter)
         .renderList(
             container as unknown as HTMLElement,
         );
@@ -52,7 +55,7 @@ Deno.test(
     'available empty copy is No work orders'
     + ' available to me',
     () => {
-        const out = capture([], 'available');
+        const out = capture([], 'available', NO_FILTER);
         assertStringIncludes(
             out,
             'No work orders available to me',
@@ -68,7 +71,7 @@ Deno.test(
     + ' claimed by me',
     () => {
         assertStringIncludes(
-            capture([], 'claimed'),
+            capture([], 'claimed', NO_FILTER),
             'No work orders claimed by me',
         );
     },
@@ -79,7 +82,7 @@ Deno.test(
     + ' archived by me',
     () => {
         assertStringIncludes(
-            capture([], 'archivedByMe'),
+            capture([], 'archivedByMe', NO_FILTER),
             'No work orders archived by me',
         );
     },
@@ -89,7 +92,7 @@ Deno.test(
     'a placed row has flow, id, state, time,'
     + ' and no grip or claimant',
     () => {
-        const out = capture([placed()]);
+        const out = capture([placed()], 'available', NO_FILTER);
         assertStringIncludes(out, 'Onboarding');
         assertStringIncludes(out, '#WO-1');
         assertStringIncludes(out, 'Review');
@@ -123,7 +126,7 @@ Deno.test(
             lastTransitionedAt:
                 '2026-04-01T12:00:00.000000Z',
             position: 2,
-        }]);
+        }], 'available', NO_FILTER);
         assertStringIncludes(out, 'State unknown');
         assertStringIncludes(out, 'Test flow');
         assertStringIncludes(out, '#unplaced-7');
@@ -192,6 +195,70 @@ Deno.test(
         );
         assertEquals(
             page.includes('drag-handle'), false,
+        );
+    },
+);
+
+Deno.test(
+    'a matched empty list names the search text',
+    () => {
+        const out = capture([], 'available', {
+            kind: 'matched', text: 'zz',
+        });
+        assertStringIncludes(
+            out, 'No work orders match “zz”',
+        );
+        assertEquals(
+            out.includes('No work orders available'),
+            false,
+        );
+    },
+);
+
+Deno.test(
+    'a matched empty list escapes the search text',
+    () => {
+        const out = capture([], 'claimed', {
+            kind: 'matched', text: '<b>zz</b>',
+        });
+        assertStringIncludes(out, '&lt;b&gt;zz');
+        assertEquals(out.includes('<b>'), false);
+    },
+);
+
+Deno.test(
+    'the workbox search box sits between the title'
+    + ' and the create button',
+    async () => {
+        const page = await Deno.readTextFile(
+            new URL(
+                '../web-app/workbox/index.html',
+                import.meta.url,
+            ),
+        );
+        const wrapper = page.indexOf(
+            'class="search-wrapper search-wrapper-wide"',
+        );
+        const input = /<input[^>]*id="workbox-search"[^>]*>/
+            .exec(page);
+        assertEquals(input !== null, true);
+        assertStringIncludes(
+            input![0], 'aria-label="Search work orders"',
+        );
+        assertEquals(
+            wrapper >= 0
+                && wrapper < input!.index
+                && !page.slice(wrapper, input!.index)
+                    .includes('</div>'),
+            true,
+        );
+        const at = (needle: string) => page.indexOf(needle);
+        const title = at('class="page-title"');
+        const search = at('id="workbox-search"');
+        const create = at('id="create-work-order-btn"');
+        assertEquals(
+            title >= 0 && title < search && search < create,
+            true,
         );
     },
 );

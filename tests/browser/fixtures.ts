@@ -45,6 +45,7 @@ export const VIEWPORT = { width: 1280, height: 800 };
 const CONDITION_TIMEOUT_MS = 10_000;
 const DRAG_STEPS = 8;
 const STAY_SAMPLE_MS = 50;
+const HELD_TIMEOUT_MS = 5_000;
 
 export type Origin = {
     readonly baseUrl: string;
@@ -607,5 +608,91 @@ export async function stays(
                 + ` -> ${String(now)}`,
             );
         }
+    }
+}
+
+// A request the page sends, as a hold's predicate sees it.
+export type PausedRequest = {
+    readonly method: string;
+    readonly url: string;
+};
+
+// The requests a hold keeps at the browser's network layer
+// (CDP Fetch) until the test releases or fails each one.
+export type RequestHold = {
+    // The next held request, taken from the held list.
+    next(): Promise<string>;
+    heldCount(): number;
+    heldAtLeast(count: number): Promise<unknown>;
+    release(requestId: string): Promise<unknown>;
+    fail(requestId: string): Promise<unknown>;
+    // Later requests pass; the held ones stay held.
+    stopHolding(): void;
+    // Releases every request still on the held list.
+    releaseHeld(): Promise<void>;
+};
+
+// Holds the page's requests under urlPattern that `holds`
+// picks, while fn runs; every other request passes. The
+// interception detaches when fn settles, which lets any
+// request still paused go on.
+export async function withHeldRequests(
+    page: Page,
+    urlPattern: string,
+    holds: (request: PausedRequest) => boolean,
+    fn: (hold: RequestHold) => Promise<void>,
+): Promise<void> {
+    const session = page.session;
+    const held: string[] = [];
+    let holding = true;
+    const release = (requestId: string) => session.send(
+        'Fetch.continueRequest', { requestId },
+    );
+    const off = session.client.on(
+        'Fetch.requestPaused',
+        (params, sessionId) => {
+            if (sessionId !== session.sessionId) return;
+            const paused = params as {
+                readonly requestId: string;
+                readonly request: PausedRequest;
+            };
+            if (holding && holds(paused.request)) {
+                held.push(paused.requestId);
+                return;
+            }
+            void release(paused.requestId);
+        },
+    );
+    try {
+        await session.send('Fetch.enable', {
+            patterns: [{ urlPattern, requestStage: 'Request' }],
+        });
+        await fn({
+            next: () => pollUntil(
+                'a held request', HELD_TIMEOUT_MS,
+                () => Promise.resolve(held.shift()),
+            ),
+            heldCount: () => held.length,
+            heldAtLeast: (count) => pollUntil(
+                'held requests', HELD_TIMEOUT_MS,
+                () => Promise.resolve(
+                    held.length >= count || null,
+                ),
+            ),
+            release,
+            fail: (requestId) => session.send(
+                'Fetch.failRequest',
+                { requestId, errorReason: 'Failed' },
+            ),
+            stopHolding: () => {
+                holding = false;
+            },
+            releaseHeld: async () => {
+                await Promise.all(held.splice(0).map(release));
+            },
+        });
+    } finally {
+        off();
+        await session.send('Fetch.disable');
     }
 }

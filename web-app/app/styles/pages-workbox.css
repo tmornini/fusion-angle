@@ -19,6 +19,29 @@
     }
 }
 
+/* Title left, search centered over the lists' gap,
+    button right. */
+.workbox-header {
+    display: grid;
+    grid-template-columns: 1fr minmax(0, 30rem) 1fr;
+}
+
+.workbox-header-actions {
+    justify-self: end;
+}
+
+/* The page moves the box after the button here, so it
+    takes its own row in reading and tab order. */
+@media (max-width: 767px) {
+    .workbox-header {
+        grid-template-columns: 1fr auto;
+    }
+
+    .workbox-header > .search-wrapper {
+        grid-column: 1 / -1;
+    }
+}
+
 .work-order-history-fields {
     display: grid;
     grid-template-columns: auto 1fr;

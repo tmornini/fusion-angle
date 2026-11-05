@@ -21,6 +21,7 @@ import {
     buildInitialManagedMembersState,
     applyManagedMembersSearch,
     applyManagedMembersKind,
+    type MemberSearch,
 } from '../web-app/app/presenters/member.ts';
 
 // presenters/member.ts never reads localStorage (checked
@@ -326,19 +327,38 @@ Deno.test(
     },
 );
 
+const ALICE = 'xdaJyuuPyHfffCGLhqDrOQ';
+const BRUNO = 'ZtJq3nWkQe2vXyLmPaR8sA';
+
+function matched(
+    identityIds: readonly string[],
+): MemberSearch {
+    return { kind: 'matched', text: 'typed', identityIds };
+}
+
 Deno.test(
-    'search filter applies to all three sections',
+    'a matched search filters and orders all three'
+    + ' sections',
     () => {
         const html = htmlOf(
             [
                 makeHuman('self', 'Zelda'),
-                makeHuman('xdaJyuuPyHfffCGLhqDrOQ', 'Alice'),
-                makeAI('ai1', 'Claude'),
+                makeHuman(ALICE, 'Alice'),
+                makeHuman(BRUNO, 'Bruno'),
+                makeAI('ai1', 'Marvin'),
+                makeAI('ai2', 'Robbie'),
+                makeAI('ai3', 'Hal'),
+                makeServiceMember('svc1', 'CI bot'),
+                makeServiceMember('svc2', 'Deploy bot'),
             ],
             'self',
             s =>
                 applyManagedMembersSearch(
-                    s, 'alice',
+                    s,
+                    matched([
+                        'svc2', 'ai3', BRUNO,
+                        ALICE, 'ai2',
+                    ]),
                 ),
         );
         assert(
@@ -350,9 +370,77 @@ Deno.test(
             'Alice remains under search',
         );
         assert(
-            !html.includes('Claude'),
-            'Claude filtered out by search',
+            !html.includes('Marvin'),
+            'Marvin filtered out by search',
         );
+        assert(
+            !html.includes('CI bot'),
+            'an unmatched service is filtered out',
+        );
+        assert(
+            html.indexOf('Bruno') < html.indexOf('Alice'),
+            'humans keep the answer\'s order',
+        );
+        assert(
+            html.indexOf('Hal') < html.indexOf('Robbie'),
+            'AIs keep the answer\'s order',
+        );
+        assert(
+            html.includes('Deploy bot'),
+            'a matched service remains',
+        );
+        assert(
+            html.indexOf('HUMANS') < html.indexOf('AIs')
+            && html.indexOf('AIs')
+                < html.indexOf('SERVICES'),
+            'the answer\'s order stays within sections',
+        );
+    },
+);
+
+Deno.test(
+    'a matched search hides YOU when the caller is not'
+    + ' matched',
+    () => {
+        const html = htmlOf(
+            [
+                makeHuman('self', 'Demo'),
+                makeHuman(ALICE, 'Alice'),
+            ],
+            'self',
+            s => applyManagedMembersSearch(
+                s, matched([ALICE]),
+            ),
+        );
+        assert(!html.includes('YOU'), 'no YOU section');
+        assert(!html.includes('Demo'), 'no caller row');
+        assert(html.includes('HUMANS'));
+        assert(html.includes('Alice'));
+    },
+);
+
+Deno.test(
+    'kind chips filter the matched answer',
+    () => {
+        const html = htmlOf(
+            [
+                makeHuman('self', 'Demo'),
+                makeHuman(ALICE, 'Alice'),
+                makeHuman(BRUNO, 'Bruno'),
+                makeAI('ai1', 'Marvin'),
+            ],
+            'self',
+            s => applyManagedMembersKind(
+                applyManagedMembersSearch(
+                    s, matched(['ai1', ALICE]),
+                ),
+                'human',
+            ),
+        );
+        assert(html.includes('Alice'));
+        assert(!html.includes('Bruno'));
+        assert(!html.includes('Marvin'));
+        assert(!html.includes('AIs'));
     },
 );
 
@@ -463,17 +551,19 @@ Deno.test(
 );
 
 Deno.test(
-    'a former list with kind and search still shows'
-    + ' every former row',
+    'a matched former list shows only matched rows',
     () => {
         const html = formerHtml(
             [
                 makeHuman('self', 'Demo'),
                 makeFormer(LEAVER, REMOVED_AT),
+                makeFormer(OTHER_LEAVER, OTHER_REMOVED_AT),
             ],
             'removed',
             s => applyManagedMembersKind(
-                applyManagedMembersSearch(s, 'zzz'),
+                applyManagedMembersSearch(
+                    s, matched([OTHER_LEAVER]),
+                ),
                 'ai',
             ),
         );
@@ -482,12 +572,14 @@ Deno.test(
             1,
         );
         assert(html.includes('Former member'));
-        assert(html.includes(formatDate(REMOVED_AT)));
+        assert(html.includes(formatDate(OTHER_REMOVED_AT)));
+        assert(!html.includes(formatDate(REMOVED_AT)));
         assert(!html.includes('YOU'));
         assert(!html.includes('HUMANS'));
         assert(!html.includes('AIs'));
         assert(!html.includes('Demo'));
         assert(!html.includes(LEAVER));
+        assert(!html.includes(OTHER_LEAVER));
     },
 );
 

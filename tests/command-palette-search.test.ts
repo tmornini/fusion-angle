@@ -1,28 +1,42 @@
-import { assert, assertStrictEquals } from '@std/assert';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
-    searchItems,
+    defaultSearchItems,
+    matchedSearchItems,
     ideaToSearchItem,
     projectToSearchItem,
     humanMemberToSearchItem,
+    membershipToSearchItem,
 } from '../web-app/app/command-palette.ts';
 import type {
+    PageSearchEntry,
     SearchItem,
 } from '../web-app/app/command-palette.ts';
 import {
     Idea, Project, HumanMember,
+    type IdeaEntity,
     type IdeaState,
     type IdentityPiiEntity,
     type MembershipEntity,
+    type MembershipReadEntity,
+    type ProjectEntity,
 } from '../shared/types.ts';
+import {
+    MEMBER_WITHOUT_PII_NAME,
+    type OrganizationMatches,
+} from '../client/index.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import { responseMessage } from './fixtures/response-message.ts';
 
-function buildIdea(
+const ORGANIZATION_ID = 'AjdvjuECVZEgZoFajaIEkg';
+
+function buildIdeaMessage(
     id: string, title: string,
     state: IdeaState = 'active',
-): Idea {
-    return new Idea(responseMessage({
+): HttpMessage<IdeaEntity> {
+    return responseMessage<IdeaEntity>({
         id,
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        organization_id: ORGANIZATION_ID,
         title,
         position: 1,
         problem_statement: '',
@@ -31,15 +45,22 @@ function buildIdea(
         expected_outcome: '',
         success_metrics: '',
         state,
-    }), state);
+    });
 }
 
-function buildProject(
+function buildIdea(
     id: string, title: string,
-): Project {
-    return new Project(responseMessage({
+    state: IdeaState = 'active',
+): Idea {
+    return new Idea(buildIdeaMessage(id, title, state), state);
+}
+
+function buildProjectMessage(
+    id: string, title: string,
+): HttpMessage<ProjectEntity> {
+    return responseMessage<ProjectEntity>({
         id,
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        organization_id: ORGANIZATION_ID,
         title,
         description: 'desc',
         progress: 42,
@@ -50,8 +71,55 @@ function buildProject(
         actual_cost: 0,
         position: 1,
         state: 'approved',
-    }), 'approved');
+    });
 }
+
+function buildProject(
+    id: string, title: string,
+): Project {
+    return new Project(buildProjectMessage(id, title), 'approved');
+}
+
+function buildMembershipMessage(
+    identityId: string,
+    pii:
+        | { readonly name: string; readonly email: string }
+        | 'erased',
+): HttpMessage<MembershipReadEntity> {
+    const joined = pii === 'erased'
+        ? {}
+        : { invitee_name: pii.name, invitee_email: pii.email };
+    return responseMessage<MembershipReadEntity>({
+        id: ORGANIZATION_ID + ':' + identityId,
+        organization_id: ORGANIZATION_ID,
+        identity_id: identityId,
+        type: 'member',
+        state: 'accepted',
+        at: '2026-01-01T00:00:00.000000Z',
+        identity_kind: 'person',
+        ...joined,
+    });
+}
+
+function buildPage(
+    title: string, keywords: string,
+): PageSearchEntry {
+    return {
+        item: {
+            id: 'page-' + title,
+            title,
+            meta: 'Page',
+            category: 'pages',
+            icon: undefined as unknown as never,
+            href: '/' + title,
+        },
+        keywords,
+    };
+}
+
+const NO_MATCHES: OrganizationMatches = {
+    ideas: [], projects: [], members: [],
+};
 
 function buildHumanMember(
     id: string,
@@ -104,7 +172,6 @@ const sampleItems: SearchItem[] = [
         category: 'ideas',
         icon: undefined as unknown as never,
         href: '/a',
-        keywords: 'sweet pastry',
     },
     {
         id: 'b',
@@ -113,7 +180,6 @@ const sampleItems: SearchItem[] = [
         category: 'ideas',
         icon: undefined as unknown as never,
         href: '/b',
-        keywords: 'sweet loaf',
     },
     {
         id: 'c',
@@ -122,14 +188,13 @@ const sampleItems: SearchItem[] = [
         category: 'ideas',
         icon: undefined as unknown as never,
         href: '/c',
-        keywords: 'aged dairy',
     },
 ];
 
 Deno.test(
-    'searchItems empty query returns first N',
+    'defaultSearchItems returns first N',
     () => {
-        const out = searchItems(sampleItems, '');
+        const out = defaultSearchItems(sampleItems);
         assertStrictEquals(
             out.length, sampleItems.length,
             'all items returned (under cap)',
@@ -138,7 +203,7 @@ Deno.test(
 );
 
 Deno.test(
-    'searchItems empty query caps at default count',
+    'defaultSearchItems caps at default count',
     () => {
         const many: SearchItem[] = Array
             .from({ length: 50 }, (_, i) => ({
@@ -148,9 +213,8 @@ Deno.test(
                 category: 'pages',
                 icon: undefined as unknown as never,
                 href: '/x',
-                keywords: '',
             }));
-        const out = searchItems(many, '   ');
+        const out = defaultSearchItems(many);
         assertStrictEquals(
             out.length, 12,
             'caps at 12 default results',
@@ -159,53 +223,128 @@ Deno.test(
 );
 
 Deno.test(
-    'searchItems matches title case-insensitively',
+    'matchedSearchItems groups in category order',
     () => {
-        const out = searchItems(
-            sampleItems, 'APPLE',
+        const out = matchedSearchItems(
+            {
+                members: [buildMembershipMessage('u1', {
+                    name: 'Kestrel Smith',
+                    email: 'kestrel@example.com',
+                })],
+                projects: [buildProjectMessage(
+                    'pnXmXrxOWayANgDLdCjuBw', 'Kestrel Launch',
+                )],
+                ideas: [buildIdeaMessage(
+                    'fndCYAsXazdzMUlEGMNIZw', 'Kestrel Nest',
+                )],
+            },
+            [buildPage('Kestrel Board', '')],
+            'kestrel',
         );
-        assertStrictEquals(out.length, 1);
-        assertStrictEquals(out[0]!.id, 'a');
+        assertEquals(
+            out.map(item => item.category),
+            ['ideas', 'projects', 'members', 'pages'],
+        );
     },
 );
 
 Deno.test(
-    'searchItems matches meta',
+    'matchedSearchItems keeps answer order within each',
     () => {
-        const out = searchItems(
-            sampleItems, 'savory',
+        const out = matchedSearchItems(
+            {
+                ideas: [
+                    buildIdeaMessage('i2', 'Zebra'),
+                    buildIdeaMessage('i1', 'Aardvark'),
+                ],
+                projects: [
+                    buildProjectMessage('p2', 'Zebra'),
+                    buildProjectMessage('p1', 'Aardvark'),
+                ],
+                members: [
+                    buildMembershipMessage('u2', {
+                        name: 'Zed', email: 'zed@example.com',
+                    }),
+                    buildMembershipMessage('u1', {
+                        name: 'Abe', email: 'abe@example.com',
+                    }),
+                ],
+            },
+            [],
+            'zebra',
         );
-        assertStrictEquals(out.length, 1);
-        assertStrictEquals(out[0]!.id, 'c');
+        assertEquals(
+            out.map(item => item.id),
+            [
+                'idea-i2', 'idea-i1',
+                'project-p2', 'project-p1',
+                'member-u2', 'member-u1',
+            ],
+        );
     },
 );
 
 Deno.test(
-    'searchItems matches keywords',
+    'matchedSearchItems hides archived and deleted ideas',
     () => {
-        const out = searchItems(
-            sampleItems, 'pastry',
+        const out = matchedSearchItems(
+            {
+                ...NO_MATCHES,
+                ideas: [
+                    buildIdeaMessage('i1', 'Kept', 'active'),
+                    buildIdeaMessage('i2', 'Shelved', 'archived'),
+                    buildIdeaMessage('i3', 'Gone', 'deleted'),
+                ],
+            },
+            [],
+            'idea',
         );
-        assertStrictEquals(out.length, 1);
-        assertStrictEquals(out[0]!.id, 'a');
+        assertEquals(out.map(item => item.id), ['idea-i1']);
     },
 );
 
 Deno.test(
-    'searchItems matches across rows',
+    'matchedSearchItems ranks pages by the matcher',
     () => {
-        const out = searchItems(
-            sampleItems, 'sweet',
+        const workbox = buildPage('Workbox', 'work orders inbox');
+        const ideas = buildPage('Ideas', 'submit propose');
+        const out = matchedSearchItems(
+            NO_MATCHES, [ideas, workbox], 'wrkbox',
         );
-        assertStrictEquals(out.length, 2);
+        assertEquals(out, [workbox.item]);
     },
 );
 
 Deno.test(
-    'searchItems no match returns empty',
+    'matchedSearchItems puts exact pages before edited ones',
     () => {
-        const out = searchItems(
-            sampleItems, 'zzzz',
+        const flaw = buildPage('Flaw Report', '');
+        const flows = buildPage('Flows', '');
+        const out = matchedSearchItems(
+            NO_MATCHES, [flaw, flows], 'flow',
+        );
+        assertEquals(out, [flows.item, flaw.item]);
+    },
+);
+
+Deno.test(
+    'matchedSearchItems matches a page on its keywords',
+    () => {
+        const workbox = buildPage('Workbox', 'work orders inbox');
+        const out = matchedSearchItems(
+            NO_MATCHES, [workbox], 'inbox',
+        );
+        assertEquals(out, [workbox.item]);
+    },
+);
+
+Deno.test(
+    'matchedSearchItems no match returns empty',
+    () => {
+        const out = matchedSearchItems(
+            NO_MATCHES,
+            [buildPage('Workbox', 'work orders inbox')],
+            'zzzz',
         );
         assertStrictEquals(out.length, 0);
     },
@@ -214,33 +353,24 @@ Deno.test(
 Deno.test(
     'ideaToSearchItem builds correct shape',
     () => {
-        const tuple = {
-            idea: buildIdea('fndCYAsXazdzMUlEGMNIZw', 'My Idea'),
-            submitterName: 'Alice',
-            submittedAt: '2026-01-01',
-        };
-        const out = ideaToSearchItem(tuple);
+        const out = ideaToSearchItem(
+            buildIdea('fndCYAsXazdzMUlEGMNIZw', 'My Idea'),
+        );
         assertStrictEquals(out.id, 'idea-fndCYAsXazdzMUlEGMNIZw');
         assertStrictEquals(out.title, 'My Idea');
         assertStrictEquals(out.category, 'ideas');
-        assert(
-            out.keywords.includes('Alice'),
-        );
     },
 );
 
 Deno.test(
     'ideaToSearchItem normalises hyphens in status',
     () => {
-        const tuple = {
-            idea: buildIdea(
+        const out = ideaToSearchItem(
+            buildIdea(
                 'fxysGbBPBsnCwJNJsyZnkA', 'Other',
                 'approved',
             ),
-            submitterName: 'Bob',
-            submittedAt: '2026-01-01',
-        };
-        const out = ideaToSearchItem(tuple);
+        );
         assert(
             !out.meta.includes('-'),
             'hyphens stripped from meta',
@@ -276,33 +406,46 @@ Deno.test(
         assertStrictEquals(out.id, 'member-u1');
         assertStrictEquals(out.title, 'Carol Smith');
         assertStrictEquals(out.category, 'members');
-        assert(
-            out.keywords.includes('pm'),
-            'title in keywords',
-        );
-        assert(
-            out.keywords.includes('Product'),
-            'department in keywords',
-        );
-        assert(
-            out.keywords.includes(
-                'carol@example.com',
-            ),
-            'email in keywords',
-        );
     },
 );
 
 Deno.test(
-    'searchItems search by member email works',
+    'membershipToSearchItem builds correct shape',
     () => {
-        const memberItem = humanMemberToSearchItem(
-            buildHumanMember(
-                'u1', 'Carol', 'Smith',
-            ),
+        const out = membershipToSearchItem(
+            buildMembershipMessage('u1', {
+                name: 'Carol Smith', email: 'carol@example.com',
+            }),
         );
-        const out = searchItems(
-            [memberItem], 'carol@',
+        assertStrictEquals(out.id, 'member-u1');
+        assertStrictEquals(out.title, 'Carol Smith');
+        assertStrictEquals(out.category, 'members');
+    },
+);
+
+Deno.test(
+    'membershipToSearchItem names an erased member',
+    () => {
+        const out = membershipToSearchItem(
+            buildMembershipMessage('u1', 'erased'),
+        );
+        assertStrictEquals(out.title, MEMBER_WITHOUT_PII_NAME);
+    },
+);
+
+Deno.test(
+    'matchedSearchItems keeps a member matched by email',
+    () => {
+        const out = matchedSearchItems(
+            {
+                ...NO_MATCHES,
+                members: [buildMembershipMessage('u1', {
+                    name: 'Carol Smith',
+                    email: 'carol@example.com',
+                })],
+            },
+            [],
+            'carol@',
         );
         assertStrictEquals(out.length, 1);
     },

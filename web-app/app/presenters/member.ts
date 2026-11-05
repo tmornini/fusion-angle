@@ -15,6 +15,7 @@ import {
     HumanMember,
     AIMember,
     ServiceMember,
+    type Id,
     type Member,
     isFormerMember,
     isHumanMember,
@@ -42,12 +43,6 @@ export class HumanMemberRowPresenter {
 
     idForLink(): string {
         return this.#member.idForLink();
-    }
-
-    matchesSearch(query: string): boolean {
-        if (query === '') return true;
-        return this.#member
-            .matchesSearch(query);
     }
 
     buildRow(isSelf: boolean = false): SafeHtml {
@@ -137,12 +132,6 @@ export class AIMemberRowPresenter {
         return this.#member.idForLink();
     }
 
-    matchesSearch(query: string): boolean {
-        if (query === '') return true;
-        return this.#member
-            .matchesSearch(query);
-    }
-
     buildRow(): SafeHtml {
         return html`
         <div class="${
@@ -212,12 +201,6 @@ export class ServiceMemberRowPresenter {
         return this.#member.idForLink();
     }
 
-    matchesSearch(query: string): boolean {
-        if (query === '') return true;
-        return this.#member
-            .matchesSearch(query);
-    }
-
     buildRow(): SafeHtml {
         return html`
         <div class="${
@@ -272,6 +255,10 @@ export class FormerMemberRowPresenter {
         this.#member = member;
     }
 
+    idForLink(): string {
+        return this.#member.idForLink();
+    }
+
     buildRow(): SafeHtml {
         return html`
         <div class="member-row-former">
@@ -285,10 +272,21 @@ export class FormerMemberRowPresenter {
     }
 }
 
+// What the box narrows the roster to: nothing while it is
+// empty, else its QUERY's answer.
+export type MemberSearch =
+    | { readonly kind: 'none' }
+    | {
+        readonly kind: 'matched',
+        readonly text: string,
+        // identity ids in best-match order
+        readonly identityIds: readonly Id[],
+    };
+
 export type ManagedMembersState = {
     members: Member[];
     currentMemberId: string;
-    search: string;
+    search: MemberSearch;
     kind: MemberKindFilter;
     membership: 'accepted' | 'removed';
 };
@@ -300,7 +298,7 @@ export function buildInitialManagedMembersState(
     return {
         members,
         currentMemberId,
-        search: '',
+        search: { kind: 'none' },
         kind: 'all',
         membership: 'accepted',
     };
@@ -308,12 +306,24 @@ export function buildInitialManagedMembersState(
 
 export function applyManagedMembersSearch(
     state: ManagedMembersState,
-    query: string,
+    search: MemberSearch,
 ): ManagedMembersState {
-    return {
-        ...state,
-        search: query.toLowerCase(),
-    };
+    return { ...state, search };
+}
+
+// While matched, the rows the answer names, in its order.
+function searchedRows<Row extends { idForLink(): string }>(
+    rows: readonly Row[],
+    search: MemberSearch,
+): Row[] {
+    if (search.kind === 'none') return [...rows];
+    const byId = new Map(
+        rows.map(row => [row.idForLink(), row]),
+    );
+    return search.identityIds.flatMap(id => {
+        const row = byId.get(id);
+        return row === undefined ? [] : [row];
+    });
 }
 
 export function applyManagedMembersKind(
@@ -329,35 +339,45 @@ export class ManagedMembersPresenter {
     readonly #services: ServiceMemberRowPresenter[];
     readonly #formers: FormerMemberRowPresenter[];
     readonly #currentMemberId: string;
-    readonly #search: string;
     readonly #kind: MemberKindFilter;
     readonly #membership: ManagedMembersState['membership'];
 
     constructor(state: ManagedMembersState) {
-        this.#humans = state.members
-            .filter(isHumanMember)
-            .map(
-                w => new HumanMemberRowPresenter(w),
-            );
-        this.#ais = state.members
-            .filter(isAIMember)
-            .map(
-                w => new AIMemberRowPresenter(w),
-            );
-        this.#services = state.members
-            .filter(isServiceMember)
-            .map(
-                w => new ServiceMemberRowPresenter(w),
-            );
-        this.#formers = state.members
-            .filter(isFormerMember)
-            .map(
-                member =>
-                    new FormerMemberRowPresenter(member),
-            );
+        this.#humans = searchedRows(
+            state.members
+                .filter(isHumanMember)
+                .map(
+                    w => new HumanMemberRowPresenter(w),
+                ),
+            state.search,
+        );
+        this.#ais = searchedRows(
+            state.members
+                .filter(isAIMember)
+                .map(
+                    w => new AIMemberRowPresenter(w),
+                ),
+            state.search,
+        );
+        this.#services = searchedRows(
+            state.members
+                .filter(isServiceMember)
+                .map(
+                    w => new ServiceMemberRowPresenter(w),
+                ),
+            state.search,
+        );
+        this.#formers = searchedRows(
+            state.members
+                .filter(isFormerMember)
+                .map(
+                    member =>
+                        new FormerMemberRowPresenter(member),
+                ),
+            state.search,
+        );
         this.#currentMemberId =
             state.currentMemberId;
-        this.#search = state.search;
         this.#kind = state.kind;
         this.#membership = state.membership;
     }
@@ -407,9 +427,6 @@ export class ManagedMembersPresenter {
                 === this.#currentMemberId,
         );
         if (!self) return html``;
-        if (!self.matchesSearch(this.#search)) {
-            return html``;
-        }
         return html`
             <div class="${
                 'member-section-header'
@@ -424,9 +441,6 @@ export class ManagedMembersPresenter {
             .filter(
                 p => p.idForLink()
                     !== this.#currentMemberId,
-            )
-            .filter(
-                p => p.matchesSearch(this.#search),
             );
         return html`
             <div class="${
@@ -447,9 +461,6 @@ export class ManagedMembersPresenter {
     }
 
     #buildAIsSection(): SafeHtml {
-        const filtered = this.#ais.filter(
-            p => p.matchesSearch(this.#search),
-        );
         return html`
             <div class="${
                 'member-section-header'
@@ -457,21 +468,18 @@ export class ManagedMembersPresenter {
                 + ' text-muted mt-4'
             }">AIs</div>
             ${
-                filtered.length === 0
+                this.#ais.length === 0
                     ? this.#buildEmptyRow(
                         'No AIs match your'
                         + ' filter.',
                     )
-                    : html`${filtered.map(
+                    : html`${this.#ais.map(
                         p => p.buildRow(),
                     )}`
             }`;
     }
 
     #buildServicesSection(): SafeHtml {
-        const filtered = this.#services.filter(
-            p => p.matchesSearch(this.#search),
-        );
         return html`
             <div class="${
                 'member-section-header'
@@ -479,12 +487,12 @@ export class ManagedMembersPresenter {
                 + ' text-muted mt-4'
             }">SERVICES</div>
             ${
-                filtered.length === 0
+                this.#services.length === 0
                     ? this.#buildEmptyRow(
                         'No services match your'
                         + ' filter.',
                     )
-                    : html`${filtered.map(
+                    : html`${this.#services.map(
                         p => p.buildRow(),
                     )}`
             }`;

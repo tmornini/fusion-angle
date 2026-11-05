@@ -34,7 +34,9 @@ import {
 } from '../client/index.ts';
 import {
     buildInboxItems,
+    partitionInboxItems,
     WorkboxInboxPresenter,
+    type ActiveClaim,
     type InboxLists,
 } from
     '../web-app/app/presenters/workbox-inbox.ts';
@@ -866,7 +868,9 @@ Deno.test(
                 captured = value;
             },
         };
-        new WorkboxInboxPresenter(items, 'available')
+        new WorkboxInboxPresenter(
+            items, 'available', { kind: 'none' },
+        )
             .renderList(
                 container as unknown as HTMLElement,
             );
@@ -902,5 +906,113 @@ Deno.test(
                 false, absent,
             );
         }
+    },
+);
+
+// Three work orders per list, each list's input in the
+// reverse of the order its sort would give.
+async function reversedWorkOrders(): Promise<{
+    workOrders: WorkOrder[];
+    claims: Map<string, ActiveClaim>;
+}> {
+    const { tables, woId } = await setupOneWorkOrder();
+    const t = await tables();
+    const base = t.workOrders.find((w) => w.id === woId)!;
+    const claims = new Map<string, ActiveClaim>();
+    function variant(
+        id: string,
+        nodeId: string,
+        at: string,
+        position: number,
+    ): WorkOrder {
+        return {
+            ...base,
+            id,
+            nodeId,
+            position,
+            transition: { memberId: DEMO, at },
+            claim: { state: 'unclaimed' },
+        };
+    }
+    const available = ['av-3', 'av-2', 'av-1'].map(
+        (id, i) => variant(
+            id, N_MIDDLE,
+            '2030-01-0' + (3 - i) + 'T00:00:00.000000Z',
+            10 + i,
+        ),
+    );
+    const claimed = ['cl-3', 'cl-2', 'cl-1'].map(
+        (id, i) => {
+            claims.set(id, {
+                memberId: DEMO,
+                at: '2030-01-01T00:00:00.000000Z',
+            });
+            return variant(
+                id, N_MIDDLE,
+                '2030-01-0' + (i + 1) + 'T00:00:00.000000Z',
+                3 - i,
+            );
+        },
+    );
+    const archived = ['ar-3', 'ar-2', 'ar-1'].map(
+        (id, i) => variant(
+            id, N_FINISH,
+            '2030-01-0' + (i + 1) + 'T00:00:00.000000Z',
+            20 + i,
+        ),
+    );
+    return {
+        workOrders: [
+            available[0]!, claimed[0]!, archived[0]!,
+            available[1]!, claimed[1]!, archived[1]!,
+            available[2]!, claimed[2]!, archived[2]!,
+        ],
+        claims,
+    };
+}
+
+Deno.test(
+    'partitionInboxItems keeps input order',
+    async () => {
+        const { workOrders, claims } =
+            await reversedWorkOrders();
+        const lists = partitionInboxItems(
+            workOrders, claims, DEMO,
+        );
+        assertEquals(
+            ids(lists.available),
+            ['av-3', 'av-2', 'av-1'],
+        );
+        assertEquals(
+            ids(lists.claimed),
+            ['cl-3', 'cl-2', 'cl-1'],
+        );
+        assertEquals(
+            ids(lists.archivedByMe),
+            ['ar-3', 'ar-2', 'ar-1'],
+        );
+    },
+);
+
+Deno.test(
+    'buildInboxItems still sorts',
+    async () => {
+        const { workOrders, claims } =
+            await reversedWorkOrders();
+        const lists = buildInboxItems(
+            workOrders, claims, DEMO,
+        );
+        assertEquals(
+            ids(lists.available),
+            ['av-1', 'av-2', 'av-3'],
+        );
+        assertEquals(
+            ids(lists.claimed),
+            ['cl-1', 'cl-2', 'cl-3'],
+        );
+        assertEquals(
+            ids(lists.archivedByMe),
+            ['ar-1', 'ar-2', 'ar-3'],
+        );
     },
 );

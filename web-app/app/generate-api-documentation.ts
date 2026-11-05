@@ -608,6 +608,9 @@ const WRITE_EXAMPLES = new Map<string, unknown>([
     ),
 ]);
 
+// Every QUERY takes the same body: the search text.
+const QUERY_EXAMPLE = { q: 'approval' };
+
 export function exampleBodyFor(
     pattern: string,
     verb: string,
@@ -616,6 +619,7 @@ export function exampleBodyFor(
     if (lower === 'get' || lower === 'delete') {
         return 'none';
     }
+    if (lower === 'query') return formatJson(QUERY_EXAMPLE);
     const body = WRITE_EXAMPLES.get(
         lower + ' ' + pattern,
     );
@@ -753,10 +757,20 @@ function successCodes(
     return codes;
 }
 
-function statusCodesFor(
+// A QUERY answers as a GET collection does: its parts,
+// or 204 when nothing matches. A missing Content-Type or
+// a body without a string q is 400, a foreign
+// organization path is 403, and a media type other than
+// JSON is 415.
+const QUERY_STATUS_CODES = [
+    '200', '204', '400', '401', '403', '415',
+] as const;
+
+export function statusCodesFor(
     row: Route,
     verb: HttpVerb,
 ): string[] {
+    if (verb === 'query') return [...QUERY_STATUS_CODES];
     const codes: number[] = [];
     const uri = uriOf(row);
     const selects = verb === 'get' && row.select !== undefined;
@@ -876,10 +890,10 @@ function isMembershipConflict(
 }
 
 // The three lines of one stored pair, on a 2xx. A
-// collection or a versions list answers an envelope:
-// the lines ride each part, not the response. History
-// answers JSON. A grant's wire is the pair it stored,
-// so it carries the same three.
+// collection, a QUERY, or a versions list answers an
+// envelope: the lines ride each part, not the response.
+// History answers JSON. A grant's wire is the pair it
+// stored, so it carries the same three.
 const PAIR_RESPONSE_HEADERS = [
     'last-modified: on 2xx',
     'requester-identity-id: on 2xx',
@@ -1101,7 +1115,7 @@ function viewStorageField(
     verb: string,
     uri: string,
 ): string | undefined {
-    if (verb !== 'get') return undefined;
+    if (verb !== 'get' && verb !== 'query') return undefined;
     if (
         uri === '/organizations/:id/invitations/'
         || uri === '/organizations/:id/memberships/'

@@ -6412,8 +6412,8 @@ layout.
        and input focus
 - [ ] **I17** Type a search term (e.g. "ideas"). PASS: filtered results appear. Select a result — navigates to the corresponding page.
   Pin: tests/command-palette-search.test.ts
-       'searchItems matches title case-insensitively'
-       (decides the filtering a typed term drives);
+       'matchedSearchItems groups in category order'
+       (decides the list a typed term's answer paints);
        exploratory — the live open, the typed search,
        and the result-click navigation
 - [ ] **I18** Press `Escape`. PASS: command palette closes.
@@ -6425,10 +6425,10 @@ layout.
        today
 - [ ] **I20** Open command palette with an empty search field. PASS: results list shows up to 12 items from the combined index, grouped by category (Ideas, Projects, Members, Pages) with category headers — when the dataset is sparse enough for multiple categories to fit in 12 items, multiple groups appear; otherwise a single group is shown. Type a multi-category term (e.g. "a", which matches across Pages / Ideas / Projects / Members) that matches across groups. PASS: results regroup under multiple category headers. Type a term that matches no results. PASS: result list is empty or shows a no-results message.
   Pin: tests/command-palette-search.test.ts
-       'searchItems empty query caps at default
-       count' (an empty query over 50 items returns
-       exactly 12); tests/command-palette-search.test.ts
-       'searchItems no match returns empty';
+       'defaultSearchItems caps at default count' (an
+       empty query over 50 items returns exactly 12);
+       tests/command-palette-search.test.ts
+       'matchedSearchItems no match returns empty';
        exploratory — the live category grouping,
        headers, and the regroup across categories
 

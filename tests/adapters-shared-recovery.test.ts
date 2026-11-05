@@ -651,6 +651,7 @@ Deno.test(
                     }
                     return Promise.resolve([]);
                 },
+                QUERY: unused,
                 PUT: unused,
                 PATCH: unused,
                 DELETE: unused,

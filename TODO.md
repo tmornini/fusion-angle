@@ -1248,6 +1248,28 @@ Off the critical path; each with its oracle.
 
 ## Later work
 
+- Top-bar search over every entity the caller is
+  authorized for. It searches ideas, projects, members,
+  and pages today. Extend it to flows, work orders,
+  record types, records, and whatever else the API
+  serves, through the organization-root QUERY, every
+  field and id. Each new family joins
+  `organizationSearch` (`api/organization-search.ts`)
+  and matches only on what its own GET serves the
+  caller.
+- Phone drag in the workbox. On a touch screen a finger
+  moving over a card scrolls the page and the browser
+  cancels the drag (`pointercancel`).
+  `web-app/app/workbox-inbox-drag.ts` listens for
+  pointer events (`pointerdown` at `:464`, `pointermove`
+  at `:498`, `pointerup` at `:559`, `pointercancel` at
+  `:576`) with no `touch-action` on the cards and no
+  long-press, and nothing scrolls the page while
+  dragging, so a card low in "available to me" cannot
+  reach "claimed by me" at the top. Needs press-and-hold
+  to pick up and edge auto-scroll. (Read from the code;
+  not yet observed on a device.)
+
 - `./bin/measure api` — the API's speed, in one run,
   on the chart. Nothing records how fast the API
   answers: `--profile` counts each page's API requests

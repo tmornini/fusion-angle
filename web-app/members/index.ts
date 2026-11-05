@@ -30,6 +30,7 @@ import {
     getMembers,
     getFormerMembers,
     fillHumanMemberProfile,
+    queryMembershipEntities,
     postHumanMemberCreation,
     postAIMemberCreation,
     postServiceMemberCreation,
@@ -41,6 +42,9 @@ import {
 } from '../../client/index.ts';
 import { sessionContext } from '../app/client.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
+import type { Member } from '../../shared/types.ts';
+import { QUERY_TEXT_MAX_LENGTH } from
+    '../../shared/search-match.ts';
 import {
     ManagedMembersPresenter,
     buildInitialManagedMembersState,
@@ -50,24 +54,34 @@ import {
     humanMemberCreationFromDraft,
     type ManagedMembersState,
     type MemberKindFilter,
+    type MemberSearch,
 } from '../app/presenters/index.ts';
 
 const { signal } = createPageAbort();
 
+// The pause after the last keystroke before the search
+// sends its QUERY.
+const SEARCH_PAUSE_MS = 200;
+
+const NO_SEARCH: MemberSearch = { kind: 'none' };
+
+// The list on screen: its roster, membership, and search
+// move only when a read for them lands.
 let membersState:
     ManagedMembersState | null = null;
 let memberListEl: HTMLElement | null = null;
-// List on screen. A click does not move it until that
-// roster returns, so a search or kind repaint keeps
-// the rows already painted.
-let paintedMembership: ManagedMembersState['membership'] =
-    'accepted';
 // Pressed button. It may lead the list during a read.
 let chosenMembership: ManagedMembersState['membership'] =
     'accepted';
-// Two presses of one membership are different choices.
-// The earlier read must not paint over the later one.
-let membershipChoice = 0;
+// Bumped by every keystroke, press, and bell: a read that
+// finishes under an older number paints nothing.
+let membersSequence = 0;
+// False from a press or bell until a roster read after it
+// lands: until then the painted roster is not the one to
+// narrow, even when a keystroke drops the read in flight.
+let rosterCurrent = true;
+let searchTimer:
+    ReturnType<typeof setTimeout> | undefined;
 
 // Mint-once discipline (Phase 10 Task 2): the Add Member
 // dialog mints its entity id ONCE per dialog session and reuses
@@ -141,6 +155,7 @@ export async function init(): Promise<void> {
                     loaded.members,
                     ctx.identity.id,
                 );
+            rosterCurrent = true;
 
             memberListEl = memberList;
             rerenderMembers();
@@ -149,22 +164,20 @@ export async function init(): Promise<void> {
                 { signal },
             );
 
-            subscribeHumanMemberChanges(
-                () => void refresh(),
-            );
-            subscribeAIMemberChanges(
-                () => void refresh(),
-            );
-            subscribeServiceMemberChanges(
-                () => void refresh(),
-            );
+            subscribeHumanMemberChanges(rereadMembers);
+            subscribeAIMemberChanges(rereadMembers);
+            subscribeServiceMemberChanges(rereadMembers);
+            // Text typed during the load, or a box the
+            // browser restored on history navigation,
+            // searches as if typed.
+            if (searchText() !== '') void showMembers();
         },
     });
 }
 
 async function fetchMemberRoster(
     selected: ManagedMembersState['membership'],
-) {
+): Promise<Member[]> {
     const ctx = sessionContext();
     if (selected === 'removed') {
         return await getFormerMembers(ctx);
@@ -174,32 +187,125 @@ async function fetchMemberRoster(
     );
 }
 
-async function refresh(): Promise<void> {
-    if (!membersState || !memberListEl) return;
-    const selected = paintedMembership;
-    if (
-        membersState.membership !== selected
-        || chosenMembership !== selected
-    ) return;
-    const members = await fetchMemberRoster(selected);
+async function queryMemberSearch(
+    text: string,
+    selected: ManagedMembersState['membership'],
+): Promise<MemberSearch> {
+    const answer = await queryMembershipEntities(
+        sessionContext(), text, selected,
+    );
+    return {
+        kind: 'matched',
+        text,
+        identityIds: answer.map(
+            part => part.body().toValue().identity_id,
+        ),
+    };
+}
+
+function searchText(): string {
+    return $inputRequired('#member-search', document)
+        .value.trim();
+}
+
+function rereadMembers(): void {
+    rosterCurrent = false;
+    void showMembers();
+}
+
+// The pressed button and the box decide the list: that
+// roster, narrowed while the box has text to its QUERY's
+// answer. The painted roster serves while it is current
+// and the button still names it; otherwise it is read
+// again. Each read takes the next sequence number, so only
+// the newest paints. A failed QUERY keeps the list on
+// screen, never the whole roster for a search, though a
+// fresh roster it came with replaces the stale one.
+async function showMembers(): Promise<void> {
+    if (!membersState) return;
+    clearTimeout(searchTimer);
+    membersSequence += 1;
+    const sequence = membersSequence;
+    const selected = chosenMembership;
+    const text = searchText();
+    const reread = !rosterCurrent
+        || membersState.membership !== selected;
+    const [members, search] = await Promise.allSettled([
+        reread
+            ? fetchMemberRoster(selected)
+            : membersState.members,
+        text === ''
+            ? NO_SEARCH
+            : queryMemberSearch(text, selected),
+    ]);
+    const rosterName = selected === 'removed'
+        ? 'former members'
+        : 'members';
+    if (members.status === 'rejected') {
+        log.error(
+            rosterName + ' roster read failed',
+            'members', members.reason,
+        );
+        failMembersRead(
+            sequence,
+            'Failed to load ' + rosterName,
+            members.reason,
+        );
+        return;
+    }
+    if (search.status === 'rejected') {
+        log.error(
+            rosterName + ' search failed',
+            'members', search.reason,
+        );
+        keepFreshRoster(sequence, selected, members.value);
+        failMembersRead(
+            sequence,
+            'Failed to search ' + rosterName,
+            search.reason,
+        );
+        return;
+    }
+    if (!membersState || sequence !== membersSequence) return;
+    membersState = applyManagedMembersSearch(
+        {
+            ...membersState,
+            members: members.value,
+            membership: selected,
+        },
+        search.value,
+    );
+    rosterCurrent = true;
+    rerenderMembers();
+}
+
+// The list stays as painted; the next paint narrows the
+// fresh roster rather than reading it again.
+function keepFreshRoster(
+    sequence: number,
+    selected: ManagedMembersState['membership'],
+    members: Member[],
+): void {
     if (
         !membersState
-        || paintedMembership !== selected
+        || sequence !== membersSequence
         || membersState.membership !== selected
-        || chosenMembership !== selected
     ) return;
-    if (selected === 'accepted') {
-        membersState = buildInitialManagedMembersState(
-            members,
-            membersState.currentMemberId,
-        );
-    } else {
-        membersState = {
-            ...membersState,
-            members,
-        };
-    }
-    rerenderMembers();
+    membersState = { ...membersState, members };
+    rosterCurrent = true;
+}
+
+function failMembersRead(
+    sequence: number,
+    failure: string,
+    err: unknown,
+): void {
+    if (!membersState || sequence !== membersSequence) return;
+    pressMembershipState(membersState.membership);
+    showToast(
+        failure + ': ' + extractErrorMessage(err),
+        'error',
+    );
 }
 
 function rerenderMembers(): void {
@@ -209,11 +315,12 @@ function rerenderMembers(): void {
 }
 
 function initMemberListFilters(): void {
-    $inputRequired('#member-search', document)
-        .addEventListener(
-            'input', onSearchInput,
-            { signal },
-        );
+    const search = $inputRequired('#member-search', document);
+    search.maxLength = QUERY_TEXT_MAX_LENGTH;
+    search.addEventListener(
+        'input', onSearchInput,
+        { signal },
+    );
     $$('[data-kind-chip]', document).forEach(chip => {
         chip.addEventListener(
             'click', onKindChipClick,
@@ -241,8 +348,7 @@ function bindMembershipState(): void {
     for (const selected of MEMBERSHIP_STATES) {
         membershipStateButton(selected)
             ?.addEventListener(
-                'click',
-                e => void onMembershipStateClick(e),
+                'click', onMembershipStateClick,
                 { signal },
             );
     }
@@ -263,9 +369,7 @@ function pressMembershipState(
     }
 }
 
-async function onMembershipStateClick(
-    e: Event,
-): Promise<void> {
+function onMembershipStateClick(e: Event): void {
     if (!membersState || !memberListEl) return;
     const target = e.currentTarget;
     if (!(target instanceof HTMLElement)) return;
@@ -276,53 +380,24 @@ async function onMembershipStateClick(
         selected !== 'accepted'
         && selected !== 'removed'
     ) return;
-    membershipChoice += 1;
-    const choice = membershipChoice;
     pressMembershipState(selected);
-    try {
-        const members = await fetchMemberRoster(
-            selected,
-        );
-        if (
-            !membersState
-            || membershipChoice !== choice
-        ) return;
-        membersState = {
-            ...membersState,
-            members,
-            membership: selected,
-        };
-        paintedMembership = selected;
-        rerenderMembers();
-    } catch (err) {
-        const roster = selected === 'removed'
-            ? 'former members'
-            : 'members';
-        log.error(
-            roster + ' roster read failed',
-            'members', err,
-        );
-        if (
-            !membersState
-            || membershipChoice !== choice
-        ) return;
-        pressMembershipState(paintedMembership);
-        showToast(
-            'Failed to load ' + roster + ': '
-                + extractErrorMessage(err),
-            'error',
-        );
-    }
+    rereadMembers();
 }
 
-function onSearchInput(e: Event): void {
+// An emptied box shows the whole roster at once; text
+// waits for the pause, so one QUERY follows a burst of
+// keystrokes.
+function onSearchInput(): void {
     if (!membersState || !memberListEl) return;
-    const target =
-        e.target as HTMLInputElement;
-    membersState = applyManagedMembersSearch(
-        membersState, target.value,
-    );
-    rerenderMembers();
+    membersSequence += 1;
+    clearTimeout(searchTimer);
+    if (searchText() === '') {
+        void showMembers();
+        return;
+    }
+    searchTimer = setTimeout(() => {
+        void showMembers();
+    }, SEARCH_PAUSE_MS);
 }
 
 function onKindChipClick(e: Event): void {

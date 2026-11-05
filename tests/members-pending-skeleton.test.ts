@@ -25,6 +25,7 @@ const DRAIN_TURNS = 5;
 type ElementStub = {
     innerHTML: string;
     id: string;
+    value: string;
     addEventListener: () => void;
     querySelector: () => null;
     querySelectorAll: () => never[];
@@ -34,6 +35,7 @@ function makeElementStub(selector: string): ElementStub {
     return {
         innerHTML: '',
         id: selector.slice(1),
+        value: '',
         addEventListener: () => {},
         querySelector: () => null,
         querySelectorAll: () => [],

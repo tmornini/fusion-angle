@@ -128,6 +128,9 @@ import {
     generateIdentifier,
 } from '../shared/identifier.ts';
 import { addUtcSeconds } from '../shared/work-order-claims.ts';
+import { withWorkOrderSearch } from './work-order-search.ts';
+import { withMembershipSearch } from './membership-search.ts';
+import { organizationSearch } from './organization-search.ts';
 import {
     collectAttributeReferrers,
     hasReferrers,
@@ -614,6 +617,20 @@ export type SelectHandler = (
     query: RouteQuery | undefined,
 ) => Promise<HeadSelection>;
 
+// A QUERY (RFC 10008) selects as its GET does, then keeps
+// the heads whose served bodies match `text`, best first.
+// The gate has already judged the body's `q` a string, so
+// `text` is trusted here.
+export type MatchingSelectHandler = (
+    adapter: DbAdapter,
+    params: string[],
+    actor: Id,
+    organization: Id | undefined,
+    roles: readonly string[],
+    query: RouteQuery | undefined,
+    text: string,
+) => Promise<HeadSelection>;
+
 // PutHandler, PatchHandler, PostHandler, and DeleteHandler
 // carry a trailing pair: it is undefined for bearer-exempt and
 // not-yet-wired writes (TypeScript cannot prove bearerExempt
@@ -687,6 +704,7 @@ type PostHandler = (
 export interface Route {
     segments: string[];
     select?: SelectHandler;
+    selectMatching?: MatchingSelectHandler;
     put?: PutHandler;
     patch?: PatchHandler;
     delete?: DeleteHandler;
@@ -700,6 +718,7 @@ export function route(
     pattern: string,
     handlers: {
         select?: SelectHandler;
+        selectMatching?: MatchingSelectHandler;
         put?: PutHandler;
         patch?: PatchHandler;
         delete?: DeleteHandler;
@@ -4511,14 +4530,16 @@ export const routes: Route[] = [
     // precedent, so a separate create verb remains here.
     // Member-tier POST — /work-orders carries POST in
     // MEMBER_VERBS.
-    withWorkOrderValueReader(route('organizations/:id/work-orders/', {
-        select: collectionSelect(WORK_ORDERS_WIRING),
-        post: (
-            db, _p, body, actor, messagePair, organization,
-        ) => postWorkOrderCreationOp(
-            db, body, actor, messagePair, organization,
-        ),
-    })),
+    withWorkOrderSearch(withWorkOrderValueReader(route(
+        'organizations/:id/work-orders/', {
+            select: collectionSelect(WORK_ORDERS_WIRING),
+            post: (
+                db, _p, body, actor, messagePair, organization,
+            ) => postWorkOrderCreationOp(
+                db, body, actor, messagePair, organization,
+            ),
+        },
+    ))),
     // work-orders/:id is the fourth family. PUT rides
     // documentPutHandler(WORK_ORDERS_WIRING) — member-tier
     // via MEMBER_VERBS['/work-orders']. Verbs stay
@@ -4982,7 +5003,7 @@ export const routes: Route[] = [
                 },
             );
             if (
-                selection.kind !== 'collection'
+                selection.kind === 'versions'
                 && selection.head.method === 'DELETE'
             ) {
                 throw new RetiredEntityError(
@@ -5026,7 +5047,7 @@ export const routes: Route[] = [
                 },
             );
             if (
-                selection.kind !== 'collection'
+                selection.kind === 'version'
                 && selection.head.method === 'DELETE'
             ) {
                 throw new RetiredEntityError(
@@ -5240,11 +5261,18 @@ export const routes: Route[] = [
     // (postFlowTagDocumentOp shape). WRITE_RESPONSE_SPECS
     // successBody forms the stored bytes via
     // organizationEntityOf; GET serves them as stored.
+    // Its QUERY searches the organization's ideas, projects,
+    // and people through their own collection GETs'
+    // selects; the fence has matched the path to the token.
     route('organizations/:id', {
         select: (db, p) => selectHeadAtPath(
             db, canonicalPath(undefined, '/organizations/'),
             param(p, 0), 'organizations',
         ),
+        selectMatching: organizationSearch({
+            ideas: collectionSelect(IDEAS_WIRING),
+            projects: collectionSelect(PROJECTS_WIRING),
+        }),
         put: putLiveOrganizationDocumentOp,
     }),
     route('organizations/:id/versions/', {
@@ -5290,11 +5318,11 @@ export const routes: Route[] = [
         select: getOrganizationInvitations,
         post: postOrganizationInvitation,
     }),
-    route('organizations/:id/memberships/', {
+    withMembershipSearch(route('organizations/:id/memberships/', {
         query: membershipsViewQueryOf,
         select: getOrganizationInvitations,
         post: postOrganizationMembership,
-    }),
+    })),
     route(
         'organizations/:id/invitations/:membership-id',
         {

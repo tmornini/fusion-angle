@@ -15,6 +15,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
     pairIdOf,
+    partsOf,
 } from './http-fixtures.ts';
 import {
     NIL_IDENTIFIER,
@@ -31,6 +32,8 @@ import type { StatementBind } from
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import type { MessagePairEntity } from '../shared/types.ts';
 import { ledgerFields } from './ledger-row.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 // Parameterized store acceptance. ./test-postgres will
 // invoke this factory; the memory runner keeps ./validate
@@ -40,6 +43,8 @@ const AT = '2026-01-01T00:00:00.000000Z';
 const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const IDEA_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
 const FLOW_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/';
+const WORK_ORDER_PREFIX =
+    '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/';
 
 function req(
     method: string,
@@ -107,10 +112,13 @@ function flowFields(name: string): Record<string, unknown> {
     };
 }
 
-function flowCreate(id: string): Record<string, unknown> {
+function flowCreate(
+    id: string,
+    name: string,
+): Record<string, unknown> {
     return {
         id,
-        flow: flowFields('Acceptance'),
+        flow: flowFields(name),
         projectFlowId: generateIdentifier(),
         projectFlow: {
             project_id: generateIdentifier(),
@@ -459,7 +467,7 @@ export function defineStoreAcceptance(
         const { db, token } = await ready();
         const created = await handleRequest(db, req(
             'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', token
-                , flowCreate('tYhGBKEoBjBYeqTcJWMNVQ'),
+                , flowCreate('tYhGBKEoBjBYeqTcJWMNVQ', 'Acceptance'),
         ));
         assertStrictEquals(created.status, 201);
         const live = await handleRequest(
@@ -733,6 +741,160 @@ export function defineStoreAcceptance(
             await db.messagePairs
                 .getCollectionHeadPairs(EMPTY_HEAD_PATH),
         ]);
+    });
+
+    // The flows' current names reach the match through
+    // their work-order joins, one head batch on each store.
+    Deno.test(name + ': work-orders QUERY ranks by flow name',
+    async () => {
+        const { db, token } = await ready();
+        const ids: string[] = [];
+        for (const flowName of ['Aproval', 'Approval']) {
+            const flowId = generateIdentifier();
+            const flow = await handleRequest(db, req(
+                'POST', FLOW_PREFIX, token,
+                flowCreate(flowId, flowName),
+            ));
+            assertStrictEquals(flow.status, 201);
+            await flow.body?.cancel();
+            const id = generateIdentifier();
+            const node = generateIdentifier();
+            await seedCreatedWorkOrder(db, {
+                organization: ORGANIZATION,
+                id,
+                fields: {
+                    display_id: 'acceptance',
+                    flow_graph: {
+                        name: 'Frozen',
+                        lockTimeout: DEFAULT_LOCK_TIMEOUT,
+                        nodes: [],
+                        edges: [],
+                    },
+                    position: 1,
+                },
+                flowId,
+                births: [node, node],
+                at: AT,
+                token,
+                claim: 'released',
+            });
+            ids.push(id);
+        }
+        const searched = await handleRequest(db, req(
+            'QUERY', WORK_ORDER_PREFIX, token, { q: 'approval' },
+        ));
+        assertStrictEquals(searched.status, 200);
+        assertEquals(
+            (await partsOf<{ id: string }>(searched))
+                .map((part) => part.body().toValue().id),
+            [ids[1], ids[0]],
+        );
+    });
+
+    // The join's names ride the body-indexed seat read and
+    // the PII histories on each store.
+    Deno.test(name + ': memberships QUERY matches by name',
+    async () => {
+        const { db, token } = await ready();
+        const memberships = '/organizations/' + ORGANIZATION
+            + '/memberships/';
+        const ids: string[] = [];
+        for (const personName of ['Kestral Moss', 'Kestrel Moss']) {
+            const id = generateIdentifier();
+            const seated = await handleRequest(db, req(
+                'POST', memberships, token, {
+                    id,
+                    kind: 'human',
+                    membership: { type: 'member', at: AT },
+                    identity: {
+                        title: 'Engineer',
+                        department: 'Product',
+                        strengths: [],
+                        team_dimensions: {},
+                    },
+                    pii: {
+                        name: personName,
+                        email: id.toLowerCase() + '@example.com',
+                        phone: '',
+                        bio: '',
+                    },
+                },
+            ));
+            assertStrictEquals(seated.status, 201);
+            await seated.body?.cancel();
+            ids.push(membershipNameOf(ORGANIZATION, id));
+        }
+        const searched = await handleRequest(db, req(
+            'QUERY', memberships, token, { q: 'kestrel' },
+        ));
+        assertStrictEquals(searched.status, 200);
+        assertEquals(
+            (await partsOf<{ id: string }>(searched))
+                .map((part) => part.body().toValue().id),
+            [ids[1], ids[0]],
+        );
+    });
+
+    // Ideas, projects, and the seats' joined names, each
+    // family read on each store, answer grouped by family.
+    Deno.test(name + ': organization QUERY groups by family',
+    async () => {
+        const { db, token } = await ready();
+        const root = '/organizations/' + ORGANIZATION;
+        const member = generateIdentifier();
+        const seated = await handleRequest(db, req(
+            'POST', root + '/memberships/', token, {
+                id: member,
+                kind: 'human',
+                membership: { type: 'member', at: AT },
+                identity: {
+                    title: 'Engineer',
+                    department: 'Product',
+                    strengths: [],
+                    team_dimensions: {},
+                },
+                pii: {
+                    name: 'Kestrel Moss',
+                    email: 'moss@example.com',
+                    phone: '',
+                    bio: '',
+                },
+            },
+        ));
+        assertStrictEquals(seated.status, 201);
+        await seated.body?.cancel();
+        const project = generateIdentifier();
+        const projected = await handleRequest(db, req(
+            'PUT', root + '/projects/' + project, token, {
+                title: 'Kestrel rollout',
+                description: 'd',
+                progress: 0,
+                start_date: '2026-01-01',
+                target_end_date: '2026-06-01',
+                estimated_cost: 1000,
+                actual_cost: 0,
+                position: 1,
+                state: 'submitted',
+            },
+        ));
+        assertStrictEquals(projected.status, 201);
+        await projected.body?.cancel();
+        const idea = generateIdentifier();
+        const ideated = await handleRequest(db, req(
+            'PUT', IDEA_PREFIX + idea, token,
+            ideaDocument('Kestrel plan'),
+        ));
+        assertStrictEquals(ideated.status, 201);
+        await ideated.body?.cancel();
+        const searched = await handleRequest(db, req(
+            'QUERY', root, token, { q: 'kestrel' },
+        ));
+        assertStrictEquals(searched.status, 200);
+        assertEquals(
+            (await partsOf<{ id: string }>(searched))
+                .map((part) => part.body().toValue().id),
+            [idea, project, membershipNameOf(ORGANIZATION, member)],
+        );
     });
 
     Deno.test(name + ': an empty head batch answers no'

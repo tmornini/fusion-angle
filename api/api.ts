@@ -67,8 +67,10 @@ import {
     HTTP_FORBIDDEN,
     HTTP_PRECONDITION_FAILED,
     HTTP_PRECONDITION_REQUIRED,
+    HTTP_UNSUPPORTED_MEDIA_TYPE,
     errorJson,
 } from '../shared/http-errors.ts';
+import { QUERY_TEXT_MAX_LENGTH } from '../shared/search-match.ts';
 import {
     AUTHENTICATION_ROUTES,
     authenticateRequest,
@@ -227,6 +229,31 @@ function writeResponseSpecFor(
 function isWriteMethod(method: string): method is WriteMethod {
     return method === 'PUT' || method === 'POST'
         || method === 'PATCH' || method === 'DELETE';
+}
+
+// RFC 10008 §2: a QUERY's media type defines its query, so
+// the gate fails one that is missing (400) or that is not
+// the JSON the gate parses (415).
+function queryMediaTypeRefusal(
+    headers: Headers,
+    pathname: string,
+): Response | undefined {
+    const field = headers.get('content-type');
+    if (field === null) {
+        return errorJson(
+            'QUERY ' + pathname + ' requires a Content-Type',
+            HTTP_BAD_REQUEST,
+        );
+    }
+    const mediaType = field.split(';', 1)[0]!.trim()
+        .toLowerCase();
+    if (mediaType !== 'application/json') {
+        return errorJson(
+            'QUERY ' + pathname + ' takes application/json',
+            HTTP_UNSUPPORTED_MEDIA_TYPE,
+        );
+    }
+    return undefined;
 }
 
 // Presence and form only (§2): the gate never reads a head
@@ -758,8 +785,13 @@ async function dispatched(
         }
     }
 
+    // A QUERY reads as its GET does, so the URL's query
+    // string means what it means on the GET.
     let viewQuery: ViewQuery | undefined;
-    if (method === 'GET' && matched.query !== undefined) {
+    if (
+        (method === 'GET' || method === 'QUERY')
+        && matched.query !== undefined
+    ) {
         const judged = matched.query(ctx.search);
         if (judged.kind === 'refused') {
             return Response.json(
@@ -768,6 +800,13 @@ async function dispatched(
             );
         }
         viewQuery = judged;
+    }
+
+    if (method === 'QUERY') {
+        const refused = queryMediaTypeRefusal(
+            request.headers, pathname,
+        );
+        if (refused !== undefined) return refused;
     }
 
     // Parse the request body when the method
@@ -780,6 +819,7 @@ async function dispatched(
         method === 'PUT'
         || method === 'POST'
         || method === 'PATCH'
+        || method === 'QUERY'
     ) {
         const parse = parseObjectBody(ctx.bodyBytes);
         if (!parse.ok) {
@@ -999,6 +1039,53 @@ async function dispatched(
                     {
                         error:
                             'Method GET not'
+                            + ' allowed on '
+                            + pathname,
+                    },
+                    { status: HTTP_METHOD_NOT_ALLOWED },
+                );
+            }
+            case 'QUERY': {
+                // The search text (RFC 10008), judged once
+                // here: every matching selector trusts it.
+                const text = body?.['q'];
+                if (typeof text !== 'string') {
+                    return Response.json(
+                        {
+                            error: 'QUERY body requires'
+                                + ' a string q',
+                        },
+                        { status: HTTP_BAD_REQUEST },
+                    );
+                }
+                if (text.length > QUERY_TEXT_MAX_LENGTH) {
+                    return Response.json(
+                        {
+                            error: 'QUERY body requires'
+                                + ' a string q of at most '
+                                + QUERY_TEXT_MAX_LENGTH
+                                + ' characters',
+                        },
+                        { status: HTTP_BAD_REQUEST },
+                    );
+                }
+                if (matched.selectMatching !== undefined) {
+                    return servedSelection(
+                        await matched.selectMatching(
+                            effective, params, actor,
+                            organization, roles,
+                            viewQuery, text,
+                        ),
+                        {
+                            date: httpDateOf(nowUtc()),
+                            requestId: ctx.requestId,
+                        },
+                    );
+                }
+                return Response.json(
+                    {
+                        error:
+                            'Method QUERY not'
                             + ' allowed on '
                             + pathname,
                     },

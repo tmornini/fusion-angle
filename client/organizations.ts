@@ -1,9 +1,15 @@
 import type {
+    IdeaEntity,
+    MembershipReadEntity,
     OrganizationEntity,
+    ProjectEntity,
 } from '../shared/types.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
-import type { RequestContext } from './request-context.ts';
+import {
+    activeOrganization,
+    type RequestContext,
+} from './request-context.ts';
 import { compareIdentifiers } from '../shared/identifier.ts';
 
 // The organization verbs — RequestContext first, HTTP-verb
@@ -44,4 +50,47 @@ export function putOrganization(
         body,
         [held],
     );
+}
+
+// The organization's ideas, projects, and people matching
+// `text`, best match first within each.
+export interface OrganizationMatches {
+    readonly ideas: readonly HttpMessage<IdeaEntity>[];
+    readonly projects: readonly HttpMessage<ProjectEntity>[];
+    readonly members:
+        readonly HttpMessage<MembershipReadEntity>[];
+}
+
+// Each part names its document in its content-location,
+// /organizations/:id/<family>/:id, and the family sorts it.
+// A family this client does not know is a server it does
+// not know, so the search fails rather than drop the part.
+export async function queryOrganization(
+    ctx: RequestContext,
+    text: string,
+): Promise<OrganizationMatches> {
+    const parts = await ctx.QUERY(
+        'organizations/' + activeOrganization(ctx), { q: text },
+    );
+    const ideas: HttpMessage<IdeaEntity>[] = [];
+    const projects: HttpMessage<ProjectEntity>[] = [];
+    const members: HttpMessage<MembershipReadEntity>[] = [];
+    for (const part of parts) {
+        const location = part.query('header.content-location')
+            .toText();
+        const family = location.split('/')[3];
+        if (family === 'ideas') {
+            ideas.push(part as HttpMessage<IdeaEntity>);
+        } else if (family === 'projects') {
+            projects.push(part as HttpMessage<ProjectEntity>);
+        } else if (family === 'invitations') {
+            members.push(part as HttpMessage<MembershipReadEntity>);
+        } else {
+            throw new Error(
+                'an organization search part names an unknown'
+                    + ' family: ' + location,
+            );
+        }
+    }
+    return { ideas, projects, members };
 }

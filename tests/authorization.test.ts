@@ -84,6 +84,20 @@ Deno.test('admin is permitted on every verb at root', () => {
     }
 });
 
+Deno.test('admin and member may QUERY the work orders', () => {
+    for (const role of ['admin', 'member']) {
+        assertStrictEquals(
+            isPermitted(
+                'QUERY',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg'
+                    + '/work-orders',
+                [role],
+            ),
+            true,
+        );
+    }
+});
+
 Deno.test('deny-by-default: no held role is forbidden', () => {
     assertStrictEquals(
         isPermitted(

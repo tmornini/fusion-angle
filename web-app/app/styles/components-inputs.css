@@ -58,6 +58,8 @@
 .input-error { border-color: hsl(var(--destructive)); }
 .input-error:focus { box-shadow: 0 0 0 2px hsl(var(--destructive) / 0.2); }
 .search-wrapper-md { max-width: 20rem; }
+/* Compound: layout.css's .search-wrapper cascades later. */
+.search-wrapper.search-wrapper-wide { max-width: 30rem; }
 
 .dialog-wide { max-width: 36rem; }
 

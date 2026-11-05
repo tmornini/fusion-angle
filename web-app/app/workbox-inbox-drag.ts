@@ -6,6 +6,7 @@ import {
 } from './drag-reorder-positions.ts';
 import {
     WorkboxInboxPresenter,
+    type InboxFilter,
     type InboxListKind,
 } from './presenters/workbox-inbox.ts';
 import {
@@ -91,10 +92,23 @@ export function inboxListKindFromHash(
         : 'claimed';
 }
 
+// How the claimed list is ordered: by the caller's drags,
+// or by a QUERY's best match, whose visible positions are
+// out of order and a subset of the claimed order.
+export type InboxOrder =
+    | { readonly kind: 'dragged' }
+    | {
+        readonly kind: 'matched',
+        // Every position the caller holds claimed,
+        // ascending.
+        readonly claimedPositions: readonly number[],
+    };
+
 export function classifyInboxDrop(
     source: InboxListKind,
     destination: InboxDropDestination,
     rightListKind: 'claimed' | 'archivedByMe',
+    order: InboxOrder['kind'],
 ): InboxDropAction {
     if (rightListKind === 'archivedByMe') {
         return 'none';
@@ -122,7 +136,7 @@ export function classifyInboxDrop(
         source === 'claimed'
         && destination === 'claimed'
     ) {
-        return 'reorder';
+        return order === 'matched' ? 'none' : 'reorder';
     }
     return 'none';
 }
@@ -170,11 +184,12 @@ function stripEmptyCopy(list: HTMLElement): void {
 function paintEmptyIfNoCards(
     list: HTMLElement,
     kind: InboxListKind,
+    filter: InboxFilter,
 ): void {
     if (list.querySelector('[data-work-order-card]')) {
         return;
     }
-    new WorkboxInboxPresenter([], kind)
+    new WorkboxInboxPresenter([], kind, filter)
         .renderList(list);
 }
 
@@ -203,6 +218,7 @@ export function paintInboxDrop(
         available: HTMLElement;
         claimed: HTMLElement;
     },
+    filter: InboxFilter,
 ): void {
     if (transfer.kind === 'none') {
         return;
@@ -211,7 +227,7 @@ export function paintInboxDrop(
         stripEmptyCopy(lists.available);
         lists.available.appendChild(card);
         paintEmptyIfNoCards(
-            lists.claimed, 'claimed',
+            lists.claimed, 'claimed', filter,
         );
         return;
     }
@@ -221,7 +237,7 @@ export function paintInboxDrop(
     );
     if (transfer.kind === 'claim') {
         paintEmptyIfNoCards(
-            lists.available, 'available',
+            lists.available, 'available', filter,
         );
     }
 }
@@ -271,6 +287,7 @@ export function initInboxDrag(
         idAttribute: string;
         rightListKind: () =>
             'claimed' | 'archivedByMe';
+        order: () => InboxOrder;
         onDrop: (
             id: string,
             transfer: InboxTransfer,
@@ -410,14 +427,28 @@ export function initInboxDrag(
         y: number,
         idx: number | null,
     ): InboxTransfer {
+        const order = options.order();
         const action = classifyInboxDrop(
             source, dest, options.rightListKind(),
+            order.kind,
         );
         if (action === 'release') {
             return { kind: 'release' };
         }
         if (action === 'none') {
             return { kind: 'none' };
+        }
+        if (
+            action === 'claim'
+            && order.kind === 'matched'
+        ) {
+            return {
+                kind: 'claim',
+                position: computeNewPosition(
+                    order.claimedPositions,
+                    order.claimedPositions.length,
+                ),
+            };
         }
         const slot = idx ?? dropSlot(y, null);
         const position = computeNewPosition(
@@ -482,7 +513,10 @@ export function initInboxDrag(
         if (!drag.moved) return;
         drag.card.classList.add('inbox-dragging');
         const dest = listKindAt(e.clientX, e.clientY);
+        // A matched list has no slot to drop into: a
+        // claim takes the bottom of the claimed order.
         const newIdx = inboxShowsDropIndicator(dest)
+            && options.order().kind === 'dragged'
             ? dropSlot(e.clientY, drag.idx)
             : null;
         const follow = !(

@@ -3289,6 +3289,72 @@ export const API_DOC_ROOMS:
             '412',
         ],
     },
+    {
+        hash: 'query/organizations/id',
+        verb: 'QUERY',
+        uri: '/api/organizations/:id',
+        body: '{\n  "q": "approval"\n}',
+        headers:
+        [
+            'Authorization: Bearer …',
+            'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [],
+        statuses:
+        [
+            '200',
+            '204',
+            '400',
+            '401',
+            '403',
+            '415',
+        ],
+    },
+    {
+        hash: 'query/organizations/id/memberships',
+        verb: 'QUERY',
+        uri: '/api/organizations/:id/memberships/',
+        body: '{\n  "q": "approval"\n}',
+        headers:
+        [
+            'Authorization: Bearer …',
+            'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [],
+        statuses:
+        [
+            '200',
+            '204',
+            '400',
+            '401',
+            '403',
+            '415',
+        ],
+    },
+    {
+        hash: 'query/organizations/id/work-orders',
+        verb: 'QUERY',
+        uri: '/api/organizations/:id/work-orders/',
+        body: '{\n  "q": "approval"\n}',
+        headers:
+        [
+            'Authorization: Bearer …',
+            'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [],
+        statuses:
+        [
+            '200',
+            '204',
+            '400',
+            '401',
+            '403',
+            '415',
+        ],
+    },
 ];
 
 export const API_DOC_STATUSES:
@@ -3349,6 +3415,11 @@ export const API_DOC_STATUSES:
         hash: 'statuses/412',
         code: '412',
         body: '{\n  "error": "precondition failed"\n}',
+    },
+    {
+        hash: 'statuses/415',
+        code: '415',
+        body: '{\n  "error": "QUERY /path takes application/json"\n}',
     },
     {
         hash: 'statuses/422',

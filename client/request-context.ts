@@ -146,6 +146,10 @@ export interface RequestContext {
     readonly session: ClientSession;
     GET<T>(resource: string): Promise<HttpMessage<T>>;
     GETCollection<T>(resource: string): Promise<HttpMessage<T>[]>;
+    QUERY<T>(
+        resource: string,
+        body: Record<string, unknown>,
+    ): Promise<HttpMessage<T>[]>;
     PUT<T>(
         resource: string,
         body: Record<string, unknown>,
@@ -265,6 +269,17 @@ function openRequestContext(
             return run<HttpMessage<T>[]>(
                 tok => verbs.GETCollection<T>(
                     resource, tok, headers,
+                ));
+        },
+        QUERY: <T>(
+            resource: string,
+            body: Record<string, unknown>,
+        ) => {
+            core.recordRequest('QUERY', resource);
+            const headers = writeHeaders();
+            return run<HttpMessage<T>[]>(
+                tok => verbs.QUERY<T>(
+                    resource, body, tok, headers,
                 ));
         },
         PUT: <T>(

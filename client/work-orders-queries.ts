@@ -286,6 +286,24 @@ export async function getWorkOrders(
     return (await getWorkOrderEntities(ctx)).map(toWorkOrder);
 }
 
+// The work orders matching `text`, best match first.
+export async function queryWorkOrderEntities(
+    ctx: RequestContext,
+    text: string,
+): Promise<HttpMessage<WorkOrderEntity>[]> {
+    return await ctx.QUERY<WorkOrderEntity>(
+        organizationCollection(ctx, 'work-orders'), { q: text },
+    );
+}
+
+export async function queryWorkOrders(
+    ctx: RequestContext,
+    text: string,
+): Promise<WorkOrder[]> {
+    return (await queryWorkOrderEntities(ctx, text))
+        .map(toWorkOrder);
+}
+
 export async function getFlowWorkOrderEntities(
     ctx: RequestContext,
     flowId: string,

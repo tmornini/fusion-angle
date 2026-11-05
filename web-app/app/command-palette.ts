@@ -24,17 +24,29 @@ import {
     getProjects,
     getHumanMembers,
     featuredHumanMembers,
+    ideaOf,
+    projectOf,
+    queryOrganization,
     subscribeIdeaChanges,
     subscribeProjectChanges,
     subscribeHumanMemberChanges,
-    type IdeaWithSubmitter,
     MEMBER_WITHOUT_PII_NAME,
+    type OrganizationMatches,
 } from '../../client/index.ts';
 import { getClient, sessionContext } from './client.ts';
 import {
+    Idea,
     Project,
     HumanMember,
+    ideaIsVisible,
+    type MembershipReadEntity,
 } from '../../shared/types.ts';
+import type { HttpMessage } from
+    '../../shared/http-message/http-message.ts';
+import {
+    QUERY_TEXT_MAX_LENGTH,
+    rankedBySearch,
+} from '../../shared/search-match.ts';
 import {
     PAGE_REGISTRY,
 } from './page-registry.ts';
@@ -53,22 +65,21 @@ export interface SearchItem {
         | 'pages';
     icon: SafeHtml;
     href: string;
-    keywords: string;
 }
 
-interface PalettePageEntry {
-    title: string;
-    icon: SafeHtml;
-    href: string;
-    keywords: string;
+// A page matches on its keywords as well as its title, in
+// the browser; nothing else the palette lists matches here.
+export interface PageSearchEntry {
+    readonly item: SearchItem;
+    readonly keywords: string;
 }
 
 const DEBOUNCE_MS = 100;
 const PALETTE_DEFAULT_RESULT_COUNT = 12;
 
 function buildPageList(
-): PalettePageEntry[] {
-    const result: PalettePageEntry[] = [];
+): PageSearchEntry[] {
+    const result: PageSearchEntry[] = [];
     for (
         const [name, entry]
         of Object.entries(PAGE_REGISTRY)
@@ -78,22 +89,27 @@ function buildPageList(
         if (!entry.keywords) continue;
         const iconFn = entry.icon;
         result.push({
-            title: entry.title,
-            icon: iconFn
-                ? iconFn(
-                    ICON_SIZE.base, '',
-                )
-                : iconSearch(
-                    ICON_SIZE.base, '',
-                ),
-            href: buildPageUrl(name),
+            item: {
+                id: 'page-' + result.length,
+                title: entry.title,
+                meta: 'Page',
+                category: 'pages',
+                icon: iconFn
+                    ? iconFn(
+                        ICON_SIZE.base, '',
+                    )
+                    : iconSearch(
+                        ICON_SIZE.base, '',
+                    ),
+                href: buildPageUrl(name),
+            },
             keywords: entry.keywords,
         });
     }
     return result;
 }
 
-const pages: PalettePageEntry[] =
+const pages: PageSearchEntry[] =
     buildPageList();
 
 interface CommandPaletteState {
@@ -102,6 +118,7 @@ interface CommandPaletteState {
     allItems: SearchItem[];
     filteredItems: SearchItem[];
     isDataLoaded: boolean;
+    searchSequence: number;
     debounceTimeoutId:
         ReturnType<typeof setTimeout>
         | null;
@@ -173,22 +190,20 @@ function isCommandPaletteHotkey(
 }
 
 export function ideaToSearchItem(
-    tuple: IdeaWithSubmitter,
+    idea: Idea,
 ): SearchItem {
     return {
-        id: 'idea-' + tuple.idea.idForLink(),
-        title: tuple.idea.titleText(),
-        meta: tuple.idea.stateValue()
+        id: 'idea-' + idea.idForLink(),
+        title: idea.titleText(),
+        meta: idea.stateValue()
             .replace(/-/g, ' '),
         category: 'ideas',
         icon: iconLightbulb(
             ICON_SIZE.base, '',
         ),
         href: buildPageUrl('idea-convert', {
-            ideaId: tuple.idea.idForLink(),
+            ideaId: idea.idForLink(),
         }),
-        keywords: tuple.submitterName + ' '
-            + tuple.idea.stateValue(),
     };
 }
 
@@ -210,7 +225,6 @@ export function projectToSearchItem(
         href: buildPageUrl('project-detail', {
             projectId: project.idForLink(),
         }),
-        keywords: project.stateValue(),
     };
 }
 
@@ -222,14 +236,8 @@ export function humanMemberToSearchItem(
     const title = pii.erased
         ? MEMBER_WITHOUT_PII_NAME
         : pii.name;
-    const emailKeyword = pii.erased
-        ? ''
-        : ' ' + pii.email;
     const role = profile.present
         ? profile.title + ' · ' + profile.department
-        : '';
-    const roleKeywords = profile.present
-        ? profile.title + ' ' + profile.department
         : '';
     return {
         id: 'member-' + member.idForLink(),
@@ -240,48 +248,58 @@ export function humanMemberToSearchItem(
             ICON_SIZE.base, '',
         ),
         href: buildPageUrl('members'),
-        keywords: roleKeywords + emailKeyword,
     };
 }
 
-function pageToSearchItem(
-    page: PalettePageEntry,
-    index: number,
+// The membership carries no profile, so a matched member
+// shows no role; the server still matched on it.
+export function membershipToSearchItem(
+    message: HttpMessage<MembershipReadEntity>,
 ): SearchItem {
+    const membership = message.body().toValue();
     return {
-        id: 'page-' + index,
-        title: page.title,
-        meta: 'Page',
-        category: 'pages',
-        icon: page.icon,
-        href: page.href,
-        keywords: page.keywords,
+        id: 'member-' + membership.identity_id,
+        title: membership.invitee_name === undefined
+            ? MEMBER_WITHOUT_PII_NAME
+            : membership.invitee_name,
+        meta: '',
+        category: 'members',
+        icon: iconPerson(
+            ICON_SIZE.base, '',
+        ),
+        href: buildPageUrl('members'),
     };
 }
 
-// Case-insensitive substring match across
-// title/meta/keywords. When query is empty,
-// returns the first PALETTE_DEFAULT_RESULT_COUNT
-// items so the panel always shows something.
-export function searchItems(
-    items: readonly SearchItem[],
+// An empty query searches nothing: the panel shows the
+// head of the index so it always shows something.
+export function defaultSearchItems(
+    index: readonly SearchItem[],
+): SearchItem[] {
+    return index.slice(0, PALETTE_DEFAULT_RESULT_COUNT);
+}
+
+// The server ranked each family; the pages rank here. The
+// answer serves archived ideas, which the index's getIdeas
+// hides, so ideaIsVisible hides them here too.
+export function matchedSearchItems(
+    matches: OrganizationMatches,
+    pages: readonly PageSearchEntry[],
     query: string,
 ): SearchItem[] {
-    if (!query.trim()) {
-        return items.slice(
-            0, PALETTE_DEFAULT_RESULT_COUNT,
-        );
-    }
-    const needle = query.toLowerCase();
-    return items.filter(
-        item =>
-            item.title.toLowerCase()
-                .includes(needle)
-            || item.meta.toLowerCase()
-                .includes(needle)
-            || item.keywords.toLowerCase()
-                .includes(needle),
-    );
+    return [
+        ...matches.ideas
+            .map(ideaOf)
+            .filter(idea => ideaIsVisible(idea.stateValue()))
+            .map(ideaToSearchItem),
+        ...matches.projects
+            .map(projectOf)
+            .map(projectToSearchItem),
+        ...matches.members.map(membershipToSearchItem),
+        ...rankedBySearch(pages, query, page =>
+            [page.item.title, page.keywords])
+            .map(page => page.item),
+    ];
 }
 
 export function initCommandPalette(
@@ -292,6 +310,7 @@ export function initCommandPalette(
         allItems: [],
         filteredItems: [],
         isDataLoaded: false,
+        searchSequence: 0,
         debounceTimeoutId: null,
         backdrop: null,
         dialog: null,
@@ -321,14 +340,15 @@ export function initCommandPalette(
             featuredHumanMembers(humans);
 
         state.allItems = [
-            ...ideas.map(ideaToSearchItem),
+            ...ideas.map(tuple =>
+                ideaToSearchItem(tuple.idea)),
             ...projects.map(
                 projectToSearchItem,
             ),
             ...featured.map(
                 humanMemberToSearchItem,
             ),
-            ...pages.map(pageToSearchItem),
+            ...pages.map(page => page.item),
         ];
         state.isDataLoaded = true;
     }
@@ -349,12 +369,11 @@ class="command-palette-empty"
 
     function mutateResults(
         query: string,
+        items: SearchItem[],
     ): void {
         if (!state.list) return;
 
-        state.filteredItems = searchItems(
-            state.allItems, query,
-        );
+        state.filteredItems = items;
         state.activeIndex = 0;
 
         if (
@@ -524,20 +543,46 @@ posIndex === state.activeIndex
         putLocation(item.href);
     }
 
-    function loadIndexAndRender(): void {
+    // Every render reads the input's text as it is now and
+    // takes a new sequence number; an answer for any other
+    // number is for text since replaced, and drops.
+    function searchAndRender(): void {
         if (!state.input) return;
-        const query = state.input.value;
-        getSearchIndex().then(
-            () => mutateResults(query),
+        state.searchSequence += 1;
+        const sequence = state.searchSequence;
+        const query = state.input.value.trim();
+        const answer: Promise<SearchItem[]> = query === ''
+            ? getSearchIndex().then(() =>
+                defaultSearchItems(state.allItems))
+            : searchOrganization(query);
+        answer.then(
+            items => {
+                if (sequence !== state.searchSequence) return;
+                mutateResults(query, items);
+            },
             err => {
+                if (sequence !== state.searchSequence) return;
                 log.warn(
-                    'search index load failed',
+                    'search load failed',
                     'palette',
                     err,
                 );
                 mutateLoadError();
             },
         );
+    }
+
+    // An unscoped session has no organization to search and
+    // builds no index, so it lists nothing, as the empty
+    // query's index does.
+    async function searchOrganization(
+        query: string,
+    ): Promise<SearchItem[]> {
+        if (!getClient().sessionIsOrganizationScoped()) return [];
+        const matches = await queryOrganization(
+            sessionContext(), query,
+        );
+        return matchedSearchItems(matches, pages, query);
     }
 
     function open(): void {
@@ -560,12 +605,19 @@ posIndex === state.activeIndex
             state.input.focus();
         }
 
-        loadIndexAndRender();
+        searchAndRender();
     }
 
     function close(): void {
         if (!state.isOpen) return;
         state.isOpen = false;
+        // A closed palette searches nothing: no pending
+        // pause fires, and no answer in flight paints.
+        if (state.debounceTimeoutId) {
+            clearTimeout(state.debounceTimeoutId);
+            state.debounceTimeoutId = null;
+        }
+        state.searchSequence += 1;
         state.backdrop
             ?.classList.add('hidden');
         state.dialog
@@ -624,6 +676,7 @@ posIndex === state.activeIndex
                 + ' members, pages…'
             }"
             type="text"
+            maxlength="${QUERY_TEXT_MAX_LENGTH}"
             role="combobox"
             aria-expanded="true"
             aria-controls="${
@@ -698,14 +751,12 @@ posIndex === state.activeIndex
             state.dialog,
         );
 
-        function applyDebouncedQuery(): void {
-            if (!state.input) return;
-            mutateResults(state.input.value);
-        }
-
         let scheduleCount = 0;
         let burstStart = 0;
         state.input?.addEventListener('input', () => {
+            // The text changed, so no answer in flight is
+            // for it.
+            state.searchSequence += 1;
             if (state.debounceTimeoutId) {
                 clearTimeout(
                     state.debounceTimeoutId,
@@ -727,7 +778,7 @@ posIndex === state.activeIndex
                             : 0;
                     const callStart =
                         performance.now();
-                    applyDebouncedQuery();
+                    searchAndRender();
                     const callDurMs =
                         performance.now() - callStart;
                     log.info(
@@ -931,7 +982,7 @@ posIndex === state.activeIndex
     function invalidateSearchIndex(): void {
         state.isDataLoaded = false;
         state.allItems = [];
-        if (state.isOpen) loadIndexAndRender();
+        if (state.isOpen) searchAndRender();
     }
     subscribeIdeaChanges(invalidateSearchIndex);
     subscribeProjectChanges(invalidateSearchIndex);
