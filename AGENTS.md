@@ -304,7 +304,9 @@ skill, the patterns load via the prompt.
 
 Subagents work in the dispatching agent's worktree and never
 create their own — never pass the Agent tool `isolation`.
-Subagents never run `./deploy --render`.
+Subagents never run `./deploy --render`. Merging is the
+operator's to initiate, and the master session's to run
+when asked.
 
 ## Where things live
 
