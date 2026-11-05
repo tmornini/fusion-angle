@@ -51,8 +51,8 @@ no `node` binary on `PATH` at all.
 require a clean working directory.
 Each commit on a development branch runs
 `./test validate --syntax`. Squash that branch to one
-commit per feature, run `./test validate`, then merge
-`--no-ff`. Run `./test validate browser` before a
+commit per feature and run `./test validate` before the
+operator's merge. Run `./test validate browser` before a
 build, a deploy, or a walk.
 
 `./bin/serve` needs `POSTGRES_URL` and
@@ -170,7 +170,7 @@ runs it after `./test postgres`.
 
 Three layers verify this product. Layer 1 is
 `./test validate`, run after the branch is squashed to
-one commit per feature and before the `--no-ff` merge.
+one commit per feature and before the operator's merge.
 Each commit before that squash runs
 `./test validate --syntax`, which is `deno check
 --frozen` and does not write the validate stamp.
