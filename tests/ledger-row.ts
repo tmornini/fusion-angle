@@ -17,7 +17,7 @@ import {
 
 const ZERO_SALT = '00'.repeat(16);
 
-export type LedgerSeed = {
+type LedgerSeed = {
     readonly id: string,
     readonly path: string,
     readonly name: string,
