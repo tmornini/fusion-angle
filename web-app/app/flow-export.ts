@@ -29,10 +29,11 @@ import {
     asBoolean,
 } from '../../shared/json-assert.ts';
 import {
+    flowGraphOf,
     getFlowWithGraph,
     getProjectFlowEntities,
+    type FlowGraph,
 } from '../../client/flow-queries.ts';
-import type { FlowGraph } from '../../client/flow-queries.ts';
 import type { HttpMessage } from
     '../../shared/http-message/http-message.ts';
 import type { RequestContext } from '../../client/request-context.ts';
@@ -253,33 +254,23 @@ async function getFlowBackupData(
 }
 
 function buildBackupJson(
-    flow: FlowWithGraph,
+    graph: FlowGraph,
     projectId: string | undefined,
 ): string {
-    const graph = asStoredGraph(
-        flow.graph, 'flow.graph',
-    );
     const backup: Backup = {
         exportedAt: nowUtc(),
         projectId,
         flow: {
-            id: flow.id,
-            name: flow.name,
-            isLocked: asBoolean(
-                flow.is_locked,
-                'is_locked',
-            ),
-            isAutoLayout: asBoolean(
-                flow.is_auto_layout,
-                'is_auto_layout',
-            ),
-            isAutoFit: asBoolean(
-                flow.is_auto_fit,
-                'is_auto_fit',
-            ),
-            lockTimeout:
-                flow.lock_timeout,
-            graph,
+            id: graph.id,
+            name: graph.name,
+            isLocked: graph.isLocked,
+            isAutoLayout: graph.isAutoLayout,
+            isAutoFit: graph.isAutoFit,
+            lockTimeout: graph.lockTimeout,
+            graph: {
+                nodes: graph.nodes,
+                edges: graph.edges,
+            },
         },
     };
     // The backup file speaks the storage tongue —
@@ -304,45 +295,20 @@ export async function getFlowZip(
 }> {
     const { flow: read, projectId } =
         await getFlowBackupData(ctx, flowId);
-    const flow = read.body().toValue();
-
-    const graph = asStoredGraph(
-        flow.graph, 'flow.graph',
-    );
-
-    const mermaidGraph: FlowGraph = {
-        message: read,
-        id: flow.id,
-        name: flow.name,
-        isLocked: asBoolean(
-            flow.is_locked,
-            'is_locked',
-        ),
-        isAutoLayout: asBoolean(
-            flow.is_auto_layout,
-            'is_auto_layout',
-        ),
-        isAutoFit: asBoolean(
-            flow.is_auto_fit,
-            'is_auto_fit',
-        ),
-        lockTimeout: flow.lock_timeout,
-        nodes: graph.nodes,
-        edges: graph.edges,
-    };
+    const graph = flowGraphOf(read);
 
     const enc = new TextEncoder();
     const mmd = enc.encode(
-        generateMermaid(mermaidGraph),
+        generateMermaid(graph),
     );
     const json = enc.encode(
-        buildBackupJson(flow, projectId),
+        buildBackupJson(graph, projectId),
     );
     const txt = enc.encode(
         buildFlowTxt(flowId),
     );
     const sidecar = enc.encode(
-        buildSidecar(mermaidGraph),
+        buildSidecar(graph),
     );
 
     const data = buildZip([
@@ -352,7 +318,7 @@ export async function getFlowZip(
         { name: 'sidecar.json', data: sidecar },
     ]);
 
-    const safeName = flow.name
+    const safeName = graph.name
         .replaceAll(
             /[^a-zA-Z0-9_-]/g, '-',
         )
