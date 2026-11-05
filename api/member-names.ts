@@ -54,12 +54,14 @@ export async function memberNamesOf(
     ]);
 }
 
-function servedBodiesOf(
+// The bodies a collection GET serves: its live heads',
+// each through the selection's reader.
+export function servedBodiesOf(
     selection: HeadSelection,
 ): Record<string, unknown>[] {
     if (selection.kind !== 'collection') {
         throw new Error(
-            'member names read a collection, not a '
+            'served bodies read a collection, not a '
                 + selection.kind,
         );
     }

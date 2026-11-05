@@ -130,6 +130,7 @@ import {
 import { addUtcSeconds } from '../shared/work-order-claims.ts';
 import { withWorkOrderSearch } from './work-order-search.ts';
 import { withMembershipSearch } from './membership-search.ts';
+import { organizationSearch } from './organization-search.ts';
 import {
     collectAttributeReferrers,
     hasReferrers,
@@ -5002,7 +5003,7 @@ export const routes: Route[] = [
                 },
             );
             if (
-                selection.kind !== 'collection'
+                selection.kind === 'versions'
                 && selection.head.method === 'DELETE'
             ) {
                 throw new RetiredEntityError(
@@ -5046,7 +5047,7 @@ export const routes: Route[] = [
                 },
             );
             if (
-                selection.kind !== 'collection'
+                selection.kind === 'version'
                 && selection.head.method === 'DELETE'
             ) {
                 throw new RetiredEntityError(
@@ -5260,11 +5261,18 @@ export const routes: Route[] = [
     // (postFlowTagDocumentOp shape). WRITE_RESPONSE_SPECS
     // successBody forms the stored bytes via
     // organizationEntityOf; GET serves them as stored.
+    // Its QUERY searches the organization's ideas, projects,
+    // and people through their own collection GETs'
+    // selects; the fence has matched the path to the token.
     route('organizations/:id', {
         select: (db, p) => selectHeadAtPath(
             db, canonicalPath(undefined, '/organizations/'),
             param(p, 0), 'organizations',
         ),
+        selectMatching: organizationSearch({
+            ideas: collectionSelect(IDEAS_WIRING),
+            projects: collectionSelect(PROJECTS_WIRING),
+        }),
         put: putLiveOrganizationDocumentOp,
     }),
     route('organizations/:id/versions/', {

@@ -266,7 +266,9 @@
   <a href="#get/organizations/id">
     <circle class="filled" fill="hsl(var(--foreground))" cx="34" cy="562" r="5"/>
   </a>
-  <rect class="empty" x="69" y="557" width="10" height="10" fill="none" stroke="hsl(var(--muted-foreground))"/>
+  <a href="#query/organizations/id">
+    <circle class="filled" fill="hsl(var(--foreground))" cx="74" cy="562" r="5"/>
+  </a>
   <a href="#put/organizations/id">
     <circle class="filled" fill="hsl(var(--foreground))" cx="114" cy="562" r="5"/>
   </a>

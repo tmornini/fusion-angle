@@ -1005,9 +1005,8 @@ function searchHead(
         id,
         'PUT',
         'HTTP/1.1 200 OK\r\n'
-            + 'content-type: application/json\r\n'
-            + 'content-length: ' + String(text.length)
-            + '\r\n\r\n' + text,
+            + 'content-length: ' + String(text.length) + '\r\n'
+            + 'content-type: application/json\r\n\r\n' + text,
         at,
     );
 }
@@ -1127,4 +1126,69 @@ async () => {
         roles: ['member'],
     });
     assertEquals(body, { id: head!.id, state: 'active' });
+});
+
+// Each part of a mixed selection carries its own reader
+// and names its document; a deleted part is dropped.
+Deno.test('a mixed selection serves each part through its own'
++ ' reader', async () => {
+    const [near, deleted, exact] = await searchHeads();
+    const joined: Reader = {
+        sees: 'joined',
+        joined: new Map([[near!.id, { joined_key: 'joined' }]]),
+    };
+    const parts = await partsOf<Record<string, unknown>>(
+        servedSelection({
+            kind: 'mixed',
+            parts: [
+                {
+                    head: exact!, lifecycle: 'state',
+                    reader: { sees: 'whole' },
+                    location: SEARCH_PREFIX + exact!.id,
+                },
+                {
+                    head: deleted!, lifecycle: 'state',
+                    reader: { sees: 'whole' },
+                    location: SEARCH_PREFIX + deleted!.id,
+                },
+                {
+                    head: near!, lifecycle: 'state',
+                    reader: joined,
+                    location: SEARCH_PREFIX + near!.id,
+                },
+            ],
+        }, SEARCH_TX),
+    );
+    assertEquals(
+        parts.map((part) => part.body().toValue()),
+        [
+            { id: exact!.id, title: 'Approval desk', state: 'active' },
+            {
+                id: near!.id,
+                title: 'Approvel queue',
+                state: 'active',
+                joined_key: 'joined',
+            },
+        ],
+    );
+    assertEquals(
+        parts.map((part) =>
+            part.query('header.content-location').toText()),
+        [SEARCH_PREFIX + exact!.id, SEARCH_PREFIX + near!.id],
+    );
+});
+
+Deno.test('a mixed selection of deleted parts is 204',
+async () => {
+    const [, deleted] = await searchHeads();
+    const response = servedSelection({
+        kind: 'mixed',
+        parts: [{
+            head: deleted!, lifecycle: 'state',
+            reader: { sees: 'whole' },
+            location: SEARCH_PREFIX + deleted!.id,
+        }],
+    }, SEARCH_TX);
+    assertStrictEquals(response.status, 204);
+    assertStrictEquals(await response.text(), '');
 });

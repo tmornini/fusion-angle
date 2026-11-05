@@ -24,6 +24,7 @@ import {
     selectHeadsAtPath,
 } from './head-reads.ts';
 import { servedBodyOf } from './served-response.ts';
+import { servedBodiesOf } from './member-names.ts';
 import {
     membershipOfHead,
     organizationMembershipHeads,
@@ -145,21 +146,12 @@ async function documentsAt<T extends { readonly id: Id }>(
     path: string,
     entityOf: (body: Record<string, unknown>) => T,
 ): Promise<ReadonlyMap<Id, T>> {
-    const selection = await selectHeadsAtPath(db, path, 'stateless');
-    if (selection.kind !== 'collection') {
-        throw new Error(
-            'member documents read a collection, not a '
-                + selection.kind,
-        );
-    }
-    return new Map(selection.heads
-        .filter((head) => !isDeletedHead(head, selection.lifecycle))
-        .map((head) => {
-            const entity = entityOf(
-                servedBodyOf(head, selection.reader),
-            );
-            return [entity.id, entity];
-        }));
+    return new Map(servedBodiesOf(
+        await selectHeadsAtPath(db, path, 'stateless'),
+    ).map((body) => {
+        const entity = entityOf(body);
+        return [entity.id, entity];
+    }));
 }
 
 // The identities/:id GET names an identity other than the

@@ -34,6 +34,8 @@ import { memberNamesOf } from './member-names.ts';
 
 type EventValuesReader = Extract<Reader, { sees: 'event-values' }>;
 
+type Collection = Extract<HeadSelection, { kind: 'collection' }>;
+
 type FlowNaming = { readonly id: Id, readonly name: string };
 
 // What a work order joins to, each under the rule of the
@@ -132,7 +134,7 @@ function memberFieldsOf(
 }
 
 function eventValuesReaderOf(
-    selection: HeadSelection,
+    selection: Collection,
 ): EventValuesReader {
     const reader = selection.reader;
     if (reader.sees !== 'event-values') {
@@ -144,14 +146,14 @@ function eventValuesReaderOf(
     return reader;
 }
 
-function collectionHeadsOf(selection: HeadSelection) {
+function collectionOf(selection: HeadSelection): Collection {
     if (selection.kind !== 'collection') {
         throw new Error(
             'a work-order search reads a collection, not a '
                 + selection.kind,
         );
     }
-    return selection.heads;
+    return selection;
 }
 
 // Each live flow's work-order joins, read in one snapshot.
@@ -163,7 +165,7 @@ async function flowsByWorkOrderOf(
     const flows = await selectHeadsAtPath(
         db, canonicalPath(organization, '/flows/'), 'state',
     );
-    const live = collectionHeadsOf(flows).filter((head) =>
+    const live = flows.heads.filter((head) =>
         !isDeletedHead(head, flows.lifecycle));
     const joins = await db.messagePairs.getCollectionHeadPairsBatch(
         live.map((head) => ({
@@ -195,7 +197,7 @@ async function liveRecordTypesOf(
     const types = await selectHeadsAtPath(
         db, recordTypesUriPrefix(organization), 'state',
     );
-    return new Set(collectionHeadsOf(types)
+    return new Set(types.heads
         .filter((head) => !isDeletedHead(head, types.lifecycle))
         .map((head) => head.name));
 }
@@ -209,10 +211,11 @@ async function boundValuesOf(
     organization: Id,
     selection: HeadSelection,
 ): Promise<ReadonlyMap<Id, readonly string[]>> {
-    const reader = eventValuesReaderOf(selection);
+    const collection = collectionOf(selection);
+    const reader = eventValuesReaderOf(collection);
     const liveTypes = await liveRecordTypesOf(db, organization);
-    const live = collectionHeadsOf(selection).filter((head) =>
-        !isDeletedHead(head, selection.lifecycle));
+    const live = collection.heads.filter((head) =>
+        !isDeletedHead(head, collection.lifecycle));
     const bound = await Promise.all(
         live.map(async (head) => {
             const order = validateWorkOrderVersion(

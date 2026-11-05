@@ -835,6 +835,68 @@ export function defineStoreAcceptance(
         );
     });
 
+    // Ideas, projects, and the seats' joined names, each
+    // family read on each store, answer grouped by family.
+    Deno.test(name + ': organization QUERY groups by family',
+    async () => {
+        const { db, token } = await ready();
+        const root = '/organizations/' + ORGANIZATION;
+        const member = generateIdentifier();
+        const seated = await handleRequest(db, req(
+            'POST', root + '/memberships/', token, {
+                id: member,
+                kind: 'human',
+                membership: { type: 'member', at: AT },
+                identity: {
+                    title: 'Engineer',
+                    department: 'Product',
+                    strengths: [],
+                    team_dimensions: {},
+                },
+                pii: {
+                    name: 'Kestrel Moss',
+                    email: 'moss@example.com',
+                    phone: '',
+                    bio: '',
+                },
+            },
+        ));
+        assertStrictEquals(seated.status, 201);
+        await seated.body?.cancel();
+        const project = generateIdentifier();
+        const projected = await handleRequest(db, req(
+            'PUT', root + '/projects/' + project, token, {
+                title: 'Kestrel rollout',
+                description: 'd',
+                progress: 0,
+                start_date: '2026-01-01',
+                target_end_date: '2026-06-01',
+                estimated_cost: 1000,
+                actual_cost: 0,
+                position: 1,
+                state: 'submitted',
+            },
+        ));
+        assertStrictEquals(projected.status, 201);
+        await projected.body?.cancel();
+        const idea = generateIdentifier();
+        const ideated = await handleRequest(db, req(
+            'PUT', IDEA_PREFIX + idea, token,
+            ideaDocument('Kestrel plan'),
+        ));
+        assertStrictEquals(ideated.status, 201);
+        await ideated.body?.cancel();
+        const searched = await handleRequest(db, req(
+            'QUERY', root, token, { q: 'kestrel' },
+        ));
+        assertStrictEquals(searched.status, 200);
+        assertEquals(
+            (await partsOf<{ id: string }>(searched))
+                .map((part) => part.body().toValue().id),
+            [idea, project, membershipNameOf(ORGANIZATION, member)],
+        );
+    });
+
     Deno.test(name + ': an empty head batch answers no'
     + ' entries', async () => {
         const { db } = await ready();
