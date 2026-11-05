@@ -40,6 +40,13 @@ export interface HttpFacade {
         token: string,
         headerFields?: HeaderFields,
     ): Promise<HttpMessage<T>[]>;
+    // A search's matches, in a collection's parts.
+    QUERY<T>(
+        resource: string,
+        body: Record<string, unknown>,
+        token: string,
+        headerFields?: HeaderFields,
+    ): Promise<HttpMessage<T>[]>;
     PUT<T>(
         resource: string,
         payload: Record<string, unknown>,
@@ -127,6 +134,30 @@ async function answered<T>(
         response.status,
         message,
     );
+}
+
+// A collection's answer, one message per part; a 204 is
+// none. The boundary is read from the raw line: the
+// structured parser would take its leading digit for a
+// number. The body is split as Latin-1, one char per
+// octet, so a part's content-length counts what it framed.
+async function answeredParts<T>(
+    response: Response,
+): Promise<HttpMessage<T>[]> {
+    const type = response.headers.get('content-type');
+    const message = await answered(response);
+    if (response.status === HTTP_NO_CONTENT) {
+        return [];
+    }
+    if (type === null) {
+        throw new HttpMessageError(
+            'a collection answer has no content-type',
+        );
+    }
+    return splitParts(
+        type,
+        Octets.fromBytes(message.body().toBytes()).toLatin1(),
+    ).map((part) => HttpMessage.fromWire<T>(part));
 }
 
 function isCredentialDoor(
@@ -361,38 +392,25 @@ export function createHttpFacade(
                     'GET', resource, token,
                     undefined, headerFields,
                 )),
-            // The boundary is read from the raw line: the
-            // structured parser would take its leading digit
-            // for a number. The body is split as Latin-1, one
-            // char per octet, so a part's content-length
-            // counts what it framed.
             GETCollection: async <T>(
                 resource: string,
                 token: string,
                 headerFields?: HeaderFields,
-            ): Promise<HttpMessage<T>[]> => {
-                const response = await exchangeOnce(
+            ): Promise<HttpMessage<T>[]> =>
+                answeredParts<T>(await exchangeOnce(
                     'GET', resource, token,
                     undefined, headerFields,
-                );
-                const type = response.headers.get(
-                    'content-type',
-                );
-                const message = await answered(response);
-                if (response.status === HTTP_NO_CONTENT) {
-                    return [];
-                }
-                if (type === null) {
-                    throw new HttpMessageError(
-                        'a collection answer has no content-type',
-                    );
-                }
-                return splitParts(
-                    type,
-                    Octets.fromBytes(message.body().toBytes())
-                        .toLatin1(),
-                ).map((part) => HttpMessage.fromWire<T>(part));
-            },
+                )),
+            QUERY: async <T>(
+                resource: string,
+                body: Record<string, unknown>,
+                token: string,
+                headerFields?: HeaderFields,
+            ): Promise<HttpMessage<T>[]> =>
+                answeredParts<T>(await exchangeOnce(
+                    'QUERY', resource, token,
+                    body, headerFields,
+                )),
             PUT: async (resource, payload, token, headerFields) =>
                 answered(await exchangeOnce(
                     'PUT', resource, token,

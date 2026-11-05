@@ -7,6 +7,7 @@ import { createHttpFacade } from '../client/http-facade.ts';
 import { RequestError } from '../shared/http-errors.ts';
 import { joinParts } from '../shared/http-message/multipart.ts';
 import { HttpMessageError } from '../shared/http-message/types.ts';
+import { recordingFetch } from './fixtures/recording-fetch.ts';
 
 const NO_SESSION = {
     runSingleFlightRefresh: () => Promise.resolve(null),
@@ -198,4 +199,65 @@ async () => {
         HttpMessageError,
         'no content-type',
     );
+});
+
+Deno.test('a search sends QUERY with its JSON body', async () => {
+    const contentTypes: (string | null)[] = [];
+    const recording = recordingFetch((input, init) => {
+        const request = new Request(input, init);
+        contentTypes.push(request.headers.get('content-type'));
+        return Promise.resolve(new Response(null, { status: 204 }));
+    });
+    const facade = createHttpFacade('http://x', recording.fetch)(
+        NO_SESSION,
+    );
+    await facade.QUERY('ideas/', { q: 'ap' }, 't');
+    assertEquals(
+        recording.sent.map((row) => [row.method, row.path, row.body]),
+        [['QUERY', '/api/ideas/', '{"q":"ap"}']],
+    );
+    assertEquals(contentTypes, ['application/json']);
+});
+
+Deno.test('a search that matches nothing is no parts', async () => {
+    const facade = createHttpFacade('http://x', scripted(() =>
+        new Response(null, { status: 204 })))(NO_SESSION);
+    assertEquals(
+        await facade.QUERY('ideas/', { q: 'ap' }, 't'), [],
+    );
+});
+
+Deno.test('a search splits its matching parts', async () => {
+    const part = (id: string) => 'HTTP/1.1 200 \r\n'
+        + 'content-length: 10\r\n'
+        + 'content-type: application/json\r\n'
+        + '\r\n{"id":"' + id + '"}';
+    const boundary = '0e2c7a44-8f6b-4c1e-9d3a-2b5f7e9c1a00';
+    const facade = createHttpFacade('http://x', scripted(() =>
+        new Response(joinParts([part('a'), part('b')], boundary), {
+            headers: {
+                'content-type':
+                    'multipart/mixed; boundary=' + boundary,
+            },
+        })))(NO_SESSION);
+    const parts = await facade.QUERY<{ id: string }>(
+        'ideas/', { q: 'ap' }, 't',
+    );
+    assertEquals(
+        parts.map((p) => p.body().toValue().id), ['a', 'b'],
+    );
+});
+
+Deno.test('a refused search throws with its status', async () => {
+    const facade = createHttpFacade('http://x', scripted(() =>
+        Response.json(
+            { error: 'q must be a string' },
+            { status: 400 },
+        )))(NO_SESSION);
+    const error = await assertRejects(
+        () => facade.QUERY('ideas/', { q: 'ap' }, 't'),
+        RequestError,
+        'q must be a string',
+    );
+    assertStrictEquals(error.status, 400);
 });
