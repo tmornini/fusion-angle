@@ -765,6 +765,45 @@ Deno.test(
 );
 
 Deno.test(
+    'buildNodePanel keeps unlocked AI checkboxes'
+    + ' display-only',
+    () => {
+        const humans = [
+            makeHumanMember('hw_1', 'Ada', 'L'),
+        ];
+        const ais = [
+            makeAIMember('ai_1', 'Sonnet'),
+            makeAIMember('ai_2', 'Haiku'),
+        ];
+        const out = buildNodePanel(
+            makeNode({ agentIds: ['ai_1'] }),
+            [], false,
+            humans, ais, [],
+        ).toString();
+        assertMatch(
+            out,
+            /data-ai-member-id="ai_1"[^>]*checked/,
+        );
+        assertMatch(
+            out,
+            /data-ai-member-id="ai_1"[^>]*disabled/,
+        );
+        assertMatch(
+            out,
+            /data-ai-member-id="ai_2"[^>]*disabled/,
+        );
+        assertNotMatch(
+            out,
+            /data-ai-member-id="ai_2"[^>]*checked/,
+        );
+        assertNotMatch(
+            out,
+            /data-member-id="hw_1"[^>]*disabled/,
+        );
+    },
+);
+
+Deno.test(
     'buildNodePanel marks currently assigned'
     + ' member checkboxes as checked',
     () => {
