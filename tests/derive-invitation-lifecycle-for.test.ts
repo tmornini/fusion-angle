@@ -2,9 +2,6 @@ import { assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
-    deriveInvitationStates,
-} from '../api/derive-states.ts';
-import {
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -14,18 +11,14 @@ import {
     invitationLatched,
     partsOf,
 } from './http-fixtures.ts';
-import {
-    generateIdentifier,
-    byAtThenIdAscending,
-} from '../shared/identifier.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
 import type { MembershipEntity } from '../shared/types.ts';
 
 // An invitation's version list reads ONE document's own PUT
 // history, oldest first. The parts are the stored bodies.
-// deriveInvitationStates discovers every id; this file proves
-// the two agree on state, in that order.
 
 const SARAH = 'MQFcPtrZPIGjMCRAXtZUnA';
 const JESSICA = 'zyGBRshxOnKHUfcyFRqowg';
@@ -79,17 +72,6 @@ async function invite(
     return nameOf(identity);
 }
 
-// The derive is id-lex. Arrival order is (at, id), which
-// is the version list's order.
-async function bulkStates(
-    db: MemoryDbAdapter, id: string,
-): Promise<string[]> {
-    return (await deriveInvitationStates(db))
-        .filter((row) => row.entity_id === id)
-        .sort(byAtThenIdAscending)
-        .map((row) => row.state);
-}
-
 // Oldest first. Null when the read answers 404.
 async function versionStates(
     db: MemoryDbAdapter, id: string,
@@ -111,7 +93,7 @@ async function versionStates(
 }
 
 Deno.test('the version list: pending-only (granted,'
-+ ' unanswered) matches deriveInvitationStates\'s own subset',
++ ' unanswered) is the grant',
 async () => {
     const db = await seededDb();
     const id = await invite(db, 'sarah.chen@company.com');
@@ -125,11 +107,10 @@ async () => {
     assertStrictEquals(
         head?.requester_identity_id, ADMIN,
     );
-    assertEquals(scoped, await bulkStates(db, id));
 });
 
 Deno.test('the version list: accepted carries both the'
-+ ' pending and accepted rows, matching the bulk subset',
++ ' pending and accepted rows',
 async () => {
     const db = await seededDb();
     const id = await invite(db, 'sarah.chen@company.com');
@@ -151,11 +132,10 @@ async () => {
     const scoped = await versionStates(db, id);
     assertStrictEquals(scoped?.length, 2);
     assertEquals(scoped, ['pending', 'accepted']);
-    assertEquals(scoped, await bulkStates(db, id));
 });
 
 Deno.test('the version list: declined carries both the'
-+ ' pending and declined rows, matching the bulk subset',
++ ' pending and declined rows',
 async () => {
     const db = await seededDb();
     const id = await invite(db, 'jessica.park@company.com');
@@ -177,11 +157,10 @@ async () => {
     const scoped = await versionStates(db, id);
     assertStrictEquals(scoped?.length, 2);
     assertEquals(scoped, ['pending', 'declined']);
-    assertEquals(scoped, await bulkStates(db, id));
 });
 
 Deno.test('the version list: revoked carries both the'
-+ ' pending and revoked rows, matching the bulk subset',
++ ' pending and revoked rows',
 async () => {
     const db = await seededDb();
     const id = await invite(db, 'emily.rodriguez@company.com');
@@ -204,14 +183,14 @@ async () => {
     const scoped = await versionStates(db, id);
     assertStrictEquals(scoped?.length, 2);
     assertEquals(scoped, ['pending', 'revoked']);
-    assertEquals(scoped, await bulkStates(db, id));
 });
 
 Deno.test('the version list: a never-granted name answers'
-+ ' 404, and the bulk lifecycle has no row for it',
++ ' 404',
 async () => {
     const db = await seededDb();
     const missingId = nameOf(generateIdentifier());
-    assertStrictEquals(await versionStates(db, missingId), null);
-    assertEquals(await bulkStates(db, missingId), []);
+    assertStrictEquals(
+        await versionStates(db, missingId), null,
+    );
 });

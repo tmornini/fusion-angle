@@ -16,10 +16,12 @@ import { seedOrganizationDocument } from
 import { seedPersonIdentity } from
     './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
-import { deriveInvitations } from
-    '../api/derive-invitations.ts';
-import { membershipsOfIdentity } from
-    '../api/memberships.ts';
+import { getOrganizationInvitations } from
+    '../api/invitations-domain.ts';
+import {
+    membershipOfHead,
+    membershipsOfIdentity,
+} from '../api/memberships.ts';
 import {
     apiRequest,
     invitationLatched,
@@ -168,6 +170,21 @@ async function inviteWayne(
     ));
 }
 
+async function listedMemberships(db: DbAdapter) {
+    const rows = [];
+    for (const organizationId of [
+        'AjdvjuECVZEgZoFajaIEkg', WAYNE,
+    ]) {
+        const listed = await getOrganizationInvitations(
+            db, [organizationId], organizationId,
+            undefined, ['admin'],
+        );
+        assert(listed.kind === 'collection');
+        rows.push(...listed.heads.map(membershipOfHead));
+    }
+    return rows;
+}
+
 async function membershipsFor(
     db: DbAdapter,
     identityId: string,
@@ -191,7 +208,7 @@ async () => {
     assertStrictEquals(body.state, 'pending');
     assertStrictEquals(body.organization_id, 'BBjWJsjYIDkTRKIIPrzWRw');
     assertStrictEquals(body.identity_id, 'toccYYkLEABmlbpHJalgtQ');
-    const invitations = await deriveInvitations(db);
+    const invitations = await listedMemberships(db);
     assertStrictEquals(invitations.length, 4);
     const grant = invitations.find(
         (row) => row.id === SARAH_WAYNE,
@@ -239,7 +256,7 @@ Deno.test('invitee PUT identity nest accepted writes'
         await membershipsFor(db, 'toccYYkLEABmlbpHJalgtQ'),
         ['AjdvjuECVZEgZoFajaIEkg', 'BBjWJsjYIDkTRKIIPrzWRw'],
     );
-    const row = (await deriveInvitations(db))
+    const row = (await listedMemberships(db))
         .find(inv => inv.id === SARAH_WAYNE)!;
     assertStrictEquals(row.state, 'accepted');
 });
@@ -258,7 +275,7 @@ Deno.test('invitee PUT declined', async () => {
         },
     )));
     assertStrictEquals(res.status, 200);
-    const row = (await deriveInvitations(db))
+    const row = (await listedMemberships(db))
         .find(inv => inv.id === DAVE_WAYNE)!;
     assertStrictEquals(row.state, 'declined');
     assertEquals(
@@ -282,7 +299,7 @@ Deno.test('admin PUT org nest revoked', async () => {
         },
     )));
     assertStrictEquals(res.status, 200);
-    const row = (await deriveInvitations(db))
+    const row = (await listedMemberships(db))
         .find(inv => inv.id === SARAH_WAYNE)!;
     assertStrictEquals(row.state, 'revoked');
 });

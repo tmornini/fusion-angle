@@ -56,9 +56,6 @@ import { postWorkOrderDocumentOp } from
     '../api/routes.ts';
 import { deriveFlowWorkOrders } from
     '../api/derive-flow-work-orders.ts';
-import {
-    deriveInvitationStates,
-} from '../api/derive-states.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
 import {
     assignOrganization,
@@ -195,19 +192,15 @@ const WORK_ORDERS_WIRING: DocumentFamilyWiring = {
 // Phase Final Task 2 / C3: bulk deriveStates retired — the
 // idea/project/objective/record-type legs rode the retired
 // walk (deriveIdeaStateHistory et al., now read through GET
-// above); the work-order rows are the versions read's events,
-// each carrying the id the read named, and the
-// invitation-state rows come from the surviving derive; both
-// still owe validateStateEntity a caller.
+// above). Work-order rows are the versions read's events,
+// each carrying the id the read named. They still owe
+// validateStateEntity a caller. Invitation lifecycle rows
+// were the retired pair-scan's shape.
 Deno.test(
-    'work-order and invitation state rows validate as'
-    + ' StateEntity',
+    'work-order state rows validate as StateEntity',
     async () => {
         const db = await seededDb();
-        const rows = [
-            ...await seededWorkOrderLifecycle(db),
-            ...await deriveInvitationStates(db),
-        ];
+        const rows = await seededWorkOrderLifecycle(db);
         assert(rows.length > 0, 'state rows empty');
         for (const row of rows) {
             validateStateEntity(withoutId(row));

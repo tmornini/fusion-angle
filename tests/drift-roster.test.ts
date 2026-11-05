@@ -18,7 +18,8 @@ import {
     membershipOfHead,
     organizationMembershipHeads,
 } from '../api/memberships.ts';
-import { deriveInvitations } from '../api/derive-invitations.ts';
+import { getOrganizationInvitations } from
+    '../api/invitations-domain.ts';
 import {
     deriveIdentityKindsOf,
     deriveIdentityPiiOf,
@@ -57,8 +58,9 @@ const HUMAN_DRIFT_METHOD_FILTER_1 = generateIdentifier();
 // shared parent), memberships (the pure join relation), and
 // ai-members/human-members (the two kind-specific facets) —
 // plus invitations, whose grant/accept/decline/revoke side
-// channel this file also covers (deriveInvitations). Hand-
-// builds THREE *_TEST_WIRING mirrors of routes.ts's private
+// channel this file also covers (the organization list).
+// Hand-builds THREE *_TEST_WIRING mirrors of routes.ts's
+// private
 // wiring rows so generic-handler cases exercise the ACTUAL
 // documentCollectionGetHandler/documentGetHandler.
 //
@@ -107,6 +109,18 @@ const ACCEPTED_VIEW: ViewQuery = {
     kind: 'state',
     state: 'accepted',
 };
+
+async function organizationInvitations(
+    db: DbAdapter,
+    organizationId: string,
+): Promise<MembershipEntity[]> {
+    const listed = await getOrganizationInvitations(
+        db, [organizationId], organizationId,
+        undefined, ['admin'],
+    );
+    assert(listed.kind === 'collection');
+    return listed.heads.map(membershipOfHead);
+}
 
 async function acceptedMemberships(
     db: DbAdapter, organization: Id,
@@ -529,9 +543,9 @@ async () => {
         '2026-06-01T00:00:00.000000Z',
     );
     assertStrictEquals(sarahGrant.status, 201);
-    const sarahRow = (await deriveInvitations(db)).find(
-        (row) => row.id === sarahName,
-    )!;
+    const sarahRow = (await organizationInvitations(
+        db, organization,
+    )).find((row) => row.id === sarahName)!;
     assertStrictEquals(sarahRow.state, 'pending');
     // Phase Final Stage B: roster tables retired.
 
@@ -545,9 +559,9 @@ async () => {
         jessicaId, '2026-06-01T00:00:02.000000Z',
     );
     assertStrictEquals(jessicaAccept.status, 200);
-    const jessicaRow = (await deriveInvitations(db)).find(
-        (row) => row.id === jessicaName,
-    )!;
+    const jessicaRow = (await organizationInvitations(
+        db, organization,
+    )).find((row) => row.id === jessicaName)!;
     assertStrictEquals(jessicaRow.state, 'accepted');
     const jessicaMembership = await membershipOf(
         db, organization, jessicaId,
@@ -594,9 +608,9 @@ async () => {
         emilyId, '2026-06-01T00:00:04.000000Z',
     );
     assertStrictEquals(emilyDecline.status, 200);
-    const emilyRow = (await deriveInvitations(db)).find(
-        (row) => row.id === emilyName,
-    )!;
+    const emilyRow = (await organizationInvitations(
+        db, organization,
+    )).find((row) => row.id === emilyName)!;
     assertStrictEquals(emilyRow.state, 'declined');
 
     // D: revoke.
@@ -609,27 +623,30 @@ async () => {
         marcusId, '2026-06-01T00:00:06.000000Z',
     );
     assertStrictEquals(marcusRevoke.status, 200);
-    const marcusRow = (await deriveInvitations(db)).find(
-        (row) => row.id === marcusName,
-    )!;
+    const marcusRow = (await organizationInvitations(
+        db, organization,
+    )).find((row) => row.id === marcusName)!;
     assertStrictEquals(marcusRow.state, 'revoked');
 
     // E: a second grant of Sarah's pending membership stores
     // nothing and does not open another document.
-    const beforeDerived = (await deriveInvitations(db)).length;
+    const beforeListed = (await organizationInvitations(
+        db, organization,
+    )).length;
     const sarahDuplicate = await inviteTo(
         'sarah.chen@company.com',
         '2026-06-01T00:00:07.000000Z',
     );
     assertStrictEquals(sarahDuplicate.status, 200);
-    assertStrictEquals(
-        (await deriveInvitations(db)).length, beforeDerived,
+    const listedAfterDuplicate = await organizationInvitations(
+        db, organization,
     );
-    const derivedAfterDuplicate = await deriveInvitations(db);
     assertStrictEquals(
-        derivedAfterDuplicate.filter(
-            (row) => row.identity_id === sarahId
-                && row.organization_id === organization,
+        listedAfterDuplicate.length, beforeListed,
+    );
+    assertStrictEquals(
+        listedAfterDuplicate.filter(
+            (row) => row.identity_id === sarahId,
         ).length, 1,
     );
 
@@ -641,9 +658,8 @@ async () => {
     );
     assertStrictEquals(jessicaReaccept.status, 409);
     assertStrictEquals(
-        (await deriveInvitations(db)).find(
-            (row) => row.id === jessicaName,
-        )!.state,
+        (await organizationInvitations(db, organization))
+            .find((row) => row.id === jessicaName)!.state,
         'accepted',
     );
     assertStrictEquals(

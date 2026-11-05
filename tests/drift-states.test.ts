@@ -6,15 +6,17 @@ import { membershipNameOf } from
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import type { DbAdapter } from '../api/db.ts';
-import type { Id, StateEntity } from '../shared/types.ts';
+import type { Id } from '../shared/types.ts';
 import {
     nowUtc, DEFAULT_LOCK_TIMEOUT, MS_PER_SECOND,
     setClockForTest, resetClock,
 } from '../shared/types.ts';
 import {
-    deriveInvitationStates,
     resolveOwningOrganization,
 } from '../api/derive-states.ts';
+import { getInvitationVersionsOnOrganizationNest } from
+    '../api/invitations-domain.ts';
+import { membershipOfHead } from '../api/memberships.ts';
 import {
     documentMessagePairsAt,
 } from '../api/derive-documents.ts';
@@ -146,26 +148,23 @@ Deno.test.afterEach(() => {
     resetClock();
 });
 
-// An invitation's history, derived from the message plane —
-// the local oracle for the invitation drift legs. Work-order
-// legs read getWorkOrderEvents and flow legs read
+// An invitation's versions, oldest first. Work-order legs
+// read getWorkOrderEvents and flow legs read
 // deriveFlowStateHistory directly.
-async function invitationHistory(
-    db: DbAdapter, entityId: Id,
-): Promise<StateEntity[]> {
-    return (await deriveInvitationStates(db))
-        .filter((row) => row.entity_id === entityId)
-        .sort((a, b) =>
-            a.at < b.at ? -1 : a.at > b.at ? 1
-                : a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-}
-
-// Phase Final Task 2: states ROW half stripped — the helper
-// pins the message plane only (row plane is empty).
-async function assertHistoryParity(
-    db: DbAdapter, _organization: Id, entityId: Id,
-): Promise<StateEntity[]> {
-    return invitationHistory(db, entityId);
+async function invitationStates(
+    db: DbAdapter,
+    organization: Id,
+    name: Id,
+): Promise<string[]> {
+    const versions =
+        await getInvitationVersionsOnOrganizationNest(
+            db, [organization, name], organization,
+            undefined, ['admin'],
+        );
+    assert(versions.kind === 'versions');
+    return versions.pairs.map(
+        (pair) => membershipOfHead(pair).state,
+    );
 }
 
 function ideaDocument(
@@ -1154,11 +1153,10 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
         },
     )));
     assertStrictEquals(accept.status, 200);
-    const acceptDerived = await assertHistoryParity(
-        db, STARK_ORGANIZATION, acceptName,
-    );
     assertEquals(
-        acceptDerived.map((row) => row.state),
+        await invitationStates(
+            db, STARK_ORGANIZATION, acceptName,
+        ),
         ['pending', 'accepted'],
     );
 
@@ -1194,11 +1192,10 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
         },
     )));
     assertStrictEquals(decline.status, 200);
-    const declineDerived = await assertHistoryParity(
-        db, STARK_ORGANIZATION, declineName,
-    );
     assertEquals(
-        declineDerived.map((row) => row.state),
+        await invitationStates(
+            db, STARK_ORGANIZATION, declineName,
+        ),
         ['pending', 'declined'],
     );
 
@@ -1235,11 +1232,10 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
         },
     )));
     assertStrictEquals(revoke.status, 200);
-    const revokeDerived = await assertHistoryParity(
-        db, STARK_ORGANIZATION, revokeName,
-    );
     assertEquals(
-        revokeDerived.map((row) => row.state),
+        await invitationStates(
+            db, STARK_ORGANIZATION, revokeName,
+        ),
         ['pending', 'revoked'],
     );
 });

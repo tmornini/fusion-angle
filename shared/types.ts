@@ -1460,8 +1460,8 @@ export type MembershipReadEntity = MembershipEntity & {
 
 // An invitation binding an identity to an organization, awaiting the holder's
 // answer. Immutable like a membership, but its lifecycle is derived from the
-// invitation document's own PUT history (INVITATION_STATES,
-// deriveInvitationStates) — never a states log. The org is the inviting
+// invitation document's own PUT history (INVITATION_STATES)
+// — never a states log. The org is the inviting
 // admin's; the identity is the invitee. An ACCEPTED invitation writes the
 // real membership — the invitation itself never grants reach. Global-spine
 // (not org-fenced), because the invitee must read an invitation to an org

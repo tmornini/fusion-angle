@@ -16,9 +16,10 @@ import {
     DEFAULT_LOCK_TIMEOUT, nowUtc, SYSTEM_MEMBER_ID,
 } from '../shared/types.ts';
 import {
-    deriveInvitationStates,
     resolveOwningOrganization,
 } from '../api/derive-states.ts';
+import { getInvitationVersionsOnOrganizationNest } from
+    '../api/invitations-domain.ts';
 import {
     documentMessagePairsAt,
 } from '../api/derive-documents.ts';
@@ -29,10 +30,6 @@ import {
     attemptFor,
 } from '../api/message-pair.ts';
 import {
-    postMemberDocumentOp,
-} from '../api/routes.ts';
-import { deriveMembers } from '../api/derive-members.ts';
-import {
     seedPersonIdentity,
 } from './identity-fixtures.ts';
 import {
@@ -40,9 +37,7 @@ import {
     invitationLatched,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
-import { landMembership } from
-    './membership-fixtures.ts';
-import { membershipOf } from '../api/memberships.ts';
+import { membershipOfHead } from '../api/memberships.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { membershipNameOf } from
@@ -58,7 +53,6 @@ import { membershipNameOf } from
 // history routes.
 
 const AT = '2026-01-01T00:00:00.000000Z';
-const LATER = '2026-01-02T00:00:00.000000Z';
 
 // Non-current admins need explicit claim roles — organizationToken
 // only bakes admin for sub === 'XXZruirZyAOoRpNxaDnpSA'.
@@ -121,36 +115,6 @@ async function leftoverMembershipMessagePair(
     });
     await runWrite(
         db, attemptFor([messagePair]), [messagePair],
-    );
-}
-
-async function leftoverMemberParent(
-    db: MemoryDbAdapter,
-    id: string,
-): Promise<void> {
-    const body = {
-        type: 'human',
-        state: 'active',
-        state_at: AT,
-        state_event_id: generateIdentifier(),
-    };
-    const messagePair = await formWriteMessagePair({
-        method: 'PUT',
-        pathname: '/members/' + id,
-        routePattern: 'members/:id',
-        routeSegments: ['members', ':id'],
-        pathSegments: ['members', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization: undefined,
-        responseBody: { id, ...body },
-        operationId: generateIdentifier(),
-        requestId: generateIdentifier(),
-    });
-    await postMemberDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, messagePair,
     );
 }
 
@@ -435,6 +399,22 @@ async function inviteAndAccept(
     return name;
 }
 
+async function invitationVersionStates(
+    db: MemoryDbAdapter,
+    organization: string,
+    name: string,
+): Promise<string[]> {
+    const versions =
+        await getInvitationVersionsOnOrganizationNest(
+            db, [organization, name], organization,
+            undefined, ['admin'],
+        );
+    assert(versions.kind === 'versions');
+    return versions.pairs.map(
+        (pair) => membershipOfHead(pair).state,
+    );
+}
+
 interface UnionFixture {
     readonly db: MemoryDbAdapter;
     readonly organizationA: string;
@@ -582,156 +562,6 @@ async () => {
     );
 });
 
-Deno.test('deriveMembers is memberships ∩ identities: leftover'
-+ ' /members/ and /memberships/ do not join',
-async () => {
-    const db = memoryDbAdapter();
-    const organizationA = generateIdentifier();
-    const ghost = generateIdentifier();
-    await db.postSchemaCreation();
-    await seedOrganizationDocument(db, organizationA, 'Acme');
-    await leftoverMemberParent(db, ghost);
-    await leftoverMembershipMessagePair(db, generateIdentifier(), {
-        organization_id: organizationA, identity_id: ghost,
-        type: 'member', at: AT,
-    });
-    assertStrictEquals(
-        (await deriveMembers(db, organizationA))
-            .some((row) => row.id === ghost),
-        false,
-    );
-    await landMembership(
-        db, organizationA, ghost, 'accepted', 'member', AT,
-    );
-    assertStrictEquals(
-        (await deriveMembers(db, organizationA))
-            .some((row) => row.id === ghost),
-        false,
-        'leftover /members/ parent does not join',
-    );
-    await seedPersonIdentity(db, ghost, {
-        name: 'Ghost', email: 'g@x.com',
-        phone: '', bio: '',
-    });
-    assertStrictEquals(
-        (await deriveMembers(db, organizationA))
-            .some((row) => row.id === ghost),
-        true,
-    );
-});
-
-const PERSON = {
-    name: 'Person', email: 'p@x.com',
-    phone: '', bio: '',
-};
-
-Deno.test('deriveMembers holds an accepted membership'
-+ ' of either type with no seat', async () => {
-    const db = memoryDbAdapter();
-    const organizationA = generateIdentifier();
-    const member = generateIdentifier();
-    const admin = generateIdentifier();
-    await db.postSchemaCreation();
-    await seedOrganizationDocument(db, organizationA, 'Acme');
-    await seedPersonIdentity(db, member, {
-        ...PERSON, email: 'member@x.com',
-    });
-    await seedPersonIdentity(db, admin, {
-        ...PERSON, email: 'admin@x.com',
-    });
-    await landMembership(
-        db, organizationA, member, 'accepted', 'member', AT,
-    );
-    await landMembership(
-        db, organizationA, admin, 'accepted', 'admin', AT,
-    );
-    const rows = await deriveMembers(db, organizationA);
-    assertEquals(
-        rows.find((row) => row.id === member),
-        { id: member, type: 'human' },
-    );
-    assertEquals(
-        rows.find((row) => row.id === admin),
-        { id: admin, type: 'human' },
-    );
-    assertStrictEquals(rows.length, 2);
-});
-
-Deno.test('deriveMembers holds nothing for a removed'
-+ ' membership head whose seat remains', async () => {
-    const db = memoryDbAdapter();
-    const organizationA = generateIdentifier();
-    const identity = generateIdentifier();
-    await db.postSchemaCreation();
-    await seedOrganizationDocument(db, organizationA, 'Acme');
-    await seedPersonIdentity(db, identity, PERSON);
-    await seedSeat(
-        db, organizationA, identity, 'member', AT,
-    );
-    await landMembership(
-        db, organizationA, identity, 'removed', 'member', AT,
-    );
-    assertStrictEquals(
-        await membershipOf(db, organizationA, identity),
-        null,
-    );
-    assertStrictEquals(
-        (await deriveMembers(db, organizationA))
-            .some((row) => row.id === identity),
-        false,
-    );
-});
-
-Deno.test('deriveMembers holds nothing for a non-accepted'
-+ ' membership', async () => {
-    const db = memoryDbAdapter();
-    const organizationA = generateIdentifier();
-    await db.postSchemaCreation();
-    await seedOrganizationDocument(db, organizationA, 'Acme');
-    const states = [
-        'pending', 'declined', 'revoked', 'removed',
-    ] as const;
-    for (const state of states) {
-        const identity = generateIdentifier();
-        await seedPersonIdentity(db, identity, {
-            ...PERSON, email: state + '@x.com',
-        });
-        await landMembership(
-            db, organizationA, identity, state, 'member',
-            AT,
-        );
-        assertStrictEquals(
-            (await deriveMembers(db, organizationA))
-                .some((row) => row.id === identity),
-            false,
-            state,
-        );
-    }
-});
-
-Deno.test('deriveMembers holds nothing for an accepted'
-+ ' version under a removed head', async () => {
-    const db = memoryDbAdapter();
-    const organizationA = generateIdentifier();
-    const identity = generateIdentifier();
-    await db.postSchemaCreation();
-    await seedOrganizationDocument(db, organizationA, 'Acme');
-    await seedPersonIdentity(db, identity, PERSON);
-    await landMembership(
-        db, organizationA, identity, 'accepted', 'member',
-        AT,
-    );
-    await landMembership(
-        db, organizationA, identity, 'removed', 'member',
-        LATER,
-    );
-    assertStrictEquals(
-        (await deriveMembers(db, organizationA))
-            .some((row) => row.id === identity),
-        false,
-    );
-});
-
 Deno.test('resolveOwningOrganization: own entities resolve to A;'
 + ' foreign idea resolves to B (no bulk-union leak path)',
 async () => {
@@ -839,14 +669,9 @@ async () => {
     assert(sidecarIds.includes(fx.deletedEventId));
     assert(sidecarIds.includes(fx.restoredEventId));
     assertEquals(
-        (await deriveInvitationStates(fx.db))
-            .filter((row) =>
-                row.entity_id === fx.invitationId)
-            .sort((a, b) =>
-                a.at < b.at ? -1 : a.at > b.at ? 1
-                    : a.id < b.id ? -1
-                        : a.id > b.id ? 1 : 0)
-            .map((row) => row.state),
+        await invitationVersionStates(
+            fx.db, fx.organizationA, fx.invitationId,
+        ),
         ['pending', 'accepted'],
     );
 });
@@ -858,8 +683,8 @@ async () => {
 // membership name. A repeated accept or decline, latched on
 // the head it already moved, is 409 and appends no PUT.
 
-Deno.test('deriveInvitationStates: a repeated accept is 409'
-+ ' and derives exactly one accepted row', async () => {
+Deno.test('a repeated accept is 409 and the versions'
++ ' list holds one accepted row', async () => {
     const { db, organizationA, adminA } = await seed();
     const tokenA = await adminToken(adminA, organizationA);
     const inviteeId = 'jLMftvmIlvkHfyyIXYElhQ';
@@ -917,20 +742,18 @@ Deno.test('deriveInvitationStates: a repeated accept is 409'
         'a repeated accept is refused',
     );
 
-    const rows = await deriveInvitationStates(db);
-    assertStrictEquals(
-        rows.filter((row) => row.entity_id === name).length,
-        2,
+    const states = await invitationVersionStates(
+        db, organizationA, name,
     );
+    assertStrictEquals(states.length, 2);
     assertStrictEquals(
-        rows.filter((row) => row.entity_id === name
-            && row.state === 'accepted').length,
+        states.filter((state) => state === 'accepted').length,
         1,
     );
 });
 
-Deno.test('deriveInvitationStates: a repeated decline is 409'
-+ ' and derives exactly one declined row', async () => {
+Deno.test('a repeated decline is 409 and the versions'
++ ' list holds one declined row', async () => {
     const { db, organizationA, adminA } = await seed();
     const tokenA = await adminToken(adminA, organizationA);
     const inviteeId = 'jLwvLbZCGaiaFioqVNEetA';
@@ -988,14 +811,12 @@ Deno.test('deriveInvitationStates: a repeated decline is 409'
         'a repeated decline is refused',
     );
 
-    const rows = await deriveInvitationStates(db);
-    assertStrictEquals(
-        rows.filter((row) => row.entity_id === name).length,
-        2,
+    const states = await invitationVersionStates(
+        db, organizationA, name,
     );
+    assertStrictEquals(states.length, 2);
     assertStrictEquals(
-        rows.filter((row) => row.entity_id === name
-            && row.state === 'declined').length,
+        states.filter((state) => state === 'declined').length,
         1,
     );
 });

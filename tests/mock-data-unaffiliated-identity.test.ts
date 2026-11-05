@@ -6,10 +6,8 @@ import {
     deriveCredentialsFor,
     deriveIdentityPiiRows,
 } from '../api/derive-identity-spine.ts';
-import {
-    deriveInvitations,
-} from '../api/derive-invitations.ts';
 import { bodyOf } from '../api/derive-documents.ts';
+import { membershipOfHead } from '../api/memberships.ts';
 import {
     getIdentityInvitations,
     getInvitationOnIdentityNest,
@@ -54,11 +52,13 @@ Deno.test('the unaffiliated identity holds exactly one'
 + ' pending Stark invitation', async () => {
     const db = await sharedMockDb();
     const unaffiliated = buildUnaffiliatedIdentity();
-    const mine = (await deriveInvitations(db)).filter(
-        (row) => row.identity_id === unaffiliated.id,
+    const listed = await getIdentityInvitations(
+        db, [unaffiliated.id], unaffiliated.id,
+        undefined, [],
     );
-    assertStrictEquals(mine.length, 1);
-    const invitation = mine[0]!;
+    assert(listed.kind === 'collection');
+    assertStrictEquals(listed.heads.length, 1);
+    const invitation = membershipOfHead(listed.heads[0]!);
     assertStrictEquals(
         invitation.organization_id, STARK_ORGANIZATION,
     );
