@@ -229,6 +229,11 @@ git rebase master          # onto current master
 ./test validate --syntax   # gate for each commit
 # squash to one commit per feature, local only, then:
 ./test validate            # Layer 1
+```
+
+When the operator asks to merge:
+
+```bash
 cd -                       # the main checkout
 git merge --no-ff <slug>   # write the merge message
 git worktree remove .worktrees/<slug> && git branch -d <slug>
