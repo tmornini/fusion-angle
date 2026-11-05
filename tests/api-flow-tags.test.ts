@@ -18,7 +18,7 @@ import {
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
     pairIdOf,
 } from './http-fixtures.ts';
 
@@ -31,22 +31,6 @@ import {
 // precedent, re-nested one level deeper.
 
 const AT = '2026-01-01T00:00:00.000000Z';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    headers?: Record<string, string>,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(headers !== undefined ? { headers } : {}),
-    });
-}
 
 function flowFields(name: string) {
     return {

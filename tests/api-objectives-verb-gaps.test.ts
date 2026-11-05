@@ -7,7 +7,7 @@ import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest,
+    req,
 } from './http-fixtures.ts';
 
 // Pins the CURRENT status of every deliberate objectives-family
@@ -24,20 +24,6 @@ import {
 // POST/PUT/DELETE
 // organizations/:id/projects/:id/objective-actual-scores; GET/POST/DELETE
 // organizations/:id/projects/:id/objective-actual-scores/:sid.
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();

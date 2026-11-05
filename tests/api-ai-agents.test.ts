@@ -15,6 +15,7 @@ import { firstProviderModel } from './member-fixtures.ts';
 import { getModelsByProvider } from '../api/provider-models.ts';
 import {
     apiRequest,
+    req,
     partBodiesOf,
 } from './http-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
@@ -46,18 +47,6 @@ function agentFields(name: string) {
         skill_focus: 'drafting',
         model: firstProviderModel().id,
     };
-}
-
-function req(
-    method: string, path: string, token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
 }
 
 async function freshDb() {

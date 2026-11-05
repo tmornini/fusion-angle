@@ -11,7 +11,7 @@ import { bodyOf } from '../api/derive-documents.ts';
 import { seedPersonIdentity } from
     './identity-fixtures.ts';
 import {
-    apiRequest,
+    req,
     invitationLatched,
 } from './http-fixtures.ts';
 import {
@@ -46,15 +46,6 @@ const SETTLED_KEYS = [
     'state',
     'type',
 ];
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({ method, path, token, body });
-}
 
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();

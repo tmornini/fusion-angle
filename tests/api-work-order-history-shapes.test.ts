@@ -24,7 +24,7 @@ import { STARK_ORGANIZATION } from
 import { getWorkOrderEvents } from
     './fixtures/work-order-events.ts';
 import {
-    apiRequest,
+    req,
 } from './http-fixtures.ts';
 
 // Task 3: the versions' events speak BOTH transition shapes
@@ -52,20 +52,6 @@ const [ATTR_B0, ATTR_B1, ATTR_B2] = [
     generateIdentifier(),
     generateIdentifier(),
 ].sort(compareIdentifiers);
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 function flowGraph(): Record<string, unknown> {
     const graph: WorkOrderFlowGraph = {

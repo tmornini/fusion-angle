@@ -12,7 +12,7 @@ import {
 } from '../shared/types.ts';
 import { seedCreatedWorkOrder } from
     './work-order-fixtures.ts';
-import { apiRequest } from './http-fixtures.ts';
+import { apiRequest, req } from './http-fixtures.ts';
 
 // A work order's history is its versions (ARCHITECTURE.md
 // § Do not resurrect): `…/history` is not a route, so the
@@ -23,18 +23,6 @@ const NODE_MIDDLE = generateIdentifier();
 const NODE_FINISH = generateIdentifier();
 const FLOW_ID = generateIdentifier();
 const EDGE_2 = generateIdentifier();
-
-function req(
-    method: string,
-    path: string,
-    token?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        ...(token !== undefined ? { token } : {}),
-    });
-}
 
 function flowGraph(): Record<string, unknown> {
     const graph: WorkOrderFlowGraph = {

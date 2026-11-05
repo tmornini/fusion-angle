@@ -17,6 +17,7 @@ import {
 } from '../shared/types.ts';
 import {
     apiRequest,
+    reqWithHeaders as req,
     assertPartsAreHeads,
     partBodiesOf,
     partsOf,
@@ -52,22 +53,6 @@ const BINDING = '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
     + WO_ID + '/binding';
 const DOCUMENT_PREFIX =
     '/organizations/' + ORGANIZATION + '/work-orders/';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    headers?: Readonly<Record<string, string>>,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(headers !== undefined ? { headers } : {}),
-    });
-}
 
 function graphJson(): Record<string, unknown> {
     return {

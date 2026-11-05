@@ -15,7 +15,7 @@ import { seedCurrentMember } from './member-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import { nowUtc } from '../shared/types.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
     pairIdOf,
 } from './http-fixtures.ts';
 import {
@@ -36,22 +36,6 @@ import { seedCreatedWorkOrder } from
 
 
 const WO_ID = 'yNSSnbrpacodQTzUEcdEVA';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    headers?: Readonly<Record<string, string>>,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(headers !== undefined ? { headers } : {}),
-    });
-}
 
 // An operation on a work order names the head it read.
 async function headTag(

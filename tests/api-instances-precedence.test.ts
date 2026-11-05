@@ -24,7 +24,7 @@ import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from '../shared/types.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
     pairIdOf,
     partsOf,
 } from './http-fixtures.ts';
@@ -57,25 +57,6 @@ const INSTANCES = TYPE_DETAIL + '/instances/';
 const INSTANCE_DETAIL = INSTANCES + INSTANCE_ID;
 const FOREIGN_TYPE =
     '/organizations/' + ORGANIZATION_B + '/record-types/' + TYPE_ID;
-
-function req(
-    method: string,
-    path: string,
-    token: string | undefined,
-    body?: unknown,
-    extraHeaders?: Record<string, string>,
-    operationId?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        ...(token !== undefined ? { token } : {}),
-        body,
-        ...(extraHeaders !== undefined
-            ? { headers: extraHeaders } : {}),
-        ...(operationId !== undefined ? { operationId } : {}),
-    });
-}
 
 async function seedMembershipMessagePair(
     db: MemoryDbAdapter,

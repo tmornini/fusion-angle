@@ -26,6 +26,7 @@ import { seedCreatedWorkOrder } from
     './work-order-fixtures.ts';
 import {
     apiRequest,
+    req,
 } from './http-fixtures.ts';
 import { HttpMessage } from
     '../shared/http-message/http-message.ts';
@@ -64,20 +65,6 @@ function messagePairJsonOf(message: string): {
 // entity's actual genesis row.
 
 const AT = '2026-02-01T00:00:00.000000Z';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 // The idea body OMITS organization_id — the org fence stamps
 // it from the verified token before the store validates.

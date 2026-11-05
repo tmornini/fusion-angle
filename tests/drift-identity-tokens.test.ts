@@ -21,7 +21,7 @@ import {
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { generateIdentifier } from '../shared/identifier.ts';
 import {
-    apiRequest,
+    req,
     assertPartsAreHeads,
     partBodiesOf,
     partsOf,
@@ -68,20 +68,6 @@ const CHAIN_OMIT = generateIdentifier();
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 const AT2 = '2026-01-01T00:00:01.000000Z';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();

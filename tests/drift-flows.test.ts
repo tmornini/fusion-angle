@@ -40,7 +40,7 @@ import { deriveProjectFlows } from
     '../api/derive-project-flows.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
     assertPartsAreHeads,
     pairIdOf,
     partsOf,
@@ -93,23 +93,6 @@ const FLOWID_EV = generateIdentifier();
 // and non-lexical live fixtures.
 
 const AT = '2026-01-01T00:00:00.000000Z';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    headers?: Record<string, string>,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(headers !== undefined
-            ? { headers } : {}),
-    });
-}
 
 function sortById<T extends { id: string }>(
     rows: readonly T[],

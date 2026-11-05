@@ -26,6 +26,7 @@ import {
 } from './test-fixtures.ts';
 import {
     apiRequest,
+    req,
     pairIdOf,
     storedPutBodyText,
 } from './http-fixtures.ts';
@@ -48,20 +49,6 @@ const FORGED_ORGANIZATION = generateIdentifier();
 const DETAIL = COLLECTION + TYPE_ID;
 const ATTR_DETAIL =
     DETAIL + '/attributes/' + ATTR_ID;
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 async function seedMembershipPair(
     db: MemoryDbAdapter,

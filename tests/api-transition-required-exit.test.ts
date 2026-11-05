@@ -23,7 +23,7 @@ import {
     nowUtc,
 } from '../shared/types.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { seedCreatedWorkOrder } from
@@ -64,23 +64,6 @@ const TRANSITION =
 const TRANSITION_FREE =
     '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_FREE
         + '/transition';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    extraHeaders?: Record<string, string>,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(extraHeaders !== undefined
-            ? { headers: extraHeaders } : {}),
-    });
-}
 
 // The If-Match an operation on a work order sends: the tag
 // of the head it read, then the instance's when it bears
