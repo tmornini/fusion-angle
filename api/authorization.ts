@@ -147,8 +147,10 @@ const MEMBER_VERBS: Readonly<
     // elimination C3).
     // :id only — the root collection is retired.
     // The old '/organizations' prefix also matched
-    // GET /organizations/:id; keep that document.
-    '/organizations/:id': ['GET'],
+    // GET /organizations/:id; keep that document. A
+    // QUERY reads as the GET does, so this one row
+    // admits a member QUERY on every nested path.
+    '/organizations/:id': ['GET', 'QUERY'],
     '/identities/:id/tokens': ['POST'],
     '/identities/:id/token-revocations': ['PUT'],
     // Self-only stays in the handler. This row only
@@ -172,14 +174,15 @@ const MEMBER_TIER: readonly PolicyEntry[] =
     );
 
 // Deny-by-default policy. `admin` is allowed on every verb at
-// the root prefix `/` — "admin everywhere" in five honest
-// lines (Task 10 adds PATCH), no implicit-superuser special
-// case. The member tier widens the content surfaces to the
-// `member` role. Admin PATCH on handler-less routes answers
-// 405 (known verb, no handler); members still 403 by absence
-// of member PATCH rows outside future instance surfaces.
+// the root prefix `/` — "admin everywhere" in six honest
+// lines, no implicit-superuser special case. The member
+// tier widens the content surfaces to the `member` role.
+// Admin PATCH on handler-less routes answers 405 (known
+// verb, no handler); members still 403 by absence of
+// member PATCH rows outside future instance surfaces.
 export const ROUTE_POLICY: readonly PolicyEntry[] = [
     { verb: 'GET', pathPrefix: '/', roles: ['admin'] },
+    { verb: 'QUERY', pathPrefix: '/', roles: ['admin'] },
     { verb: 'PUT', pathPrefix: '/', roles: ['admin'] },
     { verb: 'POST', pathPrefix: '/', roles: ['admin'] },
     { verb: 'DELETE', pathPrefix: '/', roles: ['admin'] },

@@ -26,14 +26,40 @@ Deno.test('empty handlers offer nothing', () => {
     );
 });
 
-Deno.test('a fake sixth function key throws', () => {
+Deno.test('a fake seventh function key throws', () => {
     const row = {
         ...route('identities/', {}),
         head: async () => ({}),
     };
     assertThrows(
         () => offeredVerbs(row),
-        Error, 'sixth verb without a sixth column: head',
+        Error, 'seventh verb without a seventh column: head',
+    );
+});
+
+const NO_HEADS = async () => ({
+    kind: 'collection' as const,
+    heads: [],
+    lifecycle: 'stateless' as const,
+    reader: { sees: 'whole' as const },
+});
+
+Deno.test('a row with selectMatching offers query', () => {
+    assertEquals(
+        offeredVerbs(route('identities/', {
+            selectMatching: NO_HEADS,
+        })),
+        ['query'],
+    );
+});
+
+Deno.test('the GET judge query offers no QUERY', () => {
+    assertEquals(
+        offeredVerbs(route('identities/', {
+            select: NO_HEADS,
+            query: () => ({ kind: 'every' as const }),
+        })),
+        ['get'],
     );
 });
 

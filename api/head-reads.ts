@@ -5,10 +5,12 @@ import type { DbAdapter } from './db.ts';
 import {
     envelopeOf,
     responseOfWire,
+    servedBodyOf,
     servedResponse,
     type Reader,
     type Transmission,
 } from './served-response.ts';
+import { rankedBySearch } from '../shared/search-match.ts';
 import { bodyOf, DELETED_STATE } from './derive-documents.ts';
 import {
     joinParts,
@@ -30,7 +32,8 @@ export type Lifecycle = 'state' | 'stateless';
 // computes which heads, after the fence; a document's miss
 // is its to throw (403 or 404). Each head is served as
 // stored. A collection's heads are a subsequence of one
-// store read, in its (response_at, id) order. A version
+// store read, in its (response_at, id) order; a QUERY's
+// collection is in best-match order instead. A version
 // selection is one document's history from that same read:
 // its head is the last PUT or DELETE, its versions are
 // the PUTs in that order, and its miss is the family's.
@@ -217,6 +220,35 @@ export function isDeletedHead(
     return head.method === 'DELETE'
         || (lifecycle === 'state'
             && storedStateOf(head) === DELETED_STATE);
+}
+
+// A QUERY's selection: the collection's live heads whose
+// served bodies match `text`, best first. A deleted head
+// is dropped before matching, as servedCollection would
+// drop it, and each head is matched on the body its
+// reader serves, so a QUERY never matches on what the GET
+// hides.
+export function matchingCollection(
+    selection: HeadSelection,
+    text: string,
+    fieldsOf: (
+        body: Record<string, unknown>,
+        head: MessagePairEntity,
+    ) => readonly string[],
+): HeadSelection {
+    if (selection.kind !== 'collection') {
+        throw new Error(
+            'matchingCollection needs a collection, not a '
+                + selection.kind,
+        );
+    }
+    const live = selection.heads.filter((head) =>
+        !isDeletedHead(head, selection.lifecycle));
+    return {
+        ...selection,
+        heads: rankedBySearch(live, text, (head) =>
+            fieldsOf(servedBodyOf(head, selection.reader), head)),
+    };
 }
 
 // A 'state' family's PUT validator admits no body without

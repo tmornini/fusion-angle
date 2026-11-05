@@ -1,11 +1,13 @@
 import type { Route } from './routes.ts';
 
 export const HTTP_VERBS = [
-    'get', 'put', 'post', 'patch', 'delete',
+    'get', 'query', 'put', 'post', 'patch', 'delete',
 ] as const;
 
 export type HttpVerb = (typeof HTTP_VERBS)[number];
 
+// A row's `query` key is the GET's query-string judge, not
+// the QUERY method: a QUERY is offered by `selectMatching`.
 export function offeredVerbs(
     row: Route,
 ): readonly HttpVerb[] {
@@ -13,6 +15,7 @@ export function offeredVerbs(
         (key) =>
             key !== 'segments'
             && key !== 'select'
+            && key !== 'selectMatching'
             && key !== 'query'
             && !(HTTP_VERBS as readonly string[])
                 .includes(key)
@@ -22,14 +25,16 @@ export function offeredVerbs(
     );
     if (extra.length > 0) {
         throw new Error(
-            'sixth verb without a sixth column: '
+            'seventh verb without a seventh column: '
             + extra.join(','),
         );
     }
     return HTTP_VERBS.filter((verb) =>
         verb === 'get'
             ? row.select !== undefined
-            : row[verb] !== undefined);
+            : verb === 'query'
+                ? row.selectMatching !== undefined
+                : row[verb] !== undefined);
 }
 
 export function routePatternOf(row: Route): string {

@@ -1,10 +1,11 @@
 import {
     assert,
+    assertEquals,
     assertMatch,
     assertNotMatch,
     assertStrictEquals,
 } from '@std/assert';
-import { routes } from '../api/routes.ts';
+import { route, routes } from '../api/routes.ts';
 import { STATUS_DOCUMENTS } from
     '../api/http-status-documents.ts';
 import { API_ELEVATION_SVG } from
@@ -14,9 +15,11 @@ import {
     API_DOC_STATUSES,
 } from '../web-app/api-documentation/rooms.ts';
 import {
+    exampleBodyFor,
     generateAll,
     roomHashOf,
     roomPathOf,
+    statusCodesFor,
     svgOf,
     verbRoomHtml,
 } from '../web-app/app/generate-api-documentation.ts';
@@ -464,4 +467,26 @@ Deno.test('a created answer is 201, and memberships'
             uri,
         );
     }
+});
+
+Deno.test('a QUERY room takes q and answers as a collection',
+() => {
+    const uri = '/organizations/:id/work-orders/';
+    const row = route(uri.slice(1), {
+        selectMatching: async () => ({
+            kind: 'collection',
+            heads: [],
+            lifecycle: 'state',
+            reader: { sees: 'whole' },
+        }),
+    });
+    const statuses = statusCodesFor(row, 'query');
+    assertEquals(statuses, ['200', '204', '400', '401', '403', '415']);
+    const body = exampleBodyFor(uri, 'query');
+    assertEquals(JSON.parse(body), { q: 'approval' });
+    const html = verbRoomHtml('query', uri, statuses, body);
+    assertMatch(html, /<title>QUERY \/api\/organizations/);
+    assert(html.includes('Authorization: Bearer'));
+    assert(!html.includes('Response headers'));
+    assert(!html.includes('If-Match'));
 });

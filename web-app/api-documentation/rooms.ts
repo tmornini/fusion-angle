@@ -3351,6 +3351,11 @@ export const API_DOC_STATUSES:
         body: '{\n  "error": "precondition failed"\n}',
     },
     {
+        hash: 'statuses/415',
+        code: '415',
+        body: '{\n  "error": "QUERY /path takes application/json"\n}',
+    },
+    {
         hash: 'statuses/422',
         code: '422',
         body: '{\n  "error": "unprocessable message"\n}',

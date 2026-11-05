@@ -3,6 +3,7 @@ import {
     assertEquals,
     assertMatch,
     assertStrictEquals,
+    assertThrows,
 } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
 import {
@@ -27,14 +28,24 @@ import {
     instanceReader,
     loadAttributeSchemaById,
 } from '../api/routes.ts';
-import type { Reader } from '../api/served-response.ts';
+import {
+    servedBodyOf,
+    type Reader,
+} from '../api/served-response.ts';
+import {
+    matchingCollection,
+    servedSelection,
+    wholeCollectionSelection,
+    wholeHeadSelection,
+} from '../api/head-reads.ts';
+import { ledgerFields } from './ledger-row.ts';
 import { generateIdentifier } from '../shared/identifier.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { landMembership } from './membership-fixtures.ts';
 import { membershipOf } from '../api/memberships.ts';
 import { ORGANIZATION_TWO } from '../api/mock-data/seed-constants.ts';
-import { nowUtc } from '../shared/types.ts';
+import { nowUtc, type MessagePairEntity } from '../shared/types.ts';
 import {
     attemptFor,
     canonicalPath,
@@ -954,4 +965,166 @@ async () => {
             (error as Error).message, new RegExp('^' + offence),
         );
     }
+});
+
+const SEARCH_PREFIX = '/search-pin/';
+
+async function searchRow(
+    id: string,
+    method: string,
+    response: string,
+    at: number,
+): Promise<MessagePairEntity> {
+    return {
+        id,
+        ...await ledgerFields({
+            id,
+            path: SEARCH_PREFIX,
+            name: id,
+            requester_identity_id: ME,
+            method,
+            response_at: '2026-01-01T00:00:00.00000'
+                + String(at) + 'Z',
+            request: method + ' ' + SEARCH_PREFIX + id
+                + ' HTTP/1.1\r\n\r\n',
+            response,
+            operation_id: generateIdentifier(),
+            supersedes: id,
+        }),
+    };
+}
+
+function searchHead(
+    title: string,
+    state: string,
+    at: number,
+): Promise<MessagePairEntity> {
+    const id = generateIdentifier();
+    const text = JSON.stringify({ id, title, state });
+    return searchRow(
+        id,
+        'PUT',
+        'HTTP/1.1 200 OK\r\n'
+            + 'content-type: application/json\r\n'
+            + 'content-length: ' + String(text.length)
+            + '\r\n\r\n' + text,
+        at,
+    );
+}
+
+// A DELETE head is a tombstone: no body to match on.
+function tombstoneHead(at: number): Promise<MessagePairEntity> {
+    return searchRow(
+        generateIdentifier(),
+        'DELETE',
+        'HTTP/1.1 204 No Content\r\n\r\n',
+        at,
+    );
+}
+
+const SEARCH_TX = {
+    date: 'Wed, 30 Sep 2026 12:00:00 GMT',
+    requestId: generateIdentifier(),
+};
+
+function titleOf(body: Record<string, unknown>): string[] {
+    return [body['title'] as string];
+}
+
+async function searchHeads(): Promise<MessagePairEntity[]> {
+    return [
+        await searchHead('Approvel queue', 'active', 1),
+        await searchHead('Approval gone', 'deleted', 2),
+        await searchHead('Approval desk', 'active', 3),
+    ];
+}
+
+Deno.test('a matching collection drops the deleted, best first',
+async () => {
+    const [near, deleted, exact] = await searchHeads();
+    const tombstone = await tombstoneHead(4);
+    const matched = matchingCollection(
+        wholeCollectionSelection(
+            [near!, deleted!, exact!, tombstone], 'state',
+        ),
+        'approval',
+        titleOf,
+    );
+    assert(matched.kind === 'collection');
+    assertEquals(
+        matched.heads.map((head) => head.id),
+        [exact!.id, near!.id],
+    );
+    const parts = await partsOf<{ id: string }>(
+        servedSelection(matched, SEARCH_TX),
+    );
+    assertEquals(
+        parts.map((part) => part.body().toValue().id),
+        [exact!.id, near!.id],
+    );
+});
+
+Deno.test('a matching collection that matches none is 204',
+async () => {
+    const heads = await searchHeads();
+    const response = servedSelection(
+        matchingCollection(
+            wholeCollectionSelection(heads, 'state'),
+            'zebra',
+            titleOf,
+        ),
+        SEARCH_TX,
+    );
+    assertStrictEquals(response.status, 204);
+    assertStrictEquals(await response.text(), '');
+});
+
+Deno.test('a matching collection matches what its reader serves',
+async () => {
+    const heads = await searchHeads();
+    const reader: Reader = {
+        sees: 'keys',
+        readRoles: new Map([['title', ['admin']]]),
+        roles: ['member'],
+    };
+    const matched = matchingCollection(
+        { kind: 'collection', heads, lifecycle: 'state', reader },
+        'approval',
+        // The reader hides title, so nothing is left to match.
+        titleOrNothingOf,
+    );
+    assert(matched.kind === 'collection');
+    assertStrictEquals(matched.reader, reader);
+    assertEquals(matched.heads, []);
+});
+
+function titleOrNothingOf(
+    body: Record<string, unknown>,
+): string[] {
+    const title = body['title'];
+    return typeof title === 'string' ? [title] : [];
+}
+
+Deno.test('a matching collection refuses a document', async () => {
+    const [head] = await searchHeads();
+    assertThrows(
+        () => matchingCollection(
+            wholeHeadSelection(head!, 'state', 'ideas', head!.id),
+            'approval',
+            titleOf,
+        ),
+        Error,
+        'matchingCollection needs a collection',
+    );
+});
+
+Deno.test('servedBodyOf drops a key the reader hides',
+async () => {
+    const [head] = await searchHeads();
+    const body = servedBodyOf(head!, {
+        sees: 'keys',
+        readRoles: new Map([['title', ['admin']]]),
+        roles: ['member'],
+    });
+    assertEquals(body, { id: head!.id, state: 'active' });
 });

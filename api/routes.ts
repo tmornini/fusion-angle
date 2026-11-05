@@ -614,6 +614,20 @@ export type SelectHandler = (
     query: RouteQuery | undefined,
 ) => Promise<HeadSelection>;
 
+// A QUERY (RFC 10008) selects as its GET does, then keeps
+// the heads whose served bodies match `text`, best first.
+// The gate has already judged the body's `q` a string, so
+// `text` is trusted here.
+export type MatchingSelectHandler = (
+    adapter: DbAdapter,
+    params: string[],
+    actor: Id,
+    organization: Id | undefined,
+    roles: readonly string[],
+    query: RouteQuery | undefined,
+    text: string,
+) => Promise<HeadSelection>;
+
 // PutHandler, PatchHandler, PostHandler, and DeleteHandler
 // carry a trailing pair: it is undefined for bearer-exempt and
 // not-yet-wired writes (TypeScript cannot prove bearerExempt
@@ -687,6 +701,7 @@ type PostHandler = (
 export interface Route {
     segments: string[];
     select?: SelectHandler;
+    selectMatching?: MatchingSelectHandler;
     put?: PutHandler;
     patch?: PatchHandler;
     delete?: DeleteHandler;
@@ -700,6 +715,7 @@ export function route(
     pattern: string,
     handlers: {
         select?: SelectHandler;
+        selectMatching?: MatchingSelectHandler;
         put?: PutHandler;
         patch?: PatchHandler;
         delete?: DeleteHandler;

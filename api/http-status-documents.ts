@@ -51,6 +51,12 @@ export const STATUS_DOCUMENTS: readonly
         body: { error: 'precondition failed' },
     },
     {
+        code: 415,
+        body: {
+            error: 'QUERY /path takes application/json',
+        },
+    },
+    {
         code: 422,
         body: { error: 'unprocessable message' },
     },

@@ -6,6 +6,12 @@ export const SHORT_WORD_MAX_LENGTH = 4;
 export const SHORT_WORD_EDITS = 1;
 export const LONG_WORD_EDITS = 2;
 
+// A QUERY's search text, in characters. Each query word
+// that misses as a substring is measured against every
+// field word of every head, so the gate bounds the text
+// rather than letting one request stall the event loop.
+export const QUERY_TEXT_MAX_LENGTH = 256;
+
 export type SearchMatch =
     | { readonly kind: 'matched'; readonly edits: number }
     | { readonly kind: 'missed' };

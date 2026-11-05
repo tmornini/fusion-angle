@@ -238,6 +238,39 @@ export function projectedBody(
     )).toLatin1();
 }
 
+// The body a GET serves this reader, as a value: a QUERY
+// matches on it, so it never matches on what the GET
+// hides. A served head is a stored JSON object; one that
+// is not is the store's bug, never matched bare.
+export function servedBodyOf(
+    head: MessagePairEntity,
+    reader: Reader,
+): Record<string, unknown> {
+    const stored = parseWire(head.response).body;
+    if (stored === undefined) {
+        throw new Error(
+            'served head has no body: '
+                + head.path + head.name + ' (' + head.id + ')',
+        );
+    }
+    const value: unknown = JSON.parse(new TextDecoder().decode(
+        Octets.fromLatin1(
+            projectedBody(stored.toLatin1(), reader),
+        ).asBytes(),
+    ));
+    if (
+        value === null
+        || typeof value !== 'object'
+        || Array.isArray(value)
+    ) {
+        throw new Error(
+            'served head body is not a JSON object: '
+                + head.path + head.name + ' (' + head.id + ')',
+        );
+    }
+    return value as Record<string, unknown>;
+}
+
 // undefined: nothing was dropped.
 function keptKeys(
     record: Record<string, unknown>,
