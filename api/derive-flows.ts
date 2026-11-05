@@ -19,6 +19,8 @@ import type {
 import { canonicalPath } from './message-pair.ts';
 import { normalizedStoredGraph } from
     './flow-graph-relations.ts';
+import { byAtThenIdAscending } from
+    '../shared/identifier.ts';
 import {
     deriveDocumentsAt,
     documentMessagePairsAt,
@@ -30,8 +32,6 @@ import {
     type DerivedDocument,
     type DocumentMessagePair,
 } from './derive-documents.ts';
-import { liveHeadId, messageStore } from
-    './message-store.ts';
 
 // Flows' own reshaping of the generic message-plane reduction
 // (derive-documents.ts): the async fetching (one prefix scan per
@@ -183,7 +183,7 @@ async function fetchFlowDocumentMessagePairs(
     };
 }
 
-// Oldest live head (at, id) first via getCollection,
+// Oldest live head (at, id) first, from pairs in hand,
 // deleted-filtered — the head lifecycle state 'deleted'
 // excludes a flow exactly as EntityStore's states-log
 // tombstone filter does today (dead-in-practice for flows
@@ -211,26 +211,35 @@ export async function deriveFlows(
             list.push(messagePair);
         }
     }
-    const byId = new Map<Id, FlowWithGraph>();
+    const live: {
+        at: string;
+        id: string;
+        flow: FlowWithGraph;
+    }[] = [];
     for (const [flowId, document] of documents) {
-        const history = stateHistoryFrom(
-            documentLifecycleEvents(
-                messagePairsByFlowId.get(flowId) ?? [],
-            ),
+        const history = messagePairsByFlowId.get(flowId)
+            ?? [];
+        if (currentDocumentState(stateHistoryFrom(
+            documentLifecycleEvents(history),
             flowId,
-        );
-        if (currentDocumentState(history) === DELETED_STATE) {
+        )) === DELETED_STATE) {
             continue;
         }
-        byId.set(flowId, flowEntityOf(document, organization));
+        // The head stamp is the pair deriveDocumentsAt
+        // kept: latest (at, id), which is what the
+        // collection head read orders by.
+        const head = history.find((messagePair) =>
+            messagePair.id === document.messagePairId,
+        );
+        if (head === undefined) continue;
+        live.push({
+            at: head.at,
+            id: head.id,
+            flow: flowEntityOf(document, organization),
+        });
     }
-    const live = await messageStore(db).getCollection(prefix);
-    const flows: FlowWithGraph[] = [];
-    for (const entity of live) {
-        const row = byId.get(liveHeadId(entity));
-        if (row !== undefined) flows.push(row);
-    }
-    return flows;
+    live.sort(byAtThenIdAscending);
+    return live.map((row) => row.flow);
 }
 
 export async function deriveFlow(
