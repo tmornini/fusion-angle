@@ -42,9 +42,8 @@ function canShowPort(
 
 // Flow-canvas palette, centralized so one edit reskins the
 // whole SVG. hsl(var(--token)) resolves inside SVG exactly as
-// in CSS — token-driven, no raw hex. BLUE stays exported for
-// the designer presenter.
-export const BLUE = 'hsl(var(--primary))';
+// in CSS — token-driven, no raw hex.
+const BLUE = 'hsl(var(--primary))';
 const WARN = 'hsl(var(--warning))';
 const GREEN = 'hsl(var(--success))';
 const RED = 'hsl(var(--error))';
@@ -1102,10 +1101,7 @@ export function buildConnectPreview(
             + ` y1="${src.y}"`
             + ` x2="${connect.toX}"`
             + ` y2="${connect.toY}"`
-            + ' stroke='
-            + '"var('
-            + '--color-muted-foreground,'
-            + ' #5a6480)"'
+            + ` stroke="${MUTED}"`
             + ' stroke-width="2"'
             + ' opacity="0.5"'
             + ' pointer-events="none"/>';
@@ -1189,9 +1185,7 @@ export function buildConnectPreview(
         + ' text-anchor="middle"'
         + ' font-size="14"'
         + ' font-weight="600"'
-        + ' fill="var('
-        + '--color-foreground,'
-        + ' #e0e4ef)">'
+        + ` fill="${FOREGROUND}">`
         + 'New State</text>'
         + '</g>';
 }

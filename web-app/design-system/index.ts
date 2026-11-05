@@ -75,6 +75,8 @@ function buildShadowBox(
 const FLOW_BLUE = 'hsl(var(--primary))';
 const FLOW_WARN = 'hsl(var(--warning))';
 const FLOW_GREEN = 'hsl(var(--success))';
+const FLOW_FOREGROUND = 'hsl(var(--foreground))';
+const FLOW_MUTED = 'hsl(var(--muted-foreground))';
 
 const NW = 140;
 const NH = 56;
@@ -147,18 +149,14 @@ function buildFlowNodeSvg(
         + ' text-anchor="middle"'
         + ' font-size="14"'
         + ' font-weight="600"'
-        + ' fill="var('
-        + '--color-foreground,'
-        + ' #e0e4ef)">'
+        + ` fill="${FLOW_FOREGROUND}">`
         + label + '</text>';
     if (subtitle !== '') {
         inner += '<text'
             + ` x="${halfW}" y="40"`
             + ' text-anchor="middle"'
             + ' font-size="11"'
-            + ' fill="var('
-            + '--color-muted-foreground,'
-            + ' #5a6480)">'
+            + ` fill="${FLOW_MUTED}">`
             + subtitle + '</text>';
     }
     inner += '<circle'
@@ -230,9 +228,7 @@ function buildFlowEdgeSvg(
         + ` y="${y + 4}"`
         + ' text-anchor="middle"'
         + ' font-size="11"'
-        + ' fill="var('
-        + '--color-foreground,'
-        + ' #e0e4ef)">'
+        + ` fill="${FLOW_FOREGROUND}">`
         + label + '</text>'
         + '</svg>',
     );
@@ -249,9 +245,7 @@ function buildFlowPortSvg(
         + '<text x="24" y="42"'
         + ' text-anchor="middle"'
         + ' font-size="10"'
-        + ' fill="var('
-        + '--color-muted-foreground,'
-        + ' #5a6480)">'
+        + ` fill="${FLOW_MUTED}">`
         + label + '</text>'
         + '</svg>',
     );
