@@ -19,81 +19,32 @@ import { seedIdentityProvider } from './identity-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-// Pins the CURRENT status of every deliberate identity-spine
-// verb gap, through handleRequest, so Task 4's document-wiring
-// registration (identities/:id onto the generic
-// documentPutHandler) cannot silently move one — a wrong-verb
-// combo shifting from 405/403 to something else would be an
-// accidental route or authz change, not a wiring change. THREE
-// regimes (finding 20), each dispatched a different way:
+// Pins the current identity-spine verb gaps through
+// handleRequest. Four regimes, 46 + 2 + 9 + 1 = 58 tests:
 //
-// (1) the route-table regime — 36 combos across the
-// identity-spine route() patterns (identities, identities/:id,
-// identities/:id/pii, identities/:id/credentials,
-// identities/:id/credentials/:cid, identities/:id/token-
-// revocations/:rid, role-grants, role-grants/:id,
-// identities/:id/tokens,
-// identities/:id/tokens/:jti, identities/:id/tokens/:jti/
-// rotation, identities/:id/tokens/:jti/revocation,
-// identities/:id/providers, identities/:id/providers/:eid):
-// a matched pattern with no handler for the request's verb
-// 405s via handleRequest's own per-method branch ("Method X
-// not allowed on <path>"). Flat identity-tokens patterns are
-// retired and assert 404. Every live pattern here is
-// admin-only for any verb this suite exercises (none of their
-// prefixes appear in authorization.ts's MEMBER_VERBS, aside
-// from '/identities/:id/tokens/' POST and
-// '/identities/:id/token-revocations' PUT, neither of
-// which this regime's POST/DELETE combos exercise), so an
-// admin token is required to reach the 405 branch rather
-// than an earlier 403.
+// (1) Route-table gaps and retired flats — 46 tests.
+// A live path with no handler for the verb 405s. A path
+// that names an identity outside the organization, and
+// a member GET of another identity's providers, 403.
+// Flat identity-pii, identity-tokens,
+// identity-token-revocations, identity-providers, and
+// role-grants paths 404.
 //
-// (2) the default-organization side channel regime — 2
-// combos on /identities/:id/default-organization
-// (api/organization-requests.ts's
-// identityDefaultOrganizationRequest): this side channel never
-// calls matchRoute — it dispatches off ctx.method directly
-// (GET, PUT, else) — so a POST or DELETE falls through its own
-// if-chain to its OWN inline terminal: 405 "Method X not
-// allowed" (no path in the message, UNLIKE the route-table
-// regime's own wording). Authorized by tree ownership (the
-// caller's own identity id), not the admin role policy, so a
-// bare identity token reaches the 405 branch.
+// (2) Default organization — 2 tests. POST and DELETE
+// /identities/:id/default-organization 405. The route
+// wires GET and PUT.
 //
-// (3) the identity-tokens authz-tier regime — GET
-// /identities/:id/tokens is admin-only (absent from
-// MEMBER_VERBS' '/identities/:id/tokens' entry, which lists
-// only POST), so a member-tier token 403s at the authz
-// layer, BEFORE matchRoute even runs. Flat GET
-// /identity-tokens is RETIRED (router 404). POST
-// /identities/:id/tokens/:jti/rotation and .../revocation
-// DO match MEMBER_VERBS' POST entry (segment-boundary
-// prefix) — a member-tier token clears that coarse policy
-// check, but api/api.ts's Region B self-only guard (Task
-// 12a) then 403s BEFORE any read when the path identity is
-// not the actor. Naming its OWN identity still answers on
-// domain terms (409 reuse for an unknown rotation jti; 404
-// for an unknown revocation jti). Flat POST
-// /identity-tokens/:jti/rotation is RETIRED (router 404).
-// Path identity must match the jti's identity or 403; an
-// absent jti GET 404s.
+// (3) Identity tokens — 9 tests. An admin GET of the
+// nest lists. A member GET 403s. Flat /identity-tokens
+// and its rotation and revocation paths 404. A member
+// POST of rotation or revocation naming another
+// identity 403s, and so does rotation through an
+// unseated path identity. GET of an absent jti 404s.
 //
-// (4) the identity-token-revocations authz-tier regime —
-// 1 combo: GET identities/:id/token-revocations/:rid stays
-// admin-only. PUT matches MEMBER_VERBS'
-// '/identities/:id/token-revocations' PUT, so a member-tier
-// token clears authz and reaches the route handler — which
-// then answers on api/api.ts's Region B self-only fence
-// (path identity vs actor). Flat
-// /identity-token-revocations/:rid is RETIRED (router 404).
-// A foreign target's 403 lives in
-// tests/api-identity-token-revocations-self.test.ts.
-//
-// 36 + 2 + 3 + 1 = 42 combos (the brief's own estimate was ~19
-// per route-table-style regime; this is the actual, execution-
-// time enumeration, verified by a temporary observed-value probe
-// before every assertion below was pinned, per Step 0/Step 1 of
-// the task brief).
+// (4) Own token-revocation PUT — 1 test. A member PUT
+// of its own identities/:id/token-revocations/:rid
+// answers 201. The path-level self/foreign fence lives
+// in tests/api-identity-token-revocations-self.test.ts.
 
 function req(
     method: string,
@@ -132,7 +83,7 @@ async function assertOutside(
     });
 }
 
-// ── regime 1: the route-table 405s (15 patterns, 36 combos) ──
+// ── regime 1: route-table gaps and retired flats (46) ──
 
 // Task 10: PATCH alphabet — no identity-spine patch yet.
 Deno.test('PATCH identities/:id on an outsider is forbidden',
@@ -675,8 +626,7 @@ async () => {
     assertStrictEquals(res.status, 404);
 });
 
-// ── regime 2: the default-organization side channel's own
-// inline 405 terminal (2 combos) ──
+// ── regime 2: default-organization POST and DELETE (2) ──
 
 Deno.test('POST identities/:id/default-organization 405s (side'
 + ' channel never matches routes)', async () => {
@@ -706,8 +656,7 @@ Deno.test('DELETE identities/:id/default-organization 405s (side'
     assertStrictEquals(res.status, 405);
 });
 
-// ── regime 3: the identity-tokens GET-admin/POST-member authz
-// asymmetry (nested under the identity; flat RETIRED) ──
+// ── regime 3: identity-tokens authz and retired flats (9) ──
 
 const TOKEN_AT = '2026-01-01T00:00:00.000000Z';
 const TOKEN_JTI = generateIdentifier();
@@ -876,8 +825,7 @@ Deno.test('GET /identities/:id/tokens/:jti 404s for an absent'
     );
 });
 
-// ── regime 4: the identity-token-revocations PUT-member/
-// GET-admin authz asymmetry (WP8, Phase 13 Task 8; 1 combo) ──
+// ── regime 4: own token-revocation PUT (1) ──
 
 Deno.test('PUT identities/:id/token-revocations/:rid clears'
 + ' authz for a member-tier token naming itself'

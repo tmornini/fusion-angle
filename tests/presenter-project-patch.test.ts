@@ -7,8 +7,8 @@ import {
 } from '../web-app/app/presenters/project-detail.ts';
 import { responseMessage } from './fixtures/response-message.ts';
 
-// None of api/types.ts, adapters/projects.ts, or
-// presenters/project-detail.ts reads localStorage (checked
+// None of shared/types.ts, web-app/app/project-view.ts,
+// or presenters/project-detail.ts reads localStorage (checked
 // against the full product tree); window/document are
 // stubbed only because a real DOM tree is out of scope for
 // these pure-function tests but the presenter module graph
