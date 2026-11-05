@@ -1,4 +1,4 @@
-import { assertEquals, assertStrictEquals, assertThrows } from '@std/assert';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import { PUT } from './in-page-facade.ts';
 import {
     memoryDbAdapter,
@@ -6,20 +6,11 @@ import {
 } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { ValidationError } from '../shared/types.ts';
-import type { RecordAttributeEntity } from '../shared/types.ts';
-import {
-    validateRecordAttributeDocumentBody,
-} from '../api/validators.ts';
-import { postRecordAttributeDocumentOp } from '../api/routes.ts';
 import {
     runWrite,
     attemptFor,
     formWriteMessagePair,
 } from '../api/message-pair.ts';
-import {
-    ATTRIBUTE_DETAIL_PATTERN,
-} from '../api/family-registry.ts';
 import {
     deriveDocumentsAt,
 } from '../api/derive-documents.ts';
@@ -30,7 +21,6 @@ import { operationIdHeader } from
 
 
 const RECORD_ID = generateIdentifier();
-const ATTRIBUTE_ID = generateIdentifier();
 
 // Phase 6 Task 3 (sixth family, 'stateless' evidence #2): PUT
 // /record-attributes/:id takes the entity's OWN fields only —
@@ -51,122 +41,6 @@ function documentFields() {
         constraints: [],
     };
 }
-
-// -- 1. validateRecordAttributeDocumentBody -----------------
-
-Deno.test('validateRecordAttributeDocumentBody accepts the entity'
-+ ' fields plus an optional organization_id and stamps ACL'
-+ ' defaults', () => {
-    const doc = validateRecordAttributeDocumentBody({
-        ...documentFields(),
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-    });
-    assertEquals(doc.entity, {
-        ...documentFields(),
-        read_roles: ['member', 'admin'],
-        write_roles: ['member', 'admin'],
-    } as typeof doc.entity);
-});
-
-Deno.test('validateRecordAttributeDocumentBody accepts the entity'
-+ ' fields with organization_id absent and stamps ACL'
-+ ' defaults', () => {
-    const doc = validateRecordAttributeDocumentBody(
-        documentFields(),
-    );
-    assertEquals(doc.entity, {
-        ...documentFields(),
-        read_roles: ['member', 'admin'],
-        write_roles: ['member', 'admin'],
-    } as typeof doc.entity);
-});
-
-Deno.test('validateRecordAttributeDocumentBody rejects a trio key'
-+ ' at the gate (no lifecycle concept exists to admit one)',
-() => {
-    assertThrows(
-        () => validateRecordAttributeDocumentBody({
-            ...documentFields(),
-            state: 'active',
-        }),
-        ValidationError,
-    );
-    assertThrows(
-        () => validateRecordAttributeDocumentBody({
-            ...documentFields(),
-            state_at: '2026-01-01T00:00:00.000000Z',
-        }),
-        ValidationError,
-    );
-    assertThrows(
-        () => validateRecordAttributeDocumentBody({
-            ...documentFields(),
-            state_event_id: 'ev-1',
-        }),
-        ValidationError,
-    );
-});
-
-Deno.test('validateRecordAttributeDocumentBody rejects an'
-+ ' options-less select attribute (the shared'
-+ ' constraint/options rule carries over intact)', () => {
-    assertThrows(
-        () => validateRecordAttributeDocumentBody({
-            ...documentFields(),
-            attribute_type: 'select',
-            options: [],
-        }),
-        ValidationError,
-    );
-});
-
-// -- 2. postRecordAttributeDocumentOp (below-gate,
-// MemoryDbAdapter) -------------------------------------------
-
-Deno.test('postRecordAttributeDocumentOp writes exactly the'
-+ ' record_attributes row and the pair', async () => {
-    const db = memoryDbAdapter();
-    await db.postSchemaCreation();
-    const body = {
-        ...documentFields(),
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-    };
-    const messagePair = await formWriteMessagePair({
-        method: 'PUT',
-        pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
-            + RECORD_ID + '/attributes/' + ATTRIBUTE_ID,
-        routePattern: ATTRIBUTE_DETAIL_PATTERN,
-        routeSegments: ATTRIBUTE_DETAIL_PATTERN.split('/'),
-        pathSegments: [
-            'organizations', 'AjdvjuECVZEgZoFajaIEkg',
-            'record-types', RECORD_ID, 'attributes',
-            ATTRIBUTE_ID,
-        ],
-        headerFields: [], body,
-        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
-        requestAt: '2026-01-01T00:00:00.000000Z',
-        organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseBody: body,
-        operationId: generateIdentifier(),
-        requestId: generateIdentifier(),
-    });
-    // Phase Final Task 2: record_attributes ROW half stripped
-    // — message plane + op return are the oracles.
-    const written = await postRecordAttributeDocumentOp(
-        db, ATTRIBUTE_ID, body, 'XXZruirZyAOoRpNxaDnpSA',
-        messagePair,
-    );
-    assertEquals(written, {
-        id: ATTRIBUTE_ID,
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-        ...documentFields(),
-        read_roles: ['member', 'admin'],
-        write_roles: ['member', 'admin'],
-    } as RecordAttributeEntity);
-    // Phase Final Stage B: record_attributes table retired.
-    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
-});
 
 // -- 3. byte-identical resend (the shadow-ledger pin's sibling
 // at the op level — see tests/api-work-order-document.test.ts's

@@ -35,7 +35,6 @@ import type {
     ProjectObjectiveBaselineScoreEntity,
     ProjectObjectiveActualScoreEntity,
     RecordEntity,
-    RecordAttributeEntity,
     IdentityProviderEntity,
     MessagePairEntity,
     TransitionFieldValueEntity,
@@ -69,7 +68,6 @@ import {
     validateProjectDocumentBody,
     validateProjectFlowEntity,
     validateFlowTagName,
-    validateRecordAttributeDocumentBody,
     validateAttributeDocument,
     validateInstancePutBody,
     validateInstancePatchBody,
@@ -1182,41 +1180,6 @@ export async function postRecordDocumentOp(
     } as unknown as Omit<RecordEntity, 'id'>;
     // Phase Final Task 2: records ROW half stripped;
     // states ROW half stripped (message plane only).
-    if (messagePair !== undefined) {
-        await runWrite(
-            db,
-            attemptFor([messagePair]),
-            [messagePair],
-        );
-    }
-    return { id, ...entity };
-}
-
-// Record attribute document write — the sixth family, and the
-// SECOND 'stateless' one (vacuous BY CONSTRUCTION). Phase Final
-// Task 2: the record_attributes ROW half is stripped — pure
-// message-plane write (postWorkOrderDocumentOp shape).
-// WRITE_RESPONSE_SPECS successBody forms the wire bytes; the
-// reconstructed return is for below-facade callers and type
-// parity. validateRecordAttributeDocumentBody rejects a body
-// carrying state at the gate. `messagePair` is optional. The actor
-// parameter is spelled `_actor`: no state event here to author.
-export async function postRecordAttributeDocumentOp(
-    db: DbAdapter,
-    id: Id,
-    body: Record<string, unknown>,
-    _actor: Id,
-    messagePair?: MessagePair,
-): Promise<RecordAttributeEntity> {
-    const doc = validateRecordAttributeDocumentBody(
-        withoutId(body),
-    );
-    const entity = {
-        ...doc.entity,
-        ...documentOperationOrganization(body),
-    } as unknown as Omit<RecordAttributeEntity, 'id'>;
-    // Phase Final Task 2: record_attributes ROW half
-    // stripped.
     if (messagePair !== undefined) {
         await runWrite(
             db,
