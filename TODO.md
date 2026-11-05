@@ -2237,6 +2237,12 @@ Off the critical path; each with its oracle.
     parameter carries no rendering test, unlike
     `RecordInstancesPresenter`'s; then Layer 2 for the
     live sequence
+  - AI-only-member and zero-member node visibility in the
+    inbox (WB20) — Layer 1; no fixture in
+    `tests/workbox-inbox.test.ts` uses either
+  - Archive-tab visibility being independent of which
+    members the final transition referenced (WB21) —
+    Layer 1; no fixture varies this
   - The stats page shell's absences — no left toolbar, no
     slide-in props panel, no marquee — and the pointer
     cursor over a node (FS1) — Layer 2, reading computed
