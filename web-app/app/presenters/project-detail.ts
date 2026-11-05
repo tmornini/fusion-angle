@@ -580,8 +580,12 @@ function buildEditableBaselineCell(
         step="any" />`;
 }
 
-function buildReadonlyMetrics(
+function buildMetrics(
     view: ProjectView,
+    costBaseline: number,
+    baselineCell: (
+        m: MetricArgs,
+    ) => SafeHtml,
 ): SafeHtml {
     const metrics: MetricArgs[] = [
         {
@@ -600,7 +604,7 @@ function buildReadonlyMetrics(
             inputId: 'cost',
             field: 'costBaseline',
             icon: iconDollarSign,
-            baseline: view.costBaselineK(),
+            baseline: costBaseline,
             actual: view.costActualK(),
             unit: 'k',
             prefix: '$',
@@ -640,79 +644,7 @@ function buildReadonlyMetrics(
                 ${metrics.map(m =>
                     buildMetricCell(
                         m,
-                        buildReadonlyBaselineCell(
-                            m,
-                        ),
-                    ))}
-            </div>
-        </div>`;
-}
-
-function buildEditableMetrics(
-    view: ProjectView,
-    draft: ProjectDraftFields,
-): SafeHtml {
-    const metrics: MetricArgs[] = [
-        {
-            label: 'Time',
-            inputId: 'time',
-            field: null,
-            icon: iconClock,
-            baseline: view.timeBaselineDays(),
-            actual: view.timeActualDays(),
-            unit: 'd',
-            prefix: '',
-            isLowerBetter: true,
-        },
-        {
-            label: 'Cost',
-            inputId: 'cost',
-            field: 'costBaseline',
-            icon: iconDollarSign,
-            baseline:
-                Number(draft.costBaseline),
-            actual: view.costActualK(),
-            unit: 'k',
-            prefix: '$',
-            isLowerBetter: true,
-        },
-        {
-            label: 'Impact',
-            inputId: 'impact',
-            field: null,
-            icon: iconTrendingUp,
-            baseline: view.impactBaselineMean(),
-            actual: view.impactActualMean(),
-            unit: ' pts',
-            prefix: '',
-            isLowerBetter: false,
-        },
-    ];
-    return html`
-        <div class="card p-6">
-            <div class="${
-                'flex items-center'
-                + ' justify-between mb-6'
-            }">
-                <h2 class="${
-                    'text-lg font-display'
-                    + ' font-semibold'
-                }">
-                    Project Metrics
-                </h2>
-                <span class="${
-                    'text-xs text-muted'
-                }">
-                    Real-time comparison
-                </span>
-            </div>
-            <div class="score-grid">
-                ${metrics.map(m =>
-                    buildMetricCell(
-                        m,
-                        buildEditableBaselineCell(
-                            m,
-                        ),
+                        baselineCell(m),
                     ))}
             </div>
         </div>`;
@@ -945,7 +877,11 @@ export class ProjectDetailPresenter {
         mutateSlot(
             container,
             '.project-metrics-slot',
-            buildReadonlyMetrics(this.#view),
+            buildMetrics(
+                this.#view,
+                this.#view.costBaselineK(),
+                buildReadonlyBaselineCell,
+            ),
         );
         mutateSlot(
             container,
@@ -1017,8 +953,10 @@ export class ProjectDetailEditPresenter {
         mutateSlot(
             container,
             '.project-metrics-slot',
-            buildEditableMetrics(
-                this.#view, this.#draft,
+            buildMetrics(
+                this.#view,
+                Number(this.#draft.costBaseline),
+                buildEditableBaselineCell,
             ),
         );
         mutateSlot(
