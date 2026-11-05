@@ -109,28 +109,15 @@ makes.
   refused, and an invented `supersedes` raises in the
   trigger.
 
-## seed/ (2026-09-23, 2026-09-24)
+## seed/ (2026-09-24)
 
-Item 0's seed figures, and the rehearsal transaction's.
-Run from the repository root. `landing.ts`, and
-`rehearsal.ts` for its Postgres figure, also need
-Postgres 18.6 in a container named `fa-seed-probe`,
+The rehearsal transaction's figures. Run from the
+repository root. `rehearsal.ts` for its Postgres figure
+needs Postgres 18.6 in a container named `fa-seed-probe`,
 database `probe`, tmpfs on `/var/lib/postgresql`, the
 compose shape, on host port 55433, named by
 `FA_PROBE_POSTGRES_URL`.
 
-- `shape.ts` — the seed on the memory backend: pairs by
-  method, chain depth, re-creations after a DELETE,
-  operation ids, bytes, and the POST whose body equals the
-  document it shares a name with.
-- `landing.ts` — the seed spec's sequence: rehearse the
-  mock-data seed on a scratch memory backend, record each
-  statement, and land the recordings by depth in one
-  Postgres transaction with the DDL, the root, and the
-  marker. `fail` breaks the last batch; `full` pads the
-  first batch to 2,340 rows.
-- `repoint.ts` — a default-organization PUT to a second
-  organization answers 200, and the default stays.
 - `rehearsal.ts` — the rehearsal transaction spec's
   figures, run at its base and its head: the
   rehearsal's recorded statements replayed through a
