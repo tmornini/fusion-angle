@@ -129,6 +129,7 @@ import {
 } from '../shared/identifier.ts';
 import { addUtcSeconds } from '../shared/work-order-claims.ts';
 import { withWorkOrderSearch } from './work-order-search.ts';
+import { withMembershipSearch } from './membership-search.ts';
 import {
     collectAttributeReferrers,
     hasReferrers,
@@ -5309,11 +5310,11 @@ export const routes: Route[] = [
         select: getOrganizationInvitations,
         post: postOrganizationInvitation,
     }),
-    route('organizations/:id/memberships/', {
+    withMembershipSearch(route('organizations/:id/memberships/', {
         query: membershipsViewQueryOf,
         select: getOrganizationInvitations,
         post: postOrganizationMembership,
-    }),
+    })),
     route(
         'organizations/:id/invitations/:membership-id',
         {

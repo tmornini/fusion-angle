@@ -20,6 +20,7 @@ import {
     buildHumanMemberMap,
     getHumanMemberProfile,
     isHumanSeat,
+    requireOrganization,
 } from './members.ts';
 import {
     buildAIAgentMap,
@@ -161,6 +162,21 @@ export async function getFormerMembers(
     );
     return removed.map(
         part => new FormerMember(part.body().toValue()),
+    );
+}
+
+// The organization's memberships in `state` matching
+// `text`, best match first, each joined as the memberships
+// GET serves it.
+export async function queryMembershipEntities(
+    ctx: RequestContext,
+    text: string,
+    state: 'accepted' | 'removed',
+): Promise<HttpMessage<MembershipReadEntity>[]> {
+    return await ctx.QUERY<MembershipReadEntity>(
+        'organizations/' + requireOrganization(ctx)
+            + '/memberships/?state=' + state,
+        { q: text },
     );
 }
 

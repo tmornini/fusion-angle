@@ -490,3 +490,23 @@ Deno.test('a QUERY room takes q and answers as a collection',
     assert(!html.includes('Response headers'));
     assert(!html.includes('If-Match'));
 });
+
+// A QUERY reads as its GET does, so its room names the
+// storage field the GET's view selects on.
+Deno.test('the memberships QUERY room names the GET\'s storage'
+    + ' field', () => {
+    const rooms = generateAll();
+    const uri = '/organizations/:id/memberships/';
+    const storageOf = (verb: string): string => {
+        const html = roomHtmlOf(rooms, verb, uri);
+        assert(html, verb + ' ' + uri);
+        const at = html.indexOf('<h2>Storage</h2>');
+        assert(at >= 0, verb + ' ' + uri);
+        return html.slice(at, html.indexOf('</ul>', at));
+    };
+    assertStrictEquals(storageOf('query'), storageOf('get'));
+    assertMatch(
+        storageOf('query'),
+        /\/invitations\/ selects on organization_id/,
+    );
+});

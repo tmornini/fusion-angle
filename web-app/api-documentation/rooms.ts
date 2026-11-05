@@ -3290,6 +3290,28 @@ export const API_DOC_ROOMS:
         ],
     },
     {
+        hash: 'query/organizations/id/memberships',
+        verb: 'QUERY',
+        uri: '/api/organizations/:id/memberships/',
+        body: '{\n  "q": "approval"\n}',
+        headers:
+        [
+            'Authorization: Bearer …',
+            'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [],
+        statuses:
+        [
+            '200',
+            '204',
+            '400',
+            '401',
+            '403',
+            '415',
+        ],
+    },
+    {
         hash: 'query/organizations/id/work-orders',
         verb: 'QUERY',
         uri: '/api/organizations/:id/work-orders/',

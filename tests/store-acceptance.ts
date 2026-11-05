@@ -791,6 +791,50 @@ export function defineStoreAcceptance(
         );
     });
 
+    // The join's names ride the body-indexed seat read and
+    // the PII histories on each store.
+    Deno.test(name + ': memberships QUERY matches by name',
+    async () => {
+        const { db, token } = await ready();
+        const memberships = '/organizations/' + ORGANIZATION
+            + '/memberships/';
+        const ids: string[] = [];
+        for (const personName of ['Kestral Moss', 'Kestrel Moss']) {
+            const id = generateIdentifier();
+            const seated = await handleRequest(db, req(
+                'POST', memberships, token, {
+                    id,
+                    kind: 'human',
+                    membership: { type: 'member', at: AT },
+                    identity: {
+                        title: 'Engineer',
+                        department: 'Product',
+                        strengths: [],
+                        team_dimensions: {},
+                    },
+                    pii: {
+                        name: personName,
+                        email: id.toLowerCase() + '@example.com',
+                        phone: '',
+                        bio: '',
+                    },
+                },
+            ));
+            assertStrictEquals(seated.status, 201);
+            await seated.body?.cancel();
+            ids.push(membershipNameOf(ORGANIZATION, id));
+        }
+        const searched = await handleRequest(db, req(
+            'QUERY', memberships, token, { q: 'kestrel' },
+        ));
+        assertStrictEquals(searched.status, 200);
+        assertEquals(
+            (await partsOf<{ id: string }>(searched))
+                .map((part) => part.body().toValue().id),
+            [ids[1], ids[0]],
+        );
+    });
+
     Deno.test(name + ': an empty head batch answers no'
     + ' entries', async () => {
         const { db } = await ready();
