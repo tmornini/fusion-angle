@@ -7,7 +7,7 @@ import {
 // with it. Keys are generated IN-TEST — no fixture key
 // material is ever committed; the public half is exported as
 // the JWKS the client row registers.
-export interface AssertionSigner {
+interface AssertionSigner {
     readonly jwks: string;
     sign(
         claims: Record<string, unknown>,

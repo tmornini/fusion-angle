@@ -539,7 +539,7 @@ export async function signIn(
 // The race wraps startOrigin, newPage, signIn, the
 // body, and cleanup: dispose on a dead socket must
 // not pin withAdminPage's await.
-export const TEST_BODY_TIMEOUT_MS = 120_000;
+const TEST_BODY_TIMEOUT_MS = 120_000;
 
 export async function withTimeout<T>(
     work: Promise<T>,
