@@ -208,9 +208,12 @@ doctrine):
 - Subject: a single line ≈50 chars, present-tense imperative,
   no prose body beyond the mandated `Co-Authored-By` trailer.
 - Never move/rename and change content in the same commit.
-- Land each unit of work on master as one merge commit
-  (`--no-ff`) whose message describes the whole unit; the
-  branch's own commits stay linear on top of master.
+- The operator initiates every merge to master. When
+  asked, land the unit as one merge commit (`--no-ff`)
+  whose message describes the whole unit; the branch's
+  own commits stay linear on top of master. Absent that
+  ask, a finished unit rests as a squashed, Layer-1-green
+  branch, and the agent reports its name.
 
 ## Worktrees
 
