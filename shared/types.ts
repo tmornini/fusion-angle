@@ -734,28 +734,6 @@ export class HumanMember {
             }
             : { present: false };
     }
-
-    matchesSearch(term: string): boolean {
-        const t = term.toLowerCase();
-        if (
-            this.#profile.present
-            && (
-                this.#profile.title
-                    .toLowerCase().includes(t)
-                || this.#profile.department
-                    .toLowerCase().includes(t)
-            )
-        ) {
-            return true;
-        }
-        if (this.#pii.erased) return false;
-        return (
-            this.#pii.name
-                .toLowerCase().includes(t)
-            || this.#pii.email
-                .toLowerCase().includes(t)
-        );
-    }
 }
 
 // ai_members detail row, keyed by the shared member id.
@@ -834,18 +812,6 @@ export class AIMember {
     modelId(): ModelId {
         return this.#model;
     }
-
-    matchesSearch(term: string): boolean {
-        const lowerTerm = term.toLowerCase();
-        return (
-            this.#name
-                .toLowerCase()
-                .includes(lowerTerm)
-            || this.#description
-                .toLowerCase()
-                .includes(lowerTerm)
-        );
-    }
 }
 
 export class ServiceMember {
@@ -882,18 +848,6 @@ export class ServiceMember {
     descriptionText(): string {
         return this.#description;
     }
-
-    matchesSearch(term: string): boolean {
-        const lowerTerm = term.toLowerCase();
-        return (
-            this.#name
-                .toLowerCase()
-                .includes(lowerTerm)
-            || this.#description
-                .toLowerCase()
-                .includes(lowerTerm)
-        );
-    }
 }
 
 // System member: a synthetic, read-only actor — the
@@ -919,12 +873,6 @@ export class SystemMember {
 
     name(): string {
         return this.#name;
-    }
-
-    matchesSearch(term: string): boolean {
-        return this.#name
-            .toLowerCase()
-            .includes(term.toLowerCase());
     }
 }
 
@@ -959,10 +907,6 @@ export class FormerMember {
 
     at(): string {
         return this.#at;
-    }
-
-    matchesSearch(_term: string): boolean {
-        return false;
     }
 }
 

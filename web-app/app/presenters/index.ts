@@ -54,6 +54,7 @@ export {
     applyManagedMembersKind,
     type ManagedMembersState,
     type MemberKindFilter,
+    type MemberSearch,
 } from './member.ts';
 export {
     InvitationListPresenter,
