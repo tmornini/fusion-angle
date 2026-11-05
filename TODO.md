@@ -3096,23 +3096,30 @@ Off the critical path; each with its oracle.
   carries `WWW-Authenticate`, Bearer on the
   resource door.
 - One strong `etag` serves projections that
-  differ by reader, and nothing sends `Vary`.
-  The stored line quotes the pair id
-  (`api/message-pair.ts:322-323`) and
+  differ by reader. The stored line quotes the
+  pair id (`api/message-pair.ts:322-323`) and
   `servedResponse` keeps it while
   `projectedBody` drops keys or values, or joins
-  keys (`api/served-response.ts:186-222`;
+  keys (`api/served-response.ts:186-223`;
   readers at `api/routes.ts:3425-3457` and
-  `api/invitations-domain.ts:486-491`). No file
-  under `api/` or `server/` writes `Vary`. The
-  edge sets `Cache-Control: no-store` when the
-  handler set none
-  (`server/http-server.ts:607-610`), so a shared
-  cache does not store the response today. A
-  conditional GET, in Cachability above, would 304
-  one reader's bytes for another. Oracle: a
-  projected representation's strong etag changes
-  with the bytes, or the response sends `Vary`
+  `identityKindJoin`,
+  `api/invitations-domain.ts:490-498`). An API
+  response sends no `Vary` for that selection.
+  The server writes `Vary` elsewhere:
+  `Accept-Encoding` when a static file has a
+  gzip sidecar
+  (`server/http-server.ts:474-476`), and
+  `Accept, Content-Type` on `/status`
+  (`STATUS_VARY`, `server/http-server.ts:85`,
+  `:353`, `:371`, `:661`). The edge sets
+  `Cache-Control: no-store` when the handler
+  set none (`server/http-server.ts:746-749`),
+  so a shared cache does not store the API
+  response today. A conditional GET, in
+  Cachability above, would 304 one reader's
+  bytes for another. Oracle: a projected
+  representation's strong etag changes with
+  the bytes, or the response sends `Vary`
   naming what selected them.
 - A write carrying both `If-Match` and
   `If-None-Match` is refused 412
@@ -3163,7 +3170,7 @@ Off the critical path; each with its oracle.
   the buffer scan
   (`api/backend-buffer-tx.ts:347`), and no table
   declares a unique column (`api/db.ts:82-85`,
-  `:343-344`, `:370-375`). Oracle: the dead 412
+  `:333-334`, `:360-365`). Oracle: the dead 412
   catch and its throw are gone, or a declared
   unique column reaches one status on both
   backends and a test pins it.
