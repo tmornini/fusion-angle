@@ -14,8 +14,10 @@ import {
     seedAdminSchema,
     seedOrganizationDocument,
 } from './test-fixtures.ts';
-import { SYSTEM_MEMBER_ID } from
-    '../shared/types.ts';
+import {
+    DEFAULT_ATTRIBUTE_ACL_ROLES,
+    SYSTEM_MEMBER_ID,
+} from '../shared/types.ts';
 import {
     seedIdentityCredential,
     seedPersonIdentity,
@@ -519,6 +521,22 @@ async function seedChain(
         },
     ));
     assertStrictEquals(recWrite.status, 201);
+    // The transition's value names this attribute; a work
+    // order's event values are served under its read rule.
+    const attributeWrite = await handleRequest(db, req(
+        'PUT',
+        '/organizations/' + organization
+            + '/record-types/' + ids.record
+            + '/attributes/' + ids.attribute,
+        recToken,
+        {
+            name: 'a', attribute_type: 'text', sort_order: 0,
+            options: [], constraints: [],
+            read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+            write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+        },
+    ));
+    assertStrictEquals(attributeWrite.status, 201);
     // Seeded through the live create, so the message plane owns
     // the work order and its flow join; the join's id is read
     // back for the nested-join pins below.

@@ -242,7 +242,7 @@ async () => {
         () => postWorkOrderDocumentOp(
             db, 'yAhMcJGxllmQkLemOQjCmA', body,
             'XXZruirZyAOoRpNxaDnpSA', messagePair,
-            'AjdvjuECVZEgZoFajaIEkg',
+            'AjdvjuECVZEgZoFajaIEkg', ['admin'],
         ),
         EntityNotFoundError,
     );

@@ -639,6 +639,7 @@ Deno.test(
             kind: 'own',
             received: pair,
             state: { id: IDEA, title: 'Fields', facet: 1 },
+            reader: { sees: 'whole' },
         });
         assertStrictEquals(answer.response.status, 201);
         assertEquals(

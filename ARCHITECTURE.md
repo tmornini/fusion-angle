@@ -408,7 +408,17 @@ and `transition` are required; the binding and `claim`
 are absent keys when unset, never null. `events`
 holds only the lifecycle events that led from the
 previous version to this one, each
-`{ id, state, member_id, at, field_values }`.
+`{ id, state, member_id, at, field_values }`. Every
+read of a work order — the document, the collection,
+its versions — and every answer to a write on one
+serves each event's `field_values` under the read rule
+of the attribute each names, as the instance GETs serve
+values: a value the reader's roles may not read, or
+whose attribute no longer exists, is absent. The
+attribute is the bound record type's; a legacy value on
+an unbound work order is judged by the one attribute of
+that id in the organization, and an id two record types
+share leaves it unreadable.
 
 Five operations each land one version through the
 former, answering the work order's state:

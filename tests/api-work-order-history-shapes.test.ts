@@ -11,6 +11,8 @@ import {
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
+import { seedMemberReadableAttributes } from
+    './fixtures/record-attributes.ts';
 import { formWriteMessagePair } from '../api/message-pair.ts';
 import { postSeedWorkOrderTransitionOp } from '../api/routes.ts';
 import {
@@ -52,6 +54,11 @@ const [ATTR_B0, ATTR_B1, ATTR_B2] = [
     generateIdentifier(),
     generateIdentifier(),
 ].sort(compareIdentifiers);
+// Literal ids pin the id-ascending order of one event's
+// rows: upper case sorts before lower.
+const ATTR_LITERAL_Y = 'UQTJZvCoKlFjEoDlDUwekw';
+const ATTR_LITERAL_X = 'UZgNCkZlSJcSaAmAJuSkcw';
+const ATTR_CLEARED = 'a3ClearedAttributeIdQw';
 
 function req(
     method: string,
@@ -141,6 +148,14 @@ async function seedBaseDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedCurrentMember(db);
+    await seedMemberReadableAttributes(
+        db, ORGANIZATION, DEV_TOKEN,
+        [
+            ATTR_SEVERITY, ATTR_X,
+            ATTR_B0!, ATTR_B1!, ATTR_B2!,
+            ATTR_LITERAL_Y, ATTR_LITERAL_X, ATTR_CLEARED,
+        ],
+    );
     return db;
 }
 
@@ -298,10 +313,10 @@ async () => {
             targetState: 'n-finish',
             ...BOUND,
             set: [
-                { attribute_id: 'UZgNCkZlSJcSaAmAJuSkcw', value: 'x' },
-                { attribute_id: 'UQTJZvCoKlFjEoDlDUwekw', value: 'y' },
+                { attribute_id: ATTR_LITERAL_X, value: 'x' },
+                { attribute_id: ATTR_LITERAL_Y, value: 'y' },
             ],
-            clear: ['a3'],
+            clear: [ATTR_CLEARED],
             release: null,
             transitionAt: nowUtc(),
         },
@@ -318,14 +333,24 @@ async () => {
     assert(row !== undefined);
     assertEquals(other!.field_values, []);
     assertEquals(row!.field_values, [
-        { id: 'UQTJZvCoKlFjEoDlDUwekw'
-            , attribute_id: 'UQTJZvCoKlFjEoDlDUwekw', value: 'y' },
-        { id: 'UZgNCkZlSJcSaAmAJuSkcw'
-            , attribute_id: 'UZgNCkZlSJcSaAmAJuSkcw', value: 'x' },
-        { id: 'a3', attribute_id: 'a3', cleared: true },
+        {
+            id: ATTR_LITERAL_Y,
+            attribute_id: ATTR_LITERAL_Y,
+            value: 'y',
+        },
+        {
+            id: ATTR_LITERAL_X,
+            attribute_id: ATTR_LITERAL_X,
+            value: 'x',
+        },
+        {
+            id: ATTR_CLEARED,
+            attribute_id: ATTR_CLEARED,
+            cleared: true,
+        },
     ]);
     const cleared = row!.field_values.find(
-        (fv) => fv.id === 'a3',
+        (fv) => fv.id === ATTR_CLEARED,
     );
     assert(cleared !== undefined);
     assertStrictEquals(Object.hasOwn(cleared!, 'value'), false);

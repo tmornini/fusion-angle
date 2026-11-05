@@ -57,7 +57,8 @@ export type KeyReadRoles = ReadonlyMap<
 // What a reader sees of a body: all of it, the keys its
 // roles admit, an instance's values its roles may read
 // by attribute (admin bypass included, as rolesCanRead),
-// or all of it joined with keys the selector derived.
+// a work order's event values under that same rule, or
+// all of it joined with keys the selector derived.
 export type Reader =
     | { readonly sees: 'whole' }
     | {
@@ -76,6 +77,19 @@ export type Reader =
     | {
         readonly sees: 'values',
         readonly attributesById: ReadonlyMap<
+            string, AttributeSchemaRow
+        >,
+        readonly roles: readonly string[],
+    }
+    | {
+        readonly sees: 'event-values',
+        // A bound work order's values, by its record type.
+        readonly boundSchemas: ReadonlyMap<
+            string, ReadonlyMap<string, AttributeSchemaRow>
+        >,
+        // A legacy value on an unbound work order: the
+        // attributes whose id names one record type only.
+        readonly unboundSchema: ReadonlyMap<
             string, AttributeSchemaRow
         >,
         readonly roles: readonly string[],
@@ -215,7 +229,9 @@ export function projectedBody(
             ? keptValues(
                 record, reader.attributesById, reader.roles,
             )
-            : joinedKeys(record, reader.joined);
+            : reader.sees === 'event-values'
+                ? keptEventValues(record, reader)
+                : joinedKeys(record, reader.joined);
     if (kept === undefined) return body;
     return Octets.fromBytes(new TextEncoder().encode(
         JSON.stringify(sortJsonKeys(kept)),
@@ -237,7 +253,8 @@ function keptKeys(
         .filter(([key]) => !hidden.includes(key)));
 }
 
-// An attribute absent from the schema is unreadable.
+// An instance keeps the values its reader may read.
+// undefined: nothing was dropped.
 function keptValues(
     record: Record<string, unknown>,
     attributesById: ReadonlyMap<string, AttributeSchemaRow>,
@@ -249,17 +266,70 @@ function keptValues(
             'projected instance body has no values array',
         );
     }
-    const readable = values.filter((entry) => {
-        const id = (entry as { attribute_id?: unknown })
-            .attribute_id;
-        const attribute = typeof id === 'string'
-            ? attributesById.get(id)
-            : undefined;
-        return attribute !== undefined
-            && rolesCanRead(roles, attribute);
-    });
+    const readable = values.filter((entry) =>
+        isReadableValue(entry, attributesById, roles));
     if (readable.length === values.length) return undefined;
     return { ...record, values: readable };
+}
+
+// An attribute absent from the schema is unreadable.
+function isReadableValue(
+    entry: unknown,
+    attributesById: ReadonlyMap<string, AttributeSchemaRow>,
+    roles: readonly string[],
+): boolean {
+    const id = (entry as { attribute_id?: unknown })
+        .attribute_id;
+    const attribute = typeof id === 'string'
+        ? attributesById.get(id)
+        : undefined;
+    return attribute !== undefined
+        && rolesCanRead(roles, attribute);
+}
+
+const NO_ATTRIBUTES: ReadonlyMap<string, AttributeSchemaRow> =
+    new Map();
+
+// A work order's events each carry the values their
+// transition set; an event keeps those its reader may
+// read, by the instance rule over the record type the
+// work order is bound to. undefined: nothing was dropped.
+function keptEventValues(
+    record: Record<string, unknown>,
+    reader: Extract<Reader, { sees: 'event-values' }>,
+): Record<string, unknown> | undefined {
+    const recordTypeId = record['record_type_id'];
+    const attributesById = typeof recordTypeId === 'string'
+        ? reader.boundSchemas.get(recordTypeId) ?? NO_ATTRIBUTES
+        : reader.unboundSchema;
+    const roles = reader.roles;
+    const events = record['events'];
+    if (!Array.isArray(events)) {
+        throw new Error(
+            'projected work order body has no events array',
+        );
+    }
+    const kept = events.map((event) => {
+        const values = (event as Record<string, unknown>)
+            ['field_values'];
+        if (!Array.isArray(values)) {
+            throw new Error(
+                'projected work order event has no'
+                + ' field_values array',
+            );
+        }
+        const readable = values.filter((entry) =>
+            isReadableValue(entry, attributesById, roles));
+        if (readable.length === values.length) return event;
+        return {
+            ...(event as Record<string, unknown>),
+            field_values: readable,
+        };
+    });
+    if (kept.every((event, at) => event === events[at])) {
+        return undefined;
+    }
+    return { ...record, events: kept };
 }
 
 // A selector that joins promises every body it serves its
