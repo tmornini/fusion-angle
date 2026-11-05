@@ -456,13 +456,13 @@ claim's liveness from the head's `claim.expires_at`,
 the page judging the stored claim against the clock.
 
 The workbox inbox is personal. `buildInboxItems` in
-`presenters/workbox-inbox.ts` takes the current
-member id and splits heads into available-to-me,
-claimed-by-me, and archived-by-me. Another member's
-live claim is omitted. Another member's archive is
-omitted. Item 11's processes rewrite keeps
-all-see-all as the default; item 11a is the
-assigned pool (current node `memberIds`).
+`web-app/app/presenters/workbox-inbox.ts` takes the
+current member id and splits heads into
+available-to-me, claimed-by-me, and archived-by-me.
+Another member's live claim is omitted. Another
+member's archive is omitted. Item 11's processes
+rewrite keeps all-see-all as the default; item 11a
+is the assigned pool (current node `memberIds`).
 
 ## Conventions
 
@@ -484,17 +484,25 @@ Naming: `mutate*` updates existing DOM; `toneFor*` /
 throw; raw stored-shape reads carry the Entity suffix
 (`getProjectEntity`).
 
-Client verbs take `ctx: RequestContext` first. Mutations
-return `Promise<void>` by default; change-awareness flows
-through notification channels. Named non-void exceptions:
-`putRecordInstance` / `patchRecordInstance` → `{ etag }`;
-`postInvitation` → `InvitationOutcome`;
-`postMockDataLoad` / `postBootstrap` →
-`SeededCredentials`; `postSessionRefresh` /
-`postPasswordLogin` → `SessionCredentials`;
-`postOrganizationSessionExchange` → `string`;
-`postFlowFromBackup` → `string`; `postFlowFromMermaid` /
-`postFlowFromZip` → `{ flowId, warnings }`.
+Client verbs take `ctx: RequestContext` first. A
+mutation returns `Promise<void>`, the saved
+`HttpMessage`, or the domain value built from it.
+`putRecordInstance` returns `RecordInstance`;
+`patchRecordInstance` returns `HttpMessage`. A
+message or a domain value also comes back from
+`putFlow`, `putIdea`, `putProject` and its field,
+position, and state writes, `putWorkOrderClaim`,
+`putWorkOrderBinding`, `putWorkOrderPosition`,
+`postWorkOrderTransition`, `deleteWorkOrderClaim`,
+`putAIMember`, `putServiceMember`,
+`putClientRegistration`, `postObjectiveArchival`,
+`postObjectiveReactivation`, `putObjectivePosition`,
+`postProjectApproval`, and `postProjectArchival`.
+`postInvitation` returns `InvitationOutcome`. `postSessionRefresh` returns
+`SessionCredentials`; `postPasswordLogin` returns
+`SessionCredentials | null`.
+`postOrganizationSessionExchange` returns `string`.
+`postFlowImport` returns `Promise<void>`.
 
 ## KNOWN seams
 

@@ -76,7 +76,8 @@ code.
    a measurement. The number rules.
 4. The report header makes the run reproducible: HEAD
    SHA, tree clean or dirty, scripture version, the raw
-   `./validate` verdict, and the run date in RFC-3339 Z.
+   `./test validate` verdict, and the run date in
+   RFC-3339 Z.
 
 ## Procedure
 
@@ -93,16 +94,16 @@ the spec and the DAG.
    The Daily Offices, plus every bold-led paragraph
    under The Articles of Faith. Record the header facts
    and the KNOWN-list count m (§ Security: KNOWN vs
-   NEW). Run `./validate` THREE times — and once more
-   under the hunt fan-out's concurrent load, if agents
-   are already dispatched. Report the modal verdict AND
-   any test whose pass/fail varies across runs: a
-   load-sensitive test is a *false prophet* (Office of
-   Verification), finding #1 under Commandment I whether
-   or not HEAD is green today. RED aborts nothing: this
-   audit is static and builds no bundle — the abort rule
-   is TEST-PLAN's, for the browser. Test-based
-   measurements carry a caveat.
+   NEW). Run `./test validate` THREE times — and once
+   more under the hunt fan-out's concurrent load, if
+   agents are already dispatched. Report the modal
+   verdict AND any test whose pass/fail varies across
+   runs: a load-sensitive test is a *false prophet*
+   (Office of Verification), finding #1 under
+   Commandment I whether or not HEAD is green today.
+   RED aborts nothing: this audit is static and builds
+   no bundle — the abort rule is TEST-PLAN's, for the
+   browser. Test-based measurements carry a caveat.
 1. **Hunt (parallel, per the DAG).** One single-task
    agent per DAG node. Prompt per the template below.
    Do not serialize independent shards. Agents share
@@ -137,10 +138,14 @@ the spec and the DAG.
     returns a measurement; it restores the finding to
     CONFIRMED or upholds the kill. Triggers only on
     killed-by-contract verdicts.
-4. **Report (serial).** Write `AUDIT-REPORT.md` once,
-   wrapped to pass the root-`.md` lint (AGENTS.md
-   § Gates); snippet lines may be truncated to fit,
-   marked explicitly — fidelity lives at the cited
+4. **Report (serial).** Write `AUDIT-REPORT.md` once.
+   `./test` scans root markdown for retired
+   storage-tier vocabulary and for one
+   `## Later work` home in TODO.md. It does not
+   measure markdown line length. AGENTS.md § Gates
+   lints code and scripts and excludes `.md`.
+   Snippet lines may be truncated, marked
+   explicitly — fidelity lives at the cited
    `file:line`. Then rest.
 
 ## The hunter's prompt
@@ -358,7 +363,7 @@ including an audit that contradicts itself.
 
 Report-only is the default; remediation is opt-in
 after the report is read. One commit per finding,
-safest-first; `./validate` green before each commit.
+safest-first; `./test validate` green before each commit.
 The Office of the Commit and AGENTS.md govern the
 rest.
 
