@@ -23,6 +23,8 @@ import {
     type Origin,
     type Page,
     type Point,
+    type RequestHold,
+    withHeldRequests,
 } from './fixtures.ts';
 import { registryUrl } from
     '../../web-app/app/browser-drive.ts';
@@ -43,7 +45,6 @@ const CAPTURED = ['d0f2h4c6', 'e1g3i5d7'];
 const NOT_CAPTURED = '3Z8ZOBeh';
 const FAR_POSITION = 100;
 const WRITE_TIMEOUT_MS = 10_000;
-const HELD_TIMEOUT_MS = 5_000;
 
 function adminId(): string {
     const admin = buildMembers().find(
@@ -168,65 +169,17 @@ async function grip(
 }
 
 // The page's work-orders QUERYs, held at the browser's
-// network layer (CDP Fetch) until the test releases or
-// fails each one; every other request passes.
-type QueryHold = {
-    // The next QUERY the page sends, still held.
-    next(): Promise<string>;
-    release(requestId: string): Promise<unknown>;
-    fail(requestId: string): Promise<unknown>;
-    // Releases the held and passes every later one.
-    passAll(): Promise<void>;
-    stop(): Promise<void>;
-};
-
-async function holdQueries(page: Page): Promise<QueryHold> {
-    const session = page.session;
-    const held: string[] = [];
-    let holding = true;
-    const release = (requestId: string) => session.send(
-        'Fetch.continueRequest', { requestId },
+// network layer while fn runs; every other request
+// passes.
+function holdQueries(
+    page: Page, fn: (hold: RequestHold) => Promise<void>,
+): Promise<void> {
+    return withHeldRequests(
+        page,
+        '*/work-orders/*',
+        (request) => request.method === 'QUERY',
+        fn,
     );
-    const off = session.client.on(
-        'Fetch.requestPaused',
-        (params, sessionId) => {
-            if (sessionId !== session.sessionId) return;
-            const paused = params as {
-                readonly requestId: string;
-                readonly request: { readonly method: string };
-            };
-            if (holding && paused.request.method === 'QUERY') {
-                held.push(paused.requestId);
-                return;
-            }
-            void release(paused.requestId);
-        },
-    );
-    await session.send('Fetch.enable', {
-        patterns: [{
-            urlPattern: '*/work-orders/*',
-            requestStage: 'Request',
-        }],
-    });
-    return {
-        next: () => pollUntil(
-            'a held QUERY', HELD_TIMEOUT_MS,
-            () => Promise.resolve(held.shift()),
-        ),
-        release,
-        fail: (requestId) => session.send(
-            'Fetch.failRequest',
-            { requestId, errorReason: 'Failed' },
-        ),
-        passAll: async () => {
-            holding = false;
-            await Promise.all(held.splice(0).map(release));
-        },
-        stop: async () => {
-            off();
-            await session.send('Fetch.disable');
-        },
-    };
 }
 
 function cardSelector(id: string): string {
@@ -360,8 +313,7 @@ Deno.test(
                 const today = await page.evaluate<string>(
                     BOTH_LISTS,
                 );
-                const hold = await holdQueries(page);
-                try {
+                await holdQueries(page, async (hold) => {
                     await typeInBox(page, TERM);
                     const inFlight = await hold.next();
                     // The cleared box's GET repaints the
@@ -391,9 +343,7 @@ Deno.test(
                         ),
                         today,
                     );
-                } finally {
-                    await hold.stop();
-                }
+                });
             },
         );
     },
@@ -410,8 +360,7 @@ Deno.test(
                     ctx, CAPTURED[0]!,
                 );
                 await openWorkbox(page, origin);
-                const hold = await holdQueries(page);
-                try {
+                await holdQueries(page, async (hold) => {
                     await typeInBox(page, TERM);
                     await hold.next();
                     const target = await page.rect(
@@ -427,7 +376,8 @@ Deno.test(
                             y: target.y + target.height / 2,
                         },
                     );
-                    await hold.passAll();
+                    hold.stopHolding();
+                    await hold.releaseHeld();
                     await untilNarrowed(
                         page, await matchedIds(ctx),
                     );
@@ -435,9 +385,7 @@ Deno.test(
                         '#claimed-list '
                         + cardSelector(dragged.id),
                     );
-                } finally {
-                    await hold.stop();
-                }
+                });
             },
         );
     },
@@ -451,8 +399,7 @@ Deno.test(
             async (page, origin) => {
                 const ctx = await adminContext(origin);
                 await openWorkbox(page, origin);
-                const hold = await holdQueries(page);
-                try {
+                await holdQueries(page, async (hold) => {
                     await typeInBox(page, TERM);
                     await hold.release(await hold.next());
                     await untilNarrowed(
@@ -484,9 +431,7 @@ Deno.test(
                         + ` “${TERM}”')`,
                         'the archived list answers',
                     );
-                } finally {
-                    await hold.stop();
-                }
+                });
             },
         );
     },

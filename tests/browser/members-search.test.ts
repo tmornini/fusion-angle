@@ -14,10 +14,11 @@ import {
     withAdminPage,
     type Origin,
     type Page,
+    type RequestHold,
+    withHeldRequests,
 } from './fixtures.ts';
 import { registryUrl } from
     '../../web-app/app/browser-drive.ts';
-import { pollUntil } from '../../web-app/app/cdp-client.ts';
 
 const browser = useBrowser();
 
@@ -30,7 +31,6 @@ const NEWCOMER = 'Quillfeather';
 // One cross-tab event rings the human, AI, and service
 // bells, and each re-reads the roster.
 const BELLS = 3;
-const HELD_TIMEOUT_MS = 5_000;
 
 function seededId(name: string): string {
     const member = buildMembers().find((m) => m.name === name);
@@ -158,67 +158,18 @@ Deno.test(
 );
 
 // The page's GETs of the accepted roster, held at the
-// browser's network layer (CDP Fetch) while holding is on;
-// every other request passes.
-type RosterHold = {
-    heldAtLeast(count: number): Promise<unknown>;
-    // Later roster GETs pass; the held ones stay held.
-    stopHolding(): void;
-    releaseHeld(): Promise<void>;
-    stop(): Promise<void>;
-};
-
-async function holdRosterReads(page: Page): Promise<RosterHold> {
-    const session = page.session;
-    const held: string[] = [];
-    let holding = true;
-    const release = (requestId: string) => session.send(
-        'Fetch.continueRequest', { requestId },
+// browser's network layer while holding is on; every
+// other request passes.
+function holdRosterReads(
+    page: Page, fn: (hold: RequestHold) => Promise<void>,
+): Promise<void> {
+    return withHeldRequests(
+        page,
+        '*/memberships/*',
+        (request) => request.method === 'GET'
+            && request.url.includes('state=accepted'),
+        fn,
     );
-    const off = session.client.on(
-        'Fetch.requestPaused',
-        (params, sessionId) => {
-            if (sessionId !== session.sessionId) return;
-            const paused = params as {
-                readonly requestId: string;
-                readonly request: {
-                    readonly method: string;
-                    readonly url: string;
-                };
-            };
-            if (
-                holding
-                && paused.request.method === 'GET'
-                && paused.request.url.includes('state=accepted')
-            ) {
-                held.push(paused.requestId);
-                return;
-            }
-            void release(paused.requestId);
-        },
-    );
-    await session.send('Fetch.enable', {
-        patterns: [{
-            urlPattern: '*/memberships/*',
-            requestStage: 'Request',
-        }],
-    });
-    return {
-        heldAtLeast: (count) => pollUntil(
-            'held roster reads', HELD_TIMEOUT_MS,
-            () => Promise.resolve(held.length >= count || null),
-        ),
-        stopHolding: () => {
-            holding = false;
-        },
-        releaseHeld: async () => {
-            await Promise.all(held.splice(0).map(release));
-        },
-        stop: async () => {
-            off();
-            await session.send('Fetch.disable');
-        },
-    };
 }
 
 // Another tab's write, as this tab hears it.
@@ -257,8 +208,7 @@ Deno.test(
                         .has(newcomer),
                     'the QUERY names the newcomer',
                 );
-                const hold = await holdRosterReads(page);
-                try {
+                await holdRosterReads(page, async (hold) => {
                     await ringBells(page);
                     await hold.heldAtLeast(BELLS);
                     hold.stopHolding();
@@ -275,9 +225,7 @@ Deno.test(
                         }).length === ${roster.length + 1}`,
                         'the fresh roster, cleared',
                     );
-                } finally {
-                    await hold.stop();
-                }
+                });
             },
         );
     },
@@ -291,8 +239,7 @@ Deno.test(
             async (page, origin) => {
                 const emily = seededId('Emily Rodriguez');
                 const sarah = seededId('Sarah Chen');
-                const hold = await holdRosterReads(page);
-                try {
+                await holdRosterReads(page, async (hold) => {
                     await page.navigate(
                         registryUrl(origin.baseUrl, 'members'),
                     );
@@ -315,9 +262,7 @@ Deno.test(
                         `${hasRow(emily)} && !${hasRow(sarah)}`,
                         'the roster narrowed on landing',
                     );
-                } finally {
-                    await hold.stop();
-                }
+                });
             },
         );
     },
