@@ -51,8 +51,8 @@ no `node` binary on `PATH` at all.
 require a clean working directory.
 Each commit on a development branch runs
 `./test validate --syntax`. Squash that branch to one
-commit per feature, run `./test validate`, then merge
-`--no-ff`. Run `./test validate browser` before a
+commit per feature and run `./test validate` before the
+operator's merge. Run `./test validate browser` before a
 build, a deploy, or a walk.
 
 `./bin/serve` needs `POSTGRES_URL` and
@@ -170,7 +170,7 @@ runs it after `./test postgres`.
 
 Three layers verify this product. Layer 1 is
 `./test validate`, run after the branch is squashed to
-one commit per feature and before the `--no-ff` merge.
+one commit per feature and before the operator's merge.
 Each commit before that squash runs
 `./test validate --syntax`, which is `deno check
 --frozen` and does not write the validate stamp.
@@ -208,9 +208,12 @@ doctrine):
 - Subject: a single line ≈50 chars, present-tense imperative,
   no prose body beyond the mandated `Co-Authored-By` trailer.
 - Never move/rename and change content in the same commit.
-- Land each unit of work on master as one merge commit
-  (`--no-ff`) whose message describes the whole unit; the
-  branch's own commits stay linear on top of master.
+- The operator initiates every merge to master. When
+  asked, land the unit as one merge commit (`--no-ff`)
+  whose message describes the whole unit; the branch's
+  own commits stay linear on top of master. Absent that
+  ask, a finished unit rests as a squashed, Layer-1-green
+  branch, and the agent reports its name.
 
 ## Worktrees
 
@@ -226,6 +229,11 @@ git rebase master          # onto current master
 ./test validate --syntax   # gate for each commit
 # squash to one commit per feature, local only, then:
 ./test validate            # Layer 1
+```
+
+When the operator asks to merge:
+
+```bash
 cd -                       # the main checkout
 git merge --no-ff <slug>   # write the merge message
 git worktree remove .worktrees/<slug> && git branch -d <slug>
@@ -296,7 +304,9 @@ skill, the patterns load via the prompt.
 
 Subagents work in the dispatching agent's worktree and never
 create their own — never pass the Agent tool `isolation`.
-Subagents never run `./deploy --render`.
+Subagents never run `./deploy --render`. Merging is the
+operator's to initiate, and the master session's to run
+when asked.
 
 ## Where things live
 
