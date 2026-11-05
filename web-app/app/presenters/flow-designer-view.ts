@@ -229,13 +229,14 @@ class="text-xs text-muted"
     const assignedAgents = new Set(
         node.agentIds ?? [],
     );
+    // Display-only until a roster seat names an agent.
     const aiCheckboxes = sortedAis.map(
         a => buildMemberCheckbox(
             a.idForLink(),
             a.nameText(),
             assigned.has(a.idForLink())
                 || assignedAgents.has(a.idForLink()),
-            isLocked,
+            true,
             'data-ai-member-id',
         ),
     );
@@ -319,14 +320,14 @@ function buildMemberCheckbox(
     memberId: string,
     name: string,
     checked: boolean,
-    isLocked: boolean,
+    disabled: boolean,
     idAttr: string,
 ): SafeHtml {
     const checkedAttr = trusted(
         checked ? ' checked' : '',
     );
     const disabledAttr = trusted(
-        isLocked ? ' disabled' : '',
+        disabled ? ' disabled' : '',
     );
     return html`<label
 class="member-checkbox-label">
