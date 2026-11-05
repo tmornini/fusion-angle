@@ -2,6 +2,7 @@ import {
     getWorkOrders,
     getMemberMap,
     isClaimedAndUnlapsed,
+    queryWorkOrders,
     type RequestContext,
     type WorkOrder,
 } from '../../client/index.ts';
@@ -16,16 +17,10 @@ export interface InboxRows {
     memberMap: Map<string, Member>;
 }
 
-// The inbox reads heads only (spec §4): each work order's
-// node, last move, and claim ride its head, so one
-// collection read serves every row.
-export async function getInboxRows(
-    ctx: RequestContext,
-): Promise<InboxRows> {
-    const [workOrders, memberMap] = await Promise.all([
-        getWorkOrders(ctx),
-        getMemberMap(ctx),
-    ]);
+function inboxRowsOf(
+    workOrders: WorkOrder[],
+    memberMap: InboxRows['memberMap'],
+): InboxRows {
     const activeClaimsByWo = new Map<Id, ActiveClaim>();
     for (const wo of workOrders) {
         if (isClaimedAndUnlapsed(wo.claim)) {
@@ -36,4 +31,31 @@ export async function getInboxRows(
         }
     }
     return { workOrders, activeClaimsByWo, memberMap };
+}
+
+// The inbox reads heads only (spec §4): each work order's
+// node, last move, and claim ride its head, so one
+// collection read serves every row.
+export async function getInboxRows(
+    ctx: RequestContext,
+): Promise<InboxRows> {
+    const [workOrders, memberMap] = await Promise.all([
+        getWorkOrders(ctx),
+        getMemberMap(ctx),
+    ]);
+    return inboxRowsOf(workOrders, memberMap);
+}
+
+// The heads the work-orders QUERY matches, best match
+// first, each keeping the message a drag on it latches.
+// The members are the last full read's: the answer
+// changes which work orders show, not who the members are.
+export async function queryInboxRows(
+    ctx: RequestContext,
+    text: string,
+    memberMap: InboxRows['memberMap'],
+): Promise<InboxRows> {
+    return inboxRowsOf(
+        await queryWorkOrders(ctx, text), memberMap,
+    );
 }

@@ -17,6 +17,7 @@ import {
     type InboxTransfer,
 } from '../web-app/app/workbox-inbox-drag.ts';
 import {
+    computeNewPosition,
     dropIndex,
 } from '../web-app/app/drag-reorder-positions.ts';
 import {
@@ -175,6 +176,7 @@ Deno.test(
         assertStrictEquals(
             classifyInboxDrop(
                 'available', 'claimed', 'claimed',
+                'dragged',
             ),
             'claim',
         );
@@ -187,6 +189,7 @@ Deno.test(
         assertStrictEquals(
             classifyInboxDrop(
                 'claimed', 'available', 'claimed',
+                'dragged',
             ),
             'release',
         );
@@ -199,6 +202,7 @@ Deno.test(
         assertStrictEquals(
             classifyInboxDrop(
                 'claimed', 'claimed', 'claimed',
+                'dragged',
             ),
             'reorder',
         );
@@ -211,6 +215,7 @@ Deno.test(
         assertStrictEquals(
             classifyInboxDrop(
                 'available', 'available', 'claimed',
+                'dragged',
             ),
             'none',
         );
@@ -225,6 +230,7 @@ Deno.test(
                 'available',
                 'archivedByMe',
                 'archivedByMe',
+                'dragged',
             ),
             'none',
         );
@@ -233,6 +239,7 @@ Deno.test(
                 'claimed',
                 'archivedByMe',
                 'archivedByMe',
+                'dragged',
             ),
             'none',
         );
@@ -247,6 +254,7 @@ Deno.test(
             classifyInboxDrop(
                 'available', 'available',
                 'archivedByMe',
+                'dragged',
             ),
             'none',
         );
@@ -254,6 +262,7 @@ Deno.test(
             classifyInboxDrop(
                 'claimed', 'available',
                 'archivedByMe',
+                'dragged',
             ),
             'none',
         );
@@ -261,6 +270,7 @@ Deno.test(
             classifyInboxDrop(
                 'available', 'claimed',
                 'archivedByMe',
+                'dragged',
             ),
             'none',
         );
@@ -273,8 +283,48 @@ Deno.test(
         assertStrictEquals(
             classifyInboxDrop(
                 'available', 'outside', 'claimed',
+                'dragged',
             ),
             'none',
+        );
+    },
+);
+
+Deno.test(
+    'while matched, claimed onto claimed is none',
+    () => {
+        assertStrictEquals(
+            classifyInboxDrop(
+                'claimed', 'claimed', 'claimed',
+                'matched',
+            ),
+            'none',
+        );
+    },
+);
+
+Deno.test(
+    'while matched, available onto claimed is claim',
+    () => {
+        assertStrictEquals(
+            classifyInboxDrop(
+                'available', 'claimed', 'claimed',
+                'matched',
+            ),
+            'claim',
+        );
+    },
+);
+
+Deno.test(
+    'while matched, claimed onto available is release',
+    () => {
+        assertStrictEquals(
+            classifyInboxDrop(
+                'claimed', 'available', 'claimed',
+                'matched',
+            ),
+            'release',
         );
     },
 );
@@ -900,6 +950,7 @@ Deno.test(
                     idAttribute:
                         'data-work-order-card',
                     rightListKind: () => 'claimed',
+                    order: () => ({ kind: 'dragged' }),
                     onDrop() {},
                 },
             );
@@ -1005,6 +1056,7 @@ Deno.test(
                     idAttribute:
                         'data-work-order-card',
                     rightListKind: () => 'claimed',
+                    order: () => ({ kind: 'dragged' }),
                     onDrop() {},
                 },
             );
@@ -1105,6 +1157,7 @@ Deno.test(
                     idAttribute:
                         'data-work-order-card',
                     rightListKind: () => 'claimed',
+                    order: () => ({ kind: 'dragged' }),
                     onDrop() {},
                 },
             );
@@ -1199,6 +1252,7 @@ Deno.test(
                     idAttribute:
                         'data-work-order-card',
                     rightListKind: () => 'claimed',
+                    order: () => ({ kind: 'dragged' }),
                     onDrop() {},
                 },
             );
@@ -1306,6 +1360,7 @@ Deno.test(
                     idAttribute:
                         'data-work-order-card',
                     rightListKind: () => 'claimed',
+                    order: () => ({ kind: 'dragged' }),
                     onDrop(_id, transfer) {
                         dropped.transfer = transfer;
                     },
@@ -1383,6 +1438,7 @@ Deno.test(
                 available: asEl(available),
                 claimed: asEl(claimed),
             },
+            { kind: 'none' },
         );
         assertEquals(
             cardIds(claimed),
@@ -1407,6 +1463,7 @@ Deno.test(
                 available: asEl(available),
                 claimed: asEl(claimed),
             },
+            { kind: 'none' },
         );
         assertEquals(cardIds(claimed), ['wo-1']);
         assertEquals(
@@ -1444,6 +1501,7 @@ Deno.test(
                 available: asEl(available),
                 claimed: asEl(claimed),
             },
+            { kind: 'none' },
         );
         assertEquals(
             cardIds(available), ['wo-1'],
@@ -1464,5 +1522,117 @@ Deno.test(
             claimed.innerHTML,
             'No work orders claimed by me',
         );
+    },
+);
+
+Deno.test(
+    'a claim while matched takes the bottom of every'
+    + ' claimed position',
+    () => {
+        const g = globalThis as Record<
+            string, unknown
+        >;
+        const previous = g.document;
+        g.document = {
+            createElement: (tag: string) =>
+                fakeEl(tag),
+        };
+        try {
+            const root = fakeEl('div');
+            const available = fakeEl('div', {
+                top: 0,
+                height: 400,
+                left: 0,
+                right: 100,
+            });
+            available.id = 'available-list';
+            available.setAttribute(
+                'data-inbox-list', 'available',
+            );
+            const claimed = fakeEl('div', {
+                top: 0,
+                height: 400,
+                left: 100,
+                right: 200,
+            });
+            claimed.id = 'claimed-list';
+            claimed.setAttribute(
+                'data-inbox-list', 'claimed',
+            );
+            const wo = fakeEl('div', {
+                top: 0,
+                height: 80,
+                left: 0,
+                right: 100,
+            });
+            wo.setAttribute(
+                'data-work-order-card', 'wo-1',
+            );
+            wo.setAttribute('data-position', '1');
+            const shown = fakeEl('div', {
+                top: 0,
+                height: 80,
+                left: 100,
+                right: 200,
+            });
+            shown.setAttribute(
+                'data-work-order-card', 'wo-2',
+            );
+            shown.setAttribute('data-position', '5');
+            attach(available, wo);
+            attach(claimed, shown);
+            attach(root, available);
+            attach(root, claimed);
+            const claimedPositions = [2, 5, 9];
+            const dropped: {
+                transfer: InboxTransfer | null;
+            } = { transfer: null };
+            initInboxDrag(
+                root as unknown as HTMLElement,
+                {
+                    cardSelector:
+                        '[data-work-order-card]',
+                    idAttribute:
+                        'data-work-order-card',
+                    rightListKind: () => 'claimed',
+                    order: () => ({
+                        kind: 'matched',
+                        claimedPositions,
+                    }),
+                    onDrop(_id, transfer) {
+                        dropped.transfer = transfer;
+                    },
+                },
+            );
+            firePointer(
+                root, 'pointerdown', wo, 50, 10,
+            );
+            firePointer(
+                root, 'pointermove', wo, 150, 10,
+            );
+            assert(
+                !claimed.children.some((c) =>
+                    c.classes.has(
+                        'inbox-drop-indicator',
+                    ),
+                ),
+            );
+            firePointer(
+                root, 'pointerup', wo, 150, 10,
+            );
+            assertEquals(dropped.transfer, {
+                kind: 'claim',
+                position: computeNewPosition(
+                    claimedPositions,
+                    claimedPositions.length,
+                ),
+            });
+        } finally {
+            if (previous === undefined) {
+                delete g.document;
+            } else {
+                g.document = previous;
+            }
+        }
     },
 );
