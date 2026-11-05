@@ -556,10 +556,22 @@ export async function getOrganizationInvitations(
     _roles: readonly string[],
     query?: ViewQuery,
 ): Promise<HeadSelection> {
+    return await selectOrganizationMemberships(
+        db, param(params, 0), askedQuery(query),
+    );
+}
+
+// The organization's memberships in the asked state, each
+// joined as the memberships GET serves it.
+export async function selectOrganizationMemberships(
+    db: DbAdapter,
+    organization: Id,
+    query: ViewQuery,
+): Promise<HeadSelection> {
     const { heads, kinds, histories } =
         await db.readTransaction(async (view) => {
             const heads = await organizationMembershipHeads(
-                view, param(params, 0), askedQuery(query),
+                view, organization, query,
             );
             return {
                 heads,

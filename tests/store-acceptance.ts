@@ -15,6 +15,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
     pairIdOf,
+    partsOf,
 } from './http-fixtures.ts';
 import {
     NIL_IDENTIFIER,
@@ -31,6 +32,8 @@ import type { StatementBind } from
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import type { MessagePairEntity } from '../shared/types.ts';
 import { ledgerFields } from './ledger-row.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 // Parameterized store acceptance. ./test-postgres will
 // invoke this factory; the memory runner keeps ./validate
@@ -40,6 +43,8 @@ const AT = '2026-01-01T00:00:00.000000Z';
 const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const IDEA_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
 const FLOW_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/';
+const WORK_ORDER_PREFIX =
+    '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/';
 
 function req(
     method: string,
@@ -107,10 +112,13 @@ function flowFields(name: string): Record<string, unknown> {
     };
 }
 
-function flowCreate(id: string): Record<string, unknown> {
+function flowCreate(
+    id: string,
+    name: string,
+): Record<string, unknown> {
     return {
         id,
-        flow: flowFields('Acceptance'),
+        flow: flowFields(name),
         projectFlowId: generateIdentifier(),
         projectFlow: {
             project_id: generateIdentifier(),
@@ -459,7 +467,7 @@ export function defineStoreAcceptance(
         const { db, token } = await ready();
         const created = await handleRequest(db, req(
             'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', token
-                , flowCreate('tYhGBKEoBjBYeqTcJWMNVQ'),
+                , flowCreate('tYhGBKEoBjBYeqTcJWMNVQ', 'Acceptance'),
         ));
         assertStrictEquals(created.status, 201);
         const live = await handleRequest(
@@ -733,6 +741,54 @@ export function defineStoreAcceptance(
             await db.messagePairs
                 .getCollectionHeadPairs(EMPTY_HEAD_PATH),
         ]);
+    });
+
+    // The flows' current names reach the match through
+    // their work-order joins, one head batch on each store.
+    Deno.test(name + ': work-orders QUERY ranks by flow name',
+    async () => {
+        const { db, token } = await ready();
+        const ids: string[] = [];
+        for (const flowName of ['Aproval', 'Approval']) {
+            const flowId = generateIdentifier();
+            const flow = await handleRequest(db, req(
+                'POST', FLOW_PREFIX, token,
+                flowCreate(flowId, flowName),
+            ));
+            assertStrictEquals(flow.status, 201);
+            await flow.body?.cancel();
+            const id = generateIdentifier();
+            const node = generateIdentifier();
+            await seedCreatedWorkOrder(db, {
+                organization: ORGANIZATION,
+                id,
+                fields: {
+                    display_id: 'acceptance',
+                    flow_graph: {
+                        name: 'Frozen',
+                        lockTimeout: DEFAULT_LOCK_TIMEOUT,
+                        nodes: [],
+                        edges: [],
+                    },
+                    position: 1,
+                },
+                flowId,
+                births: [node, node],
+                at: AT,
+                token,
+                claim: 'released',
+            });
+            ids.push(id);
+        }
+        const searched = await handleRequest(db, req(
+            'QUERY', WORK_ORDER_PREFIX, token, { q: 'approval' },
+        ));
+        assertStrictEquals(searched.status, 200);
+        assertEquals(
+            (await partsOf<{ id: string }>(searched))
+                .map((part) => part.body().toValue().id),
+            [ids[1], ids[0]],
+        );
     });
 
     Deno.test(name + ': an empty head batch answers no'

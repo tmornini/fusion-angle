@@ -53,6 +53,7 @@ import {
     workOrderEventsOf,
     projectTransitions,
     isClaimedAndUnlapsed,
+    queryWorkOrders,
 } from
 '../client/work-orders-queries.ts';
 import {
@@ -1332,4 +1333,53 @@ Deno.test('projectTransitions keeps chain order for two'
     assertEquals(moves.map((m) => m.toNodeId), [
         'n-1', 'n-2',
     ]);
+});
+
+// ── queryWorkOrders ─────────
+
+Deno.test('queryWorkOrders answers the best match first,'
++ ' each keeping its message', async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test');
+    const token = await organizationToken();
+    const ids: string[] = [];
+    for (const name of ['Aproval', 'Approval']) {
+        const id = generateIdentifier();
+        await seedCreatedWorkOrder(db, {
+            organization: 'AjdvjuECVZEgZoFajaIEkg',
+            id,
+            fields: {
+                display_id: 'WO-Q',
+                flow_graph: {
+                    name,
+                    nodes: [],
+                    edges: [],
+                    lockTimeout: DEFAULT_LOCK_TIMEOUT,
+                },
+                position: 0,
+            },
+            flowId: generateIdentifier(),
+            births: [START_NODE, START_NODE],
+            at: nowUtc(),
+            token,
+            claim: 'released',
+        });
+        ids.push(id);
+    }
+    const { ctx, sent } = recordedContext(db, token);
+    const found = await queryWorkOrders(ctx, 'approval');
+    assertEquals(found.map((wo) => wo.id), [ids[1], ids[0]]);
+    assertEquals(
+        found.map((wo) => wo.message.body().toValue().id),
+        [ids[1], ids[0]],
+    );
+    assertEquals(
+        sent.map((row) => [row.method, row.path, row.body]),
+        [[
+            'QUERY',
+            '/api/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/',
+            '{"q":"approval"}',
+        ]],
+    );
 });

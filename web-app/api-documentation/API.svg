@@ -741,7 +741,9 @@
   <a href="#get/organizations/id/work-orders">
     <circle class="filled" fill="hsl(var(--foreground))" cx="34" cy="1444" r="5"/>
   </a>
-  <rect class="empty" x="69" y="1439" width="10" height="10" fill="none" stroke="hsl(var(--muted-foreground))"/>
+  <a href="#query/organizations/id/work-orders">
+    <circle class="filled" fill="hsl(var(--foreground))" cx="74" cy="1444" r="5"/>
+  </a>
   <rect class="empty" x="109" y="1439" width="10" height="10" fill="none" stroke="hsl(var(--muted-foreground))"/>
   <a href="#post/organizations/id/work-orders">
     <circle class="filled" fill="hsl(var(--foreground))" cx="154" cy="1444" r="5"/>

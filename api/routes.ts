@@ -128,6 +128,7 @@ import {
     generateIdentifier,
 } from '../shared/identifier.ts';
 import { addUtcSeconds } from '../shared/work-order-claims.ts';
+import { withWorkOrderSearch } from './work-order-search.ts';
 import {
     collectAttributeReferrers,
     hasReferrers,
@@ -4527,14 +4528,16 @@ export const routes: Route[] = [
     // precedent, so a separate create verb remains here.
     // Member-tier POST — /work-orders carries POST in
     // MEMBER_VERBS.
-    withWorkOrderValueReader(route('organizations/:id/work-orders/', {
-        select: collectionSelect(WORK_ORDERS_WIRING),
-        post: (
-            db, _p, body, actor, messagePair, organization,
-        ) => postWorkOrderCreationOp(
-            db, body, actor, messagePair, organization,
-        ),
-    })),
+    withWorkOrderSearch(withWorkOrderValueReader(route(
+        'organizations/:id/work-orders/', {
+            select: collectionSelect(WORK_ORDERS_WIRING),
+            post: (
+                db, _p, body, actor, messagePair, organization,
+            ) => postWorkOrderCreationOp(
+                db, body, actor, messagePair, organization,
+            ),
+        },
+    ))),
     // work-orders/:id is the fourth family. PUT rides
     // documentPutHandler(WORK_ORDERS_WIRING) — member-tier
     // via MEMBER_VERBS['/work-orders']. Verbs stay
