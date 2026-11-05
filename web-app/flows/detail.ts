@@ -89,6 +89,8 @@ import {
     performUpdateAttributeRequired,
     performUndo,
     performRedo,
+    type OpFail,
+    type OpNoop,
 } from '../app/flow-operations.ts';
 import {
     applyAddAttributeRef,
@@ -292,16 +294,11 @@ async function handleAddEdge(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const ctx = sessionContext();
-    const op = await performAddEdge(
-        ctx, snap, fromId, toId,
+    const op = await stopIfRejected(
+        await performAddEdge(ctx, snap, fromId, toId),
+        ctx, snap,
     );
-    if (op.kind === 'fail') {
-        await reportOpFailure(
-            ctx, op.toast, op.toastVariant,
-            snap.flowId,
-        );
-        return;
-    }
+    if (op === null) return;
     const current =
         pageState.presenter().snapshot();
     const next: FlowSnapshot = {
@@ -335,6 +332,24 @@ async function reportOpFailure(
         nodes: g.nodes,
         edges: g.edges,
     });
+}
+
+async function stopIfRejected<
+    TOk extends { readonly kind: 'ok' },
+>(
+    op: TOk | OpFail | OpNoop,
+    ctx: RequestContext,
+    snap: FlowSnapshot,
+): Promise<TOk | null> {
+    if (op.kind === 'fail') {
+        await reportOpFailure(
+            ctx, op.toast, op.toastVariant,
+            snap.flowId,
+        );
+        return null;
+    }
+    if (op.kind === 'noop') return null;
+    return op;
 }
 
 // Fix wave (Phase 14 Task 8, post-Task-11-browser-regression):
@@ -398,17 +413,11 @@ async function handleDeleteSelectedNodes(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const ctx = sessionContext();
-    const op = await performDeleteSelectedNodes(
+    const op = await stopIfRejected(
+        await performDeleteSelectedNodes(ctx, snap),
         ctx, snap,
     );
-    if (op.kind === 'noop') return;
-    if (op.kind === 'fail') {
-        await reportOpFailure(
-            ctx, op.toast, op.toastVariant,
-            snap.flowId,
-        );
-        return;
-    }
+    if (op === null) return;
     const current = pageState.presenter().snapshot();
     const next: FlowSnapshot = {
         ...current,
@@ -432,17 +441,11 @@ async function handleDeleteSelectedEdge(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const ctx = sessionContext();
-    const op = await performDeleteSelectedEdge(
+    const op = await stopIfRejected(
+        await performDeleteSelectedEdge(ctx, snap),
         ctx, snap,
     );
-    if (op.kind === 'noop') return;
-    if (op.kind === 'fail') {
-        await reportOpFailure(
-            ctx, op.toast, op.toastVariant,
-            snap.flowId,
-        );
-        return;
-    }
+    if (op === null) return;
     const current = pageState.presenter().snapshot();
     const next: FlowSnapshot = {
         ...current,
@@ -468,18 +471,13 @@ async function handleAddAttributeRef(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const ctx = sessionContext();
-    const op = await performAddAttributeRef(
-        ctx, snap, attributeId,
-        'editable', false,
+    const op = await stopIfRejected(
+        await performAddAttributeRef(
+            ctx, snap, attributeId, 'editable', false,
+        ),
+        ctx, snap,
     );
-    if (op.kind === 'noop') return;
-    if (op.kind === 'fail') {
-        await reportOpFailure(
-            ctx, op.toast, op.toastVariant,
-            snap.flowId,
-        );
-        return;
-    }
+    if (op === null) return;
     const current = pageState.presenter().snapshot();
     const next: FlowSnapshot = {
         ...current,
@@ -497,17 +495,11 @@ async function handleRemoveAttributeRef(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const ctx = sessionContext();
-    const op = await performRemoveAttributeRef(
-        ctx, snap, attributeId,
+    const op = await stopIfRejected(
+        await performRemoveAttributeRef(ctx, snap, attributeId),
+        ctx, snap,
     );
-    if (op.kind === 'noop') return;
-    if (op.kind === 'fail') {
-        await reportOpFailure(
-            ctx, op.toast, op.toastVariant,
-            snap.flowId,
-        );
-        return;
-    }
+    if (op === null) return;
     const current = pageState.presenter().snapshot();
     const next: FlowSnapshot = {
         ...current,
@@ -527,17 +519,11 @@ async function handleUpdateAttributeMode(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const ctx = sessionContext();
-    const op = await performUpdateAttributeMode(
-        ctx, snap, attributeId, mode,
+    const op = await stopIfRejected(
+        await performUpdateAttributeMode(ctx, snap, attributeId, mode),
+        ctx, snap,
     );
-    if (op.kind === 'noop') return;
-    if (op.kind === 'fail') {
-        await reportOpFailure(
-            ctx, op.toast, op.toastVariant,
-            snap.flowId,
-        );
-        return;
-    }
+    if (op === null) return;
     const current = pageState.presenter().snapshot();
     const next: FlowSnapshot = {
         ...current,
@@ -557,18 +543,13 @@ async function handleUpdateAttributeRequired(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const ctx = sessionContext();
-    const op = await performUpdateAttributeRequired(
-        ctx, snap, attributeId,
-        isRequired,
+    const op = await stopIfRejected(
+        await performUpdateAttributeRequired(
+            ctx, snap, attributeId, isRequired,
+        ),
+        ctx, snap,
     );
-    if (op.kind === 'noop') return;
-    if (op.kind === 'fail') {
-        await reportOpFailure(
-            ctx, op.toast, op.toastVariant,
-            snap.flowId,
-        );
-        return;
-    }
+    if (op === null) return;
     const current = pageState.presenter().snapshot();
     const next: FlowSnapshot = {
         ...current,
@@ -589,16 +570,11 @@ async function handleAddNodeAtPosition(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const ctx = sessionContext();
-    const op = await performAddNodeAtPosition(
-        ctx, snap, fromId, x, y,
+    const op = await stopIfRejected(
+        await performAddNodeAtPosition(ctx, snap, fromId, x, y),
+        ctx, snap,
     );
-    if (op.kind === 'fail') {
-        await reportOpFailure(
-            ctx, op.toast, op.toastVariant,
-            snap.flowId,
-        );
-        return;
-    }
+    if (op === null) return;
     const current =
         pageState.presenter().snapshot();
     const next: FlowSnapshot = {
