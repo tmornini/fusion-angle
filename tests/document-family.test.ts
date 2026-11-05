@@ -9,7 +9,6 @@ import {
 } from '@std/assert';
 import {
     memoryDbAdapter,
-    type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
     RetiredEntityError,
@@ -56,7 +55,7 @@ import {
 } from '../api/document-family.ts';
 import { servedSelection } from '../api/head-reads.ts';
 import { organizationToken } from './token-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import { ApiError, HTTP_PRECONDITION_FAILED } from
     '../shared/http-errors.ts';
 import {
@@ -95,12 +94,6 @@ function req(
         ...(headers !== undefined
             ? { headers } : {}),
     });
-}
-
-async function freshDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
 }
 
 // -- (a) documentWriteResponseSpec's successBody, pinned

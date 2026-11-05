@@ -1,11 +1,7 @@
 import { assertStrictEquals } from '@std/assert';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';
@@ -40,12 +36,6 @@ function req(
         ...(token !== undefined ? { token } : {}),
         body,
     });
-}
-
-async function freshDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
 }
 
 for (const path of RETIRED_PATHS) {

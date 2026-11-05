@@ -1,6 +1,5 @@
 import { assertStrictEquals } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
-import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     apiRequest,
@@ -8,7 +7,7 @@ import {
     partsOf,
 } from './http-fixtures.ts';
 import {
-    seedAdminSchema,
+    freshDb,
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -34,12 +33,6 @@ function req(
         body,
         ...(operationId !== undefined ? { operationId } : {}),
     });
-}
-
-async function freshDb() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
 }
 
 // The idea body OMITS organization_id — the org fence stamps

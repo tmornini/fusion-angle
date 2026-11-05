@@ -5,10 +5,9 @@ import { handleRequest } from '../api/api.ts';
 import { GET, GETCollection, POST } from './in-page-facade.ts';
 import { apiRequest, pairIdOf } from './http-fixtures.ts';
 import { addUtcSeconds } from '../shared/work-order-claims.ts';
-import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
-    seedAdminSchema,
+    freshDb,
 } from './test-fixtures.ts';
 import {
     nowUtc,
@@ -32,12 +31,6 @@ const EDGE_2 = generateIdentifier();
 const EV_1 = generateIdentifier();
 const EV_2 = generateIdentifier();
 const EV_3 = generateIdentifier();
-
-async function freshDb() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
-}
 
 // The frozen flow graph a work order captures at creation. A
 // linear start → middle → finish, stored as a native object on

@@ -6,12 +6,11 @@ import {
 } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
 import {
-    memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { DEV_TOKEN, organizationToken } from
     './token-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import {
     ORGANIZATION_TWO,
     STARK_ORGANIZATION,
@@ -61,12 +60,6 @@ function req(
         body,
         ...(headers !== undefined ? { headers } : {}),
     });
-}
-
-async function freshDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
 }
 
 // -- Ideas --------------------------------------------------

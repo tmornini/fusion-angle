@@ -2,20 +2,13 @@ import { assert, assertRejects, assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { GET, GETCollection, POST } from './in-page-facade.ts';
-import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
-    seedAdminSchema,
+    freshDb,
 } from './test-fixtures.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
 
-
-async function freshDb() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
-}
 
 // The objective body OMITS organization_id — the org fence
 // stamps it from the verified token before the store validates.

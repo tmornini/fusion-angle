@@ -16,7 +16,6 @@ import {
     documentMessagePairsAt,
 } from '../api/derive-documents.ts';
 import {
-    memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
@@ -32,7 +31,7 @@ import {
     responseRecordOf,
 } from '../api/message-pair.ts';
 import { organizationToken } from './token-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import {
     apiRequest, pairIdOf, storedPutBodyText,
@@ -110,12 +109,6 @@ function documentBody(
         revivals: [],
         ...(overrides ?? {}),
     };
-}
-
-async function freshDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
 }
 
 async function createFlow(

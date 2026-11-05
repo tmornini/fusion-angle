@@ -1,10 +1,9 @@
 import { assert, assertRejects, assertStrictEquals } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
 import { MissingTableError } from '../api/db.ts';
-import { memoryDbAdapter } from '../api/db-memory.ts';
 import { reachableToken } from
     './token-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import { captureConsole } from './fixtures/console-capture.ts';
 import { withPerformanceNow } from './fixtures/performance-now.ts';
 import { framedRequest } from './http-fixtures.ts';
@@ -18,12 +17,6 @@ import { framedRequest } from './http-fixtures.ts';
 // still propagate past the fence catch, exactly as it already
 // propagates past the domain-boundary catch. A missing table
 // is a failed request; product boot does not recover it.
-
-async function freshDb() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
-}
 
 Deno.test(
     'a Region A fence-read fault (fenceRequest itself) redacts'

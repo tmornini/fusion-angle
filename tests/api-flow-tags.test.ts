@@ -7,13 +7,12 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
-    memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
-    seedAdminSchema,
+    freshDb,
 } from './test-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
@@ -85,12 +84,6 @@ function documentBody(
         graphDelta: emptyDelta(),
         revivals: [],
     };
-}
-
-async function freshDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
 }
 
 async function createFlow(

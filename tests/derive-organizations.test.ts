@@ -6,7 +6,6 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import {
-    memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
@@ -18,7 +17,7 @@ import {
     storedPutBodyText,
 } from './http-fixtures.ts';
 import {
-    seedAdminSchema,
+    freshDb,
     organizationRow,
     seedOrganizationDocument,
 } from './test-fixtures.ts';
@@ -52,12 +51,6 @@ function req(
         token,
         body,
     });
-}
-
-async function freshDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
 }
 
 // DEV_TOKEN's claim organization, which seedAdminSchema
