@@ -11,6 +11,7 @@
 
 import { join } from '@std/path';
 
+import { exists } from './deno-file.ts';
 import { PAGE_REGISTRY } from './page-registry.ts';
 import {
     statsForPage,
@@ -168,18 +169,6 @@ function usageText(): string {
 }
 
 // ── Small utils ──────
-
-function exists(path: string): boolean {
-    try {
-        Deno.statSync(path);
-        return true;
-    } catch (error) {
-        if (error instanceof Deno.errors.NotFound) {
-            return false;
-        }
-        throw error;
-    }
-}
 
 async function freePort(): Promise<number> {
     // Loopback, as the spawned server's URL will be.

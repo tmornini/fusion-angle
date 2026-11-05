@@ -4,6 +4,7 @@
 // stays indifferent to which runtime spawned the child.
 
 import { join } from '@std/path';
+import { exists } from './deno-file.ts';
 
 export const CHROME_READY_MS = 15_000;
 export const POLL_MS = 200;
@@ -466,18 +467,6 @@ export async function browserWsUrl(
         );
     }
     return info.webSocketDebuggerUrl;
-}
-
-function exists(path: string): boolean {
-    try {
-        Deno.statSync(path);
-        return true;
-    } catch (error) {
-        if (error instanceof Deno.errors.NotFound) {
-            return false;
-        }
-        throw error;
-    }
 }
 
 export async function waitDevtoolsPort(

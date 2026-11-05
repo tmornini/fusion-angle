@@ -4,6 +4,7 @@
 // Output is deterministic — no clocks, no randomness,
 // stable ordering — so `--check` can gate staleness.
 import { dirname, join } from '@std/path';
+import { exists } from './deno-file.ts';
 import {
     conditionalOf,
     postWorkOrderCreationOp,
@@ -1568,18 +1569,6 @@ export function generateAll(): Map<string, string> {
         );
     }
     return out;
-}
-
-function exists(path: string): boolean {
-    try {
-        Deno.statSync(path);
-        return true;
-    } catch (error) {
-        if (error instanceof Deno.errors.NotFound) {
-            return false;
-        }
-        throw error;
-    }
 }
 
 function readTree(root: string): Map<string, string> {
