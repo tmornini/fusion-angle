@@ -69,10 +69,13 @@ itself is utility layout (`flex items-center gap-2`);
 no class for it. Two pages use it, under the
 three-page line, so it stays off `components-*.css`.
 Its users: the members kind filter
-(`data-kind-chip`: All, Humans, AIs) and the members
-state selector (`data-membership-state`: Members,
-Former members). Organization sent-invitation filters
-are `stateBadge` chips (`data-invitation-state`:
+(`data-kind-chip`: All, Humans, AIs, Services),
+the members state selector
+(`data-membership-state`: Members, Former
+members), and the workbox claimed/archived
+switch (`data-inbox-pill`: Active, Archived
+by Me). Organization sent-invitation filters are
+`stateBadge` chips (`data-invitation-state`:
 Pending, Declined, Revoked) on the sent card.
 
 When groups exist, use native `<optgroup label>` —

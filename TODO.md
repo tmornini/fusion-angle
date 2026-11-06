@@ -800,9 +800,12 @@ code comments cite; specs and plans written before the
   for Postgres on Render. The app's precondition is in
   the tree: a claim decides expiry against its
   request's stamp (`isClaimUnlapsedAt`,
-  `api/work-order-version.ts:104-109`, called with
-  `received.requestAt` at `api/routes.ts:1776` and
-  `:1807`), and that stamp is the receiving process's
+  `api/work-order-version.ts:104-109`). The lapse
+  check is inside `claimedVersion`
+  (`api/work-order-version.ts:182`), which
+  `api/routes.ts:1841` runs with
+  `now: received.requestAt` (`:1856`), and that
+  stamp is the receiving process's
   `nowUtc()` (`api/request-context.ts:95`), so each
   replica's clock decides the boundary; record the
   expiry decision as its own event first. Then two
@@ -2557,7 +2560,7 @@ Off the critical path; each with its oracle.
     a third test in `tests/browser/two-jars.test.ts`: B
     sits on `ideas/`, A writes, B's DOM is unchanged
     until B navigates
-- SP-6 sign-up (`web-app/auth/index.ts:642-655`)
+- SP-6 sign-up (`web-app/auth/index.ts:595-599`)
 - Billing (`web-app/billing/`)
 - Table migrations — wait on their trigger: the ledger
   store holds the table's DDL final, and item 0h ships
@@ -3603,10 +3606,11 @@ Off the critical path; each with its oracle.
   crossing or "beyond 1M".
 - Request statistics in `./bin/measure`, with
   visualizations. `handleRequest` (`api/api.ts:446`) is
-  the one seam: `server/http-server.ts:687` routes the
-  product through it, and the tests' in-process
-  transport (`inProcessFetch`,
-  `tests/in-page-facade.ts:31-56`) does too, after
+  the one seam: `listenHttp` defaults it at
+  `server/http-server.ts:820`
+  (`options.handle ?? handleRequest`), and the
+  tests' in-process transport (`inProcessFetch`,
+  `tests/in-page-facade.ts:32-36`) does too, after
   `simulateLatency()`, its only caller, so a timer there
   measures the handler alone. The `./bin/measure api`
   entry harvests the server's own `latencyMs` log line
