@@ -128,9 +128,7 @@ compose shape, on host port 55433, named by
   statement, and land the recordings by depth in one
   Postgres transaction with the DDL, the root, and the
   marker. `fail` breaks the last batch; `full` pads the
-  first batch to 2,340 rows.
-- `repoint.ts` — a default-organization PUT to a second
-  organization answers 200, and the default stays.
+  first batch to 2,184 rows.
 - `rehearsal.ts` — the rehearsal transaction spec's
   figures, run at its base and its head: the
   rehearsal's recorded statements replayed through a
