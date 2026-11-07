@@ -518,22 +518,6 @@ export function iconUpload(size: IconSize, cssClass: string) {
     );
 }
 
-export function iconDownload(
-    size: IconSize,
-    cssClass: string,
-) {
-    return icon(
-        '<path d="M21 15v4a2 2 0 0 1-2 2H5a2'
-        + ' 2 0 0 1-2-2v-4"/>'
-        + '<polyline points="7 10 12 15'
-        + ' 17 10"/>'
-        + '<line x1="12" x2="12" y1="15"'
-        + ' y2="3"/>',
-        size,
-        cssClass,
-    );
-}
-
 export function iconTrash(size: IconSize, cssClass: string) {
     return icon(
         '<path d="M3 6h18"/>'
@@ -555,17 +539,6 @@ export function iconEdit(size: IconSize, cssClass: string) {
         '<path d="M17 3a2.85 2.83 0 1 1 4'
         + ' 4L7.5 20.5 2 22l1.5-5.5Z"/>'
         + '<path d="m15 5 4 4"/>',
-        size,
-        cssClass,
-    );
-}
-
-export function iconCopy(size: IconSize, cssClass: string) {
-    return icon(
-        '<rect width="14" height="14" x="8"'
-        + ' y="8" rx="2" ry="2"/>'
-        + '<path d="M4 16c-1.1 0-2-.9-2-2V4c0'
-        + '-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
         size,
         cssClass,
     );

@@ -419,10 +419,10 @@ one-line false all-clear. The remaining nine are the English
 word: eight in comments, one in the page keyword string
 `'flow, process,'` at `web-app/app/page-registry.ts:177`.
 
-Dropping the quote anchor adds nine more non-specifier hits:
+Dropping the quote anchor adds eight more non-specifier hits:
 `node: GraphNode`, a domain property name, in `flow-graph.ts`
-(×3), `flow-operations.ts` (×3), `mermaid-generate.ts`, and
-`api/types.ts`, plus the comment naming `node:crypto` at
+(×3), `flow-operations.ts` (×3), and `api/types.ts`, plus
+the comment naming `node:crypto` at
 `server/scrypt-hash.ts:2`. The identifier is right and the
 pattern is wrong. `tests/` is outside the sweep on purpose:
 its files still import `node:test`.

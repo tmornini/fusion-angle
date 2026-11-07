@@ -1,21 +1,5 @@
-import { extractErrorMessage } from './error-helpers.ts';
 import { ValidationError } from './types.ts';
 import { isIdentifier } from './identifier.ts';
-
-export function parseOrThrow(
-    raw: string,
-    label: string,
-): unknown {
-    try {
-        return JSON.parse(raw);
-    } catch (e) {
-        const msg = extractErrorMessage(e);
-        throw new ValidationError(
-            'invalid JSON for '
-                + label + ': ' + msg,
-        );
-    }
-}
 
 export function asArray(
     value: unknown,

@@ -1,4 +1,3 @@
-export * from './clipboard.ts';
 export * from './location.ts';
 export * from './url-params.ts';
 export * from './preferences.ts';

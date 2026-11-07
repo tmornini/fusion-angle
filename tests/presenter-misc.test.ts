@@ -1053,11 +1053,10 @@ Deno.test(
         const out = buildToolbar(
             true, true, true,
         ).toString();
+        assertMatch(out, /data-action="undo"/);
+        assertMatch(out, /data-action="redo"/);
+        assertMatch(out, /data-action="delete-selected"/);
         assertStrictEquals(/disabled/.test(out), false);
-        assertMatch(
-            out, /data-action="copy-mermaid"/,
-        );
-        assertMatch(out, /data-action="export-zip"/);
     },
 );
 

@@ -345,7 +345,7 @@ relationship.
 The route is the single divorce point.
 `GET organizations/:id/flows/:id` (and the list)
 reassembles `FlowWithGraph` from the message plane.
-Freeze, stats, and export read through `ctx.GET`. Undo
+Freeze and stats read through `ctx.GET`. Undo
 resolves its restore target server-side (stack+pointer
 over this flow's document-pair history vs its undo
 operation-pair history) and lands a restore pair with
@@ -502,9 +502,7 @@ through notification channels. Named non-void exceptions:
 `postMockDataLoad` / `postBootstrap` →
 `SeededCredentials`; `postSessionRefresh` /
 `postPasswordLogin` → `SessionCredentials`;
-`postOrganizationSessionExchange` → `string`;
-`postFlowFromBackup` → `string`; `postFlowFromMermaid` /
-`postFlowFromZip` → `{ flowId, warnings }`.
+`postOrganizationSessionExchange` → `string`.
 
 ## KNOWN seams
 

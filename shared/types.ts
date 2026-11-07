@@ -1188,10 +1188,9 @@ export interface WorkOrderFlowGraph {
 // `graph` field carries this native nested object; the frozen
 // plane (`work_orders.flow_graph`) keeps its own native copy.
 // The stored JSON shape is a pinned
-// contract (SCHEMA.md documents it; old rows and exported
-// backups carry it), so domain graphs cross into rows ONLY
-// through these mappers — a domain-type change cannot silently
-// rewrite storage.
+// contract (SCHEMA.md documents it; old rows carry it), so domain
+// graphs cross into rows ONLY through these mappers — a
+// domain-type change cannot silently rewrite storage.
 function storedNodeAttribute(
     ref: NodeAttribute,
 ): Record<string, unknown> {
