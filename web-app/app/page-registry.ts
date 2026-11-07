@@ -28,7 +28,7 @@ export interface PageEntry {
     searchable?: boolean;
     // Auth-gated by default: a page is exempt only when this is
     // explicitly false. The boot gate reads
-    // `requiresAuth !== false`, so the 23 app pages that
+    // `requiresAuth !== false`, so the 24 app pages that
     // omit it inherit true; only the public surface opts out.
     requiresAuth?: boolean;
     cssBundles?: string[];
