@@ -7,6 +7,8 @@ import {
 } from '@std/assert';
 import type { HistoryLine as CoreHistoryLine } from
     '../web-app/app/measure-core.ts';
+import { vizClientScript } from
+    '../web-app/app/measure-viz.ts';
 import {
     formatDurationPerf,
     pickAxisUnit,
@@ -20,6 +22,8 @@ import {
     rollupPhases,
     pageKeysUnion,
     rankPages,
+    phaseBar,
+    browserHelpersSource,
     buildPayload,
     trendLabelIndices,
     pageKeySet,
@@ -988,3 +992,203 @@ Deno.test('trendAxisMax keeps a maximum below one', () => {
         0.5,
     );
 });
+
+function countOf(text: string, needle: string): number {
+    return text.split(needle).length - 1;
+}
+
+function legendItem(name: string, ms: number): string {
+    return '<span><span class="swatch" style="'
+        + 'background:var(--' + name + ')"></span>'
+        + name + ' '
+        + formatDurationPerf(ms)
+        + '</span>';
+}
+
+function loadEmittedHelpers(): {
+    formatDurationPerf: typeof formatDurationPerf;
+    pickAxisUnit: typeof pickAxisUnit;
+    formatAxisTick: typeof formatAxisTick;
+    pageKeysUnion: typeof pageKeysUnion;
+    rankPages: typeof rankPages;
+    phaseBar: typeof phaseBar;
+} {
+    const source = "const MINUS = '\\u2212';\n"
+        + browserHelpersSource()
+        + '\nreturn {'
+        + ' formatDurationPerf, pickAxisUnit,'
+        + ' formatAxisTick, pageKeysUnion,'
+        + ' rankPages, phaseBar'
+        + ' };';
+    const load = new Function(source) as () => {
+        formatDurationPerf: typeof formatDurationPerf;
+        pickAxisUnit: typeof pickAxisUnit;
+        formatAxisTick: typeof formatAxisTick;
+        pageKeysUnion: typeof pageKeysUnion;
+        rankPages: typeof rankPages;
+        phaseBar: typeof phaseBar;
+    };
+    return load();
+}
+
+Deno.test('emitted helpers match the core', () => {
+    const got = loadEmittedHelpers();
+    assertStrictEquals(
+        got.formatDurationPerf(0.4),
+        formatDurationPerf(0.4),
+    );
+    assertStrictEquals(
+        got.formatDurationPerf(990, { signed: true }),
+        formatDurationPerf(990, { signed: true }),
+    );
+    assertStrictEquals(
+        got.formatDurationPerf(-12),
+        formatDurationPerf(-12),
+    );
+    assertStrictEquals(
+        got.formatDurationPerf(3282.75),
+        formatDurationPerf(3282.75),
+    );
+    assertStrictEquals(
+        got.pickAxisUnit([1000, 50]),
+        pickAxisUnit([1000, 50]),
+    );
+    assertStrictEquals(
+        got.formatAxisTick(3280, 's'),
+        formatAxisTick(3280, 's'),
+    );
+    assertStrictEquals(
+        got.formatAxisTick(-0.4, 'us'),
+        formatAxisTick(-0.4, 'us'),
+    );
+    const sweeps = [
+        sampleSweep('a', {
+            slow: { readyMs: 100, phases: {} },
+            fast: { readyMs: 50, phases: {} },
+        }),
+        sampleSweep('b', {
+            slow: { readyMs: 300, phases: {} },
+            fast: { readyMs: 40, phases: {} },
+            mid: { readyMs: 150, phases: {} },
+        }),
+    ];
+    const budgets = {
+        slow: { readyMs: 200 },
+        fast: { readyMs: 100 },
+    };
+    assertEquals(
+        got.rankPages(sweeps, budgets, 0, 1, 'ready'),
+        rankPages(sweeps, budgets, 0, 1, 'ready'),
+    );
+    assertEquals(
+        got.rankPages(sweeps, budgets, 0, 1, 'delta'),
+        rankPages(sweeps, budgets, 0, 1, 'delta'),
+    );
+    assertEquals(
+        got.rankPages(sweeps, {}, 0, 0, 'delta'),
+        rankPages(sweeps, {}, 0, 0, 'delta'),
+    );
+    const buckets = {
+        boot: 25,
+        fetch: 0,
+        render: 75,
+        other: 0,
+    };
+    assertStrictEquals(
+        got.phaseBar(buckets),
+        phaseBar(buckets),
+    );
+});
+
+Deno.test('phaseBar is the legend and the stack', () => {
+    const buckets = {
+        boot: 25,
+        fetch: 0,
+        render: 75,
+        other: 0,
+    };
+    assertStrictEquals(
+        phaseBar(buckets),
+        '<div class="legend">'
+            + legendItem('boot', 25)
+            + legendItem('fetch', 0)
+            + legendItem('render', 75)
+            + legendItem('other', 0)
+            + '</div>'
+            + '<div class="bar-stack">'
+            + '<div class="bar-seg" style="width:'
+            + '25%;background:var(--boot)"></div>'
+            + '<div class="bar-seg" style="width:'
+            + '75%;background:var(--render)"></div>'
+            + '</div>',
+    );
+    assertStrictEquals(
+        phaseBar({
+            boot: 0,
+            fetch: 0,
+            render: 0,
+            other: 0,
+        }),
+        '<div class="legend">'
+            + legendItem('boot', 0)
+            + legendItem('fetch', 0)
+            + legendItem('render', 0)
+            + legendItem('other', 0)
+            + '</div><div class="bar-stack"></div>',
+    );
+});
+
+Deno.test(
+    'dashboard script embeds the helpers once',
+    () => {
+        const script = vizClientScript();
+        assert(script.includes(browserHelpersSource()));
+        assert(script.includes("var MINUS = '\\u2212'"));
+        assertStrictEquals(
+            countOf(script, 'function formatDurationPerf'),
+            1,
+        );
+        assertStrictEquals(
+            countOf(script, 'function rankPages'),
+            1,
+        );
+        assertStrictEquals(
+            countOf(script, 'function phaseBar'),
+            1,
+        );
+        assertStrictEquals(
+            countOf(script, 'class="legend"'),
+            1,
+        );
+        assertStrictEquals(
+            countOf(script, 'class="bar-stack"'),
+            1,
+        );
+        assertStrictEquals(
+            countOf(
+                script,
+                'rankPages(sweeps, budgets,'
+                    + ' startIndex, endIndex, sort)',
+            ),
+            4,
+        );
+        assert(!script.includes('pageKeysUnion()'));
+        assert(!script.includes('rankPages()'));
+        assert(!script.includes(', false)'));
+        assert(!script.includes(', true)'));
+        assertStrictEquals(
+            countOf(script, '{ signed: true }'),
+            6,
+        );
+        assert(script.includes(
+            'Mean phase mix across pages',
+        ));
+        assert(script.includes(
+            'boot:page-init is residual wall time',
+        ));
+        assertStrictEquals(
+            countOf(script, 'phaseBar('),
+            3,
+        );
+    },
+);
