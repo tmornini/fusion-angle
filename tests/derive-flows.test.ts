@@ -246,3 +246,35 @@ Deno.test('ordering is oldest live head (at, id)', async () => {
         .filter((id) => ids.includes(id));
     assertEquals(observed, ids);
 });
+
+Deno.test(
+    'deriveFlows orders the heads it already holds',
+    async () => {
+        const db = await seededDb();
+        const prefix = '/organizations/'
+            + STARK_ORGANIZATION + '/flows/';
+        const heads = await db.messagePairs
+            .getCollectionHeadPairs(prefix);
+        let headReads = 0;
+        const original = db.messagePairs
+            .getCollectionHeadPairs.bind(
+                db.messagePairs,
+            );
+        (db.messagePairs as unknown as {
+            getCollectionHeadPairs: (
+                path: string,
+            ) => ReturnType<typeof original>;
+        }).getCollectionHeadPairs = async (path) => {
+            headReads += 1;
+            return original(path);
+        };
+        const derived = await deriveFlows(
+            db, STARK_ORGANIZATION,
+        );
+        assertStrictEquals(headReads, 0);
+        assertEquals(
+            derived.map((flow) => flow.id),
+            heads.map((head) => head.name),
+        );
+    },
+);
