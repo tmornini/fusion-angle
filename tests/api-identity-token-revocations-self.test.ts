@@ -19,7 +19,7 @@ import {
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import {
-    apiRequest, storedPutBodyText,
+    req, storedPutBodyText,
     framedRequest,
 } from './http-fixtures.ts';
 import {
@@ -35,20 +35,6 @@ import { generateIdentifier } from
 // widens PUT to the member tier; Region B keeps it
 // self-only (path identity vs actor). GET stays admin-only.
 // Flat /identity-token-revocations/:rid is RETIRED (404).
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 function nestedPath(
     identityId: string,

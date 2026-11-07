@@ -13,7 +13,7 @@ import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest,
+    reqWithOperationId as req,
     framedRequest,
     partsOf,
     storedPutBodyText,
@@ -42,22 +42,6 @@ function messagePairJsonOf(message: string): {
 // takes the FULL document — entity fields plus state.
 // G1: stored PUT body is ideaEntityOf of the same chain.
 // GET streams that stored body.
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    operationId?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(operationId !== undefined ? { operationId } : {}),
-    });
-}
 
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();

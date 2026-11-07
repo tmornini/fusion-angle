@@ -40,7 +40,7 @@ import { firstProviderModel } from './member-fixtures.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
     pairIdOf,
     partBodiesOf,
     partsOf,
@@ -102,23 +102,6 @@ const FLOWID_UNDO_EV = generateIdentifier();
 // C3: bulk deriveStates / bulk lifecycle collection retired.
 // Cases rework onto per-family and collection history parity.
 // Graph sidecars pin document-message-pair graphDelta / revivals.
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    headers?: Record<string, string>,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(headers !== undefined
-            ? { headers } : {}),
-    });
-}
 
 async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();

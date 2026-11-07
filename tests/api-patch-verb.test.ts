@@ -9,7 +9,7 @@ import {
 } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest,
+    reqWithOptionalToken as req,
     framedRequest,
 } from './http-fixtures.ts';
 import {
@@ -21,20 +21,6 @@ import {
 // carries a patch handler yet — admin probes on handler-less
 // routes answer 405; members still 403 at policy; unauth 401;
 // unknown path 404.
-
-function req(
-    method: string,
-    path: string,
-    token?: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        ...(token !== undefined ? { token } : {}),
-        body,
-    });
-}
 
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();

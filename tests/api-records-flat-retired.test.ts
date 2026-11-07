@@ -7,7 +7,7 @@ import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest,
+    reqWithOptionalToken as req,
 } from './http-fixtures.ts';
 
 // Task 23 pins: flat records + record-attributes wire is
@@ -15,20 +15,6 @@ import {
 // first (never a topology oracle). Facade
 // /organizations/:org/records re-enters flat and 404s.
 // Member schema mutation on nested attributes is admin-only.
-
-function req(
-    method: string,
-    path: string,
-    token?: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        ...(token !== undefined ? { token } : {}),
-        body,
-    });
-}
 
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();

@@ -34,7 +34,7 @@ import {
     documentFamilyWiring,
 } from '../api/document-family.ts';
 import {
-    apiRequest,
+    req,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -54,20 +54,6 @@ import { operationIdHeader } from
 // below-gate only, never through PUT().
 
 const AT = '2026-01-01T00:00:00.000000Z';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 function memberEntityFields(type: 'human' | 'ai' | 'system'
 = 'human') {

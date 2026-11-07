@@ -25,7 +25,7 @@ import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../shared/types.ts';
 import {
-    apiRequest,
+    reqWithExtraHeadersAndOperationId as req,
     partBodiesOf,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
@@ -64,25 +64,6 @@ const ATTRS = TYPE_DETAIL + '/attributes/';
 const INSTANCES = TYPE_DETAIL + '/instances/';
 const BINDING =
     '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID + '/binding';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    extraHeaders?: Record<string, string>,
-    operationId?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(extraHeaders !== undefined
-            ? { headers: extraHeaders } : {}),
-        ...(operationId !== undefined ? { operationId } : {}),
-    });
-}
 
 async function messagePairCount(
     db: MemoryDbAdapter,

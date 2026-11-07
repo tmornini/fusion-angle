@@ -25,7 +25,7 @@ import {
     RECORD_TYPE_DETAIL_PATTERN,
 } from '../api/family-registry.ts';
 import {
-    apiRequest,
+    reqWithOperationId as req,
     storedPutBodyText,
 } from './http-fixtures.ts';
 import {
@@ -53,22 +53,6 @@ interface RecordTypePutEcho {
 
 interface RecordTypeGetRow extends RecordTypePutEcho {
     state: string;
-}
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    operationId?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(operationId !== undefined ? { operationId } : {}),
-    });
 }
 
 function typeBody(

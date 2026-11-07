@@ -6,6 +6,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import {
     apiRequest,
+    req,
     partsOf,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
@@ -14,20 +15,6 @@ import { generateIdentifier } from
 // Succession pin: pair-chain GET /organizations/:id/flows/:id/versions is
 // 200/404 by document existence. Old table-backed :vid
 // stays a miss (404). Writes stay unwired (405).
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 function flowBody() {
     return {

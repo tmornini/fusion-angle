@@ -15,7 +15,7 @@ import {
 } from './test-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
-    apiRequest,
+    reqWithOperationId as req,
     framedRequest,
     presentedFields,
     invitationLatched,
@@ -40,22 +40,6 @@ const SARAH_ID = 'MQFcPtrZPIGjMCRAXtZUnA';
 const LAST_ADMIN =
     'the last accepted admin cannot be removed'
     + ' or demoted';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    operationId?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(operationId !== undefined ? { operationId } : {}),
-    });
-}
 
 function seatsPrefix(organization: string): string {
     return '/organizations/' + organization

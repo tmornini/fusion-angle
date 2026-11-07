@@ -7,7 +7,7 @@ import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest,
+    req,
     partsOf,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
@@ -18,20 +18,6 @@ import { generateIdentifier } from
 // seedAdminSchema (not postMockDataLoad) so the suite stays
 // self-contained; seeded genesis lives in mock-data/drift
 // pins. Writes go through the live gate.
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 async function seededDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();

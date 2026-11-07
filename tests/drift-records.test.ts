@@ -63,6 +63,7 @@ import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    req,
     assertPartsAreHeads,
     pairIdOf,
     partBodiesOf,
@@ -95,20 +96,6 @@ const EV_DRIFT_M = generateIdentifier();
 // Coverage re-homes to wire-byte handleRequest assertions and
 // non-lexical live fixtures. Records is a TRIO family with a
 // live DELETE on :id (Author gate 9).
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();

@@ -36,7 +36,7 @@ import {
     seedPersonIdentity,
 } from './identity-fixtures.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
     invitationLatched,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
@@ -73,23 +73,6 @@ async function adminToken(
     });
 }
 
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    headers?: Record<string, string>,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(headers !== undefined
-            ? { headers } : {}),
-    });
-}
 
 // Below-facade pair formation (the member-fixtures.ts idiom,
 // the derive-states-events.test.ts precedent): every write below

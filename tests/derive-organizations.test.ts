@@ -14,6 +14,7 @@ import { EntityNotFoundError } from '../api/db.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     apiRequest,
+    req,
     pairIdOf,
     storedPutBodyText,
 } from './http-fixtures.ts';
@@ -39,20 +40,6 @@ import {
 // A PUT here rewrites the claim organization's live head,
 // latched on the ETag it reads; any other organization a
 // case needs is seeded below the fence.
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();

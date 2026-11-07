@@ -7,7 +7,7 @@ import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -24,22 +24,6 @@ import { generateIdentifier } from
 // Task 61: claim is PUT/DELETE, its GET retired (405);
 // binding is create-only PUT (POST gone); release POST is
 // gone. Transition GET/PUT/DELETE stay 405.
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    headers?: Readonly<Record<string, string>>,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(headers !== undefined ? { headers } : {}),
-    });
-}
 
 // An operation names a head; none was ever read here, so any
 // well-formed tag reaches the handler.

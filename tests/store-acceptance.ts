@@ -13,7 +13,7 @@ import { messageStore } from '../api/message-store.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest,
+    reqWithOptionalTokenHeadersAndOperationId as req,
     pairIdOf,
     partsOf,
 } from './http-fixtures.ts';
@@ -45,25 +45,6 @@ const IDEA_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
 const FLOW_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/';
 const WORK_ORDER_PREFIX =
     '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/';
-
-function req(
-    method: string,
-    path: string,
-    token?: string,
-    body?: unknown,
-    headers?: Readonly<Record<string, string>>,
-    operationId?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        ...(token !== undefined ? { token } : {}),
-        body,
-        ...(headers !== undefined
-            ? { headers } : {}),
-        ...(operationId !== undefined ? { operationId } : {}),
-    });
-}
 
 function ideaDocument(title: string): Record<string, unknown> {
     return {
