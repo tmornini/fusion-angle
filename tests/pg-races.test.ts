@@ -25,7 +25,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { firstProviderModel } from './member-fixtures.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
 } from './http-fixtures.ts';
 import {
     decodeIdentifier,
@@ -98,25 +98,6 @@ function urlWithSearchPath(
     const parsed = new URL(url);
     parsed.searchParams.set('search_path', schema);
     return parsed.href;
-}
-
-function req(
-    method: string,
-    path: string,
-    token?: string,
-    body?: unknown,
-    headers?: Readonly<Record<string, string>>,
-    operationId?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        ...(token !== undefined ? { token } : {}),
-        body,
-        ...(headers !== undefined
-            ? { headers } : {}),
-        ...(operationId !== undefined ? { operationId } : {}),
-    });
 }
 
 function ideaDocument(title: string): Record<string, unknown> {

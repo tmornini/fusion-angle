@@ -8,7 +8,7 @@ import { DEV_TOKEN } from
     './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest,
+    reqWithOperationId as req,
     partsOf,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
@@ -21,22 +21,6 @@ import { generateIdentifier } from
 interface VersionRow {
     id: string;
     state: string;
-}
-
-function req(
-    method: string,
-    path: string,
-    token?: string,
-    body?: unknown,
-    operationId?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        ...(token !== undefined ? { token } : {}),
-        body,
-        ...(operationId !== undefined ? { operationId } : {}),
-    });
 }
 
 function objectiveBody(state: string) {

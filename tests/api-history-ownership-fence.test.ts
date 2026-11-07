@@ -7,7 +7,7 @@ import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import {
-    apiRequest,
+    req,
     partsOf,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
@@ -24,20 +24,6 @@ import { generateIdentifier } from
 // lives in api.test.ts.
 
 const AT = '2026-01-01T00:00:00.000000Z';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 async function seedMembershipPair(
     db: MemoryDbAdapter,

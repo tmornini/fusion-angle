@@ -21,7 +21,7 @@ import {
     type WorkOrderEventEntity,
 } from '../shared/types.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
     pairIdOf,
 } from './http-fixtures.ts';
 import {
@@ -41,22 +41,6 @@ import { operationIdHeader } from
 import { seedCreatedWorkOrder } from
     './work-order-fixtures.ts';
 
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    headers?: Readonly<Record<string, string>>,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(headers !== undefined ? { headers } : {}),
-    });
-}
 
 // An operation on a work order names the head it read.
 async function headTag(

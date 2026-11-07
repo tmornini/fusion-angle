@@ -7,24 +7,13 @@ import { DEV_TOKEN, organizationToken } from
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
+    req,
 } from './http-fixtures.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
 
 
 const AT = '2026-01-01T00:00:00.000000Z';
-
-function req(
-    method: string, path: string, token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 async function freshDb() {
     const db = memoryDbAdapter();

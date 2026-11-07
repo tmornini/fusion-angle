@@ -10,7 +10,7 @@ import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest,
+    reqWithOperationId as req,
     partsOf,
     storedPutBodyText,
 } from './http-fixtures.ts';
@@ -36,22 +36,6 @@ function messagePairJsonOf(message: string): {
 // plus
 // the state. G1: stored PUT body is projectEntityOf of
 // the same chain. GET streams that body.
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    operationId?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(operationId !== undefined ? { operationId } : {}),
-    });
-}
 
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();

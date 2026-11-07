@@ -28,7 +28,7 @@ import { sha256Bytes, sha256Hex } from
 import { Octets } from
     '../shared/http-message/octets.ts';
 import { leafHashHex } from '../shared/pair-root.ts';
-import { apiRequest } from './http-fixtures.ts';
+import { apiRequest, req } from './http-fixtures.ts';
 import {
     seedIdentityCredential,
     seedPersonIdentity,
@@ -101,15 +101,6 @@ function ideaDocument(
         success_metrics: 'm',
         state: 'active',
     };
-}
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body: unknown,
-): Request {
-    return apiRequest({ method, path, token, body });
 }
 
 // ideas/:id has no DELETE route. The head is planted

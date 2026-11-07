@@ -14,7 +14,7 @@ import {
     generateIdentifier,
 } from '../shared/identifier.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { seedCreatedWorkOrder } from
@@ -27,23 +27,6 @@ const ORGANIZATION_A = 'AjdvjuECVZEgZoFajaIEkg';
 const AT = '2020-01-01T00:00:00.000000Z';
 const FLOW_ID = generateIdentifier();
 const N_CREATE = generateIdentifier();
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    extraHeaders?: Record<string, string>,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(extraHeaders !== undefined
-            ? { headers: extraHeaders } : {}),
-    });
-}
 
 async function twoOrganizationDb(): Promise<{
     db: MemoryDbAdapter;

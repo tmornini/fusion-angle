@@ -39,7 +39,7 @@ import {
     deriveInstanceHead,
 } from '../api/derive-record-instances.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { seedCreatedWorkOrder } from
@@ -76,25 +76,6 @@ const INSTANCE_DETAIL = INSTANCES + INSTANCE_ID;
 const TRANSITION =
     '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
         + '/transition';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    extraHeaders?: Record<string, string>,
-    operationId?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(extraHeaders !== undefined
-            ? { headers: extraHeaders } : {}),
-        ...(operationId !== undefined ? { operationId } : {}),
-    });
-}
 
 // A client reads the work order's tag before an operation
 // on it.

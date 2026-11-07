@@ -58,6 +58,7 @@ import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    reqWithOperationId as req,
     assertPartsAreHeads,
     pairIdOf,
     partBodiesOf,
@@ -89,22 +90,6 @@ const OBJ_DRIFT_M = generateIdentifier();
 // reads exercise the ACTUAL generic handlers. Nested
 // revisions/scores ride bespoke derives (no generic family
 // wiring for nests).
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    operationId?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(operationId !== undefined ? { operationId } : {}),
-    });
-}
 
 async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();

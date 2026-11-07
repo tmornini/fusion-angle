@@ -16,6 +16,7 @@ import {
 import { seedCurrentMember } from './member-fixtures.ts';
 import {
     apiRequest,
+    reqWithOperationId as req,
 } from './http-fixtures.ts';
 import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
@@ -58,24 +59,6 @@ const PROJECT_ID = generateIdentifier();
 const TE_A_MID = generateIdentifier();
 const TE_B_TERM = generateIdentifier();
 const TE_A_TERM = generateIdentifier();
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    operationId?: string,
-    headers?: Readonly<Record<string, string>>,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(operationId !== undefined ? { operationId } : {}),
-        ...(headers !== undefined ? { headers } : {}),
-    });
-}
 
 // An operation on a work order names the head it read.
 async function workOrderTag(

@@ -79,6 +79,7 @@ import {
 } from '../shared/identifier.ts';
 import {
     apiRequest,
+    req,
     framedRequest,
 } from './http-fixtures.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -101,15 +102,6 @@ function ideaDocument(title: string, state: string) {
         success_metrics: 'm',
         state,
     };
-}
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({ method, path, token, body });
 }
 
 // ideas/:id has no DELETE route. The head is planted

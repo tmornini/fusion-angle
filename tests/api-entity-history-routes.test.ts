@@ -28,7 +28,7 @@ import {
 } from '../api/message-pair.ts';
 import { sharedMockDb } from './mock-seed.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
     messageOfResponse,
     pairIdOf,
     partBodiesOf,
@@ -46,22 +46,6 @@ import {
 // absent → 404. Shared handler builder wraps
 // derive*StateHistory (ASC) with DESC + missedReadError.
 // Product versions live under organizations/:id/.
-
-function req(
-    method: string,
-    path: string,
-    token?: string,
-    body?: unknown,
-    headers?: Record<string, string>,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        ...(token !== undefined ? { token } : {}),
-        body,
-        ...(headers !== undefined ? { headers } : {}),
-    });
-}
 
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
