@@ -1,19 +1,8 @@
 import { join, resolve } from '@std/path';
 import { copySync } from '@std/fs';
+import { exists, manifestOf } from './deno-file.ts';
 import { PAGE_REGISTRY } from './page-registry.ts';
 import { buildSidebarNavItemsHtml } from './nav-items.ts';
-
-function exists(path: string): boolean {
-    try {
-        Deno.statSync(path);
-        return true;
-    } catch (error) {
-        if (error instanceof Deno.errors.NotFound) {
-            return false;
-        }
-        throw error;
-    }
-}
 
 const composeDir = import.meta.dirname;
 if (composeDir === undefined) {
@@ -43,29 +32,6 @@ const standalonePages = Object.entries(PAGE_REGISTRY)
     }));
 
 const PAGE_CSS_PLACEHOLDER = '        {{PAGE_CSS_LINKS}}\n';
-
-function manifestOf(
-    value: unknown,
-): Record<string, string> {
-    if (value === null
-        || typeof value !== 'object'
-        || Array.isArray(value)) {
-        throw new Error(
-            'asset-manifest.json is not an object',
-        );
-    }
-    const out: Record<string, string> = {};
-    for (const [key, val] of Object.entries(value)) {
-        if (typeof val !== 'string') {
-            throw new Error(
-                'asset-manifest.json values must be'
-                    + ' strings',
-            );
-        }
-        out[key] = val;
-    }
-    return out;
-}
 
 function readManifest(
     outDir: string,
