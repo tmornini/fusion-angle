@@ -3,7 +3,6 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
-import { memoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { GET, GETCollection, PUT } from './in-page-facade.ts';
 import {
@@ -14,7 +13,7 @@ import {
     TOKEN_AUDIENCE,
 } from '../api/access-token.ts';
 import {
-    seedAdminSchema,
+    freshDb,
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -24,12 +23,6 @@ import { framedRequest } from './http-fixtures.ts';
 
 
 const BASE = 'http://localhost';
-
-async function freshDb() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
-}
 
 // The verb fns always attach a Bearer header, so the
 // missing-header path is reachable only via handleRequest.

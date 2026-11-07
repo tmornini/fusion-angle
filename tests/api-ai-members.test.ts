@@ -1,10 +1,9 @@
 import { assert, assertStrictEquals } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
 import { GET } from './in-page-facade.ts';
-import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN, organizationToken } from
     './token-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import {
     firstProviderModel,
     seedAIMember,
@@ -35,12 +34,6 @@ function agentFields(name: string) {
         skill_focus: 'drafting',
         model: firstProviderModel().id,
     };
-}
-
-async function freshDb() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
 }
 
 Deno.test('PUT /organizations/:id/ai-agents/:id writes'

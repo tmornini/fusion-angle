@@ -6,12 +6,11 @@ import {
 } from '@std/assert';
 import { ideaEntityOf } from '../api/derive-ideas.ts';
 import {
-    memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import {
     apiRequest,
     framedRequest,
@@ -57,12 +56,6 @@ function req(
         body,
         ...(operationId !== undefined ? { operationId } : {}),
     });
-}
-
-async function freshDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
 }
 
 async function versionsOf(

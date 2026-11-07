@@ -4,7 +4,6 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import {
-    memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest, UnauthorizedError } from '../api/api.ts';
@@ -12,7 +11,7 @@ import { inPageContext, GET } from './in-page-facade.ts';
 import {
     postSessionRefresh,
 } from '../client/session-refresh.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import { devToken } from './token-fixtures.ts';
 import {
     seedAuthorizationCodeMessagePair,
@@ -27,12 +26,6 @@ import { basicAuthorization } from
 import { operationIdHeader } from './operation-id-header.ts';
 
 const BASE = 'http://localhost';
-
-async function freshDb() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
-}
 
 // Drive the real authorization_code grant to mint a genuine
 // token chain — there is no shortcut fixture for refresh tokens.

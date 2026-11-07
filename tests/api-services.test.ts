@@ -1,10 +1,9 @@
 import { assertEquals, assertStrictEquals } from
     '@std/assert';
 import { handleRequest } from '../api/api.ts';
-import { memoryDbAdapter } from '../api/db-memory.ts';
 import { apiRequest } from './http-fixtures.ts';
 import { claimToken, DEV_TOKEN } from './token-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
@@ -19,12 +18,6 @@ const BODY = {
 function servicePath(organization: string, id = ''): string {
     return '/organizations/' + organization
         + '/services/' + id;
-}
-
-async function freshDb() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
 }
 
 // Only the members statement creates a service (Task 6),

@@ -10,7 +10,6 @@ import { RequestError, handleRequest } from '../api/api.ts';
 import {
     GET, GETCollection, PUT, POST,
 } from './in-page-facade.ts';
-import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     seedHumanMember,
     seedAIMember,
@@ -21,7 +20,7 @@ import {
 import { captureConsole } from './fixtures/console-capture.ts';
 import { withPerformanceNow } from './fixtures/performance-now.ts';
 import {
-    seedAdminSchema,
+    freshDb,
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -29,12 +28,6 @@ import { operationIdHeader } from
     './operation-id-header.ts';
 import { framedRequest } from './http-fixtures.ts';
 
-
-async function freshDb() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
-}
 
 Deno.test('GET on unknown route throws', async () => {
     const db = await freshDb();

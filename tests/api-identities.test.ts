@@ -22,6 +22,7 @@ import {
 } from '../shared/identifier.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import {
+    freshDb,
     seedAdminSchema,
 } from './test-fixtures.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
@@ -99,12 +100,6 @@ Deno.test('validateIdentityPiiEntity rejects missing field', () => {
             name: 'x', email: 'y', phone: 'z',
         }));
 });
-
-async function freshDb() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
-}
 
 function outside(method: string, path: string): string {
     return 'forbidden: ' + method + ' ' + path

@@ -6,7 +6,6 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import {
-    memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
@@ -24,7 +23,7 @@ import {
 } from '../api/derive-identity-spine.ts';
 import { documentHeadAt } from '../api/message-pair.ts';
 import {
-    seedAdminSchema,
+    freshDb,
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -57,12 +56,6 @@ function req(
         body,
         ...(operationId !== undefined ? { operationId } : {}),
     });
-}
-
-async function freshDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
 }
 
 function humanPii(name: string) {
