@@ -57,7 +57,7 @@ import {
     seedAuthorizationCodeMessagePair,
 } from './authorization-code-fixtures.ts';
 import {
-    deriveIdentityTokensFor,
+    tokenHeadsFor,
 } from '../api/derive-identity-tokens.ts';
 import {
     apiRequest,
@@ -125,6 +125,14 @@ async function freshDb() {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     return db;
+}
+
+async function tokenEntities(
+    db: MemoryDbAdapter,
+    identityId: string,
+) {
+    return (await tokenHeadsFor(db, identityId))
+        .map((head) => head.entity);
 }
 
 async function issuePair(db: MemoryDbAdapter): Promise<{
@@ -284,7 +292,7 @@ Deno.test('concurrent 401s share exactly one refresh grant',
     assertStrictEquals(members.length, 1);
     assertStrictEquals(organizations.length, 1);
     // exactly ONE rotation event: the refresh jti was spent once
-    const rotations = (await deriveIdentityTokensFor(
+    const rotations = (await tokenEntities(
         db, 'XXZruirZyAOoRpNxaDnpSA',
     )).filter(row => row.action === 'rotated');
     assertStrictEquals(rotations.length, 1);
@@ -558,7 +566,7 @@ Deno.test('a concurrent facade refresh and remint present'
     ]);
     // Assert on `revoked`, not `rotated`: the loser was a
     // replay, so the rotation count was already one.
-    const revoked = (await deriveIdentityTokensFor(
+    const revoked = (await tokenEntities(
         db, 'XXZruirZyAOoRpNxaDnpSA',
     )).filter(row => row.action === 'revoked');
     assertStrictEquals(revoked.length, 0);

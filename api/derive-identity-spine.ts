@@ -56,8 +56,7 @@ import {
 // mint; Gate-16 response-body deviation deleted with the family.
 //
 // Reads below use db.messagePairs (+
-// pickString over their decoded bodies) ONLY, mirroring api/
-// derive-members.ts and api/derive-invitations.ts. Production
+// pickString over their decoded bodies) ONLY. Production
 // reads this module today: the identity facet routes
 // (api/routes.ts), api/authentication.ts, and the
 // organization invitation reads.

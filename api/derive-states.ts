@@ -4,7 +4,7 @@ import {
     ForeignOrganizationError,
 } from './db.ts';
 import type {
-    Id, MessagePairEntity, StateEntity,
+    Id, MessagePairEntity,
 } from '../shared/types.ts';
 import {
     pickString,
@@ -17,8 +17,6 @@ import {
 import {
     documentMessagePairsAt,
     deriveDocumentsAt,
-    byIdAscending,
-    type DocumentMessagePair,
 } from './derive-documents.ts';
 import { deriveOrganizations } from './derive-organizations.ts';
 import {
@@ -42,12 +40,10 @@ import type { WorkOrderVersion } from './work-order-version.ts';
 //       document-pair body (graphDelta.deletions / revivals);
 //       resolveFlowGraphOwner below resolves their owners.
 //       No bulk derive remains (C3).
-//   (d) deriveInvitationStates — the invitation
-//       documents' own PUT history: the
-//       grant's 'pending' and the later terminal PUT (spec
-//       2026-09-15 § 2). The answering ops (acceptance /
-//       decline / revocation) are the HTTP audit alone; no
-//       derive reads them.
+//   (d) invitation lifecycle pair-scan RETIRED. Ownership
+//       still reads the invitation document
+//       (resolveInvitationOwner). History is GET
+//       .../invitations/:id/versions/.
 // bare states/:id, the per-entity history alias, the bulk
 // lifecycle collection, the five-source union (deriveStates),
 // and nested field-values collection are RETIRED (C3/C4).
@@ -102,11 +98,10 @@ async function organizationIds(
 }
 
 // The invitation's own organization_id — carried in the STORED
-// response, the wire (derive-invitations.ts's own precedent),
-// never the path (the invitations path is flat, unlike every
-// org-nested family above). Document read of this id at the
-// invitations collection — the same head fold, reused rather
-// than reimplemented.
+// response, the wire, never the path (the invitations path
+// is flat, unlike every org-nested family above). Document
+// read of this id at the invitations collection — the same
+// head fold, reused rather than reimplemented.
 async function resolveInvitationOwner(
     db: DbAdapter,
     entityId: Id,
@@ -491,49 +486,14 @@ function versionOf(pair: MessagePairEntity): WorkOrderVersion {
 // SIDECAR-KEEP); resolveFlowGraphOwner above still resolves
 // their owners for fences.
 
-// The invitation lifecycle, from the invitation document's
-// own history (api/derive-invitations.ts owns the head
-// read): every PUT at /invitations/<id> is one lifecycle
-// row — one row per PUT, the grant's 'pending' and the
-// terminal — id-lex ordered (a caller wanting chronological
-// order sorts by (at, id) itself). `id` and `at` are the
-// pair's own; `member_id` is the pair's requester (the
-// granting admin, the answering invitee, the revoking
-// admin). A duplicate grant writes no document and a no-op
-// resend appends no PUT, so neither has a row.
-function invitationLifecycleRowsOf(
-    messagePairs: readonly DocumentMessagePair[],
-): StateEntity[] {
-    const rows: StateEntity[] = [];
-    for (const messagePair of messagePairs) {
-        rows.push({
-            id: messagePair.id,
-            entity_id: messagePair.name,
-            state: pickString(messagePair.body, 'state'),
-            member_id: messagePair.requesterIdentityId,
-            at: messagePair.at,
-        });
-    }
-    return rows.sort(byIdAscending);
-}
-
-// Every invitation's lifecycle: ONE collection read of
-// /invitations/ — every pair of every document there.
-export async function deriveInvitationStates(
-    db: DbAdapter,
-): Promise<StateEntity[]> {
-    const stored = await db.messagePairs.getCollectionPairs(
-        INVITATIONS_PREFIX,
-    );
-    return invitationLifecycleRowsOf(
-        documentMessagePairsAt(stored, INVITATIONS_PREFIX),
-    );
-}
+// deriveInvitationStates RETIRED. Invitation history is
+// GET .../invitations/:id/versions/. Ownership stays
+// resolveInvitationOwner above.
 
 // deriveTrioFamilyStates / deriveStates / fenceStatesByOwner /
 // unionById / sameStateEntity RETIRED with the bulk lifecycle
 // collection (states-URI elimination C3). documentStateHeadFor
 // RETIRED with C5 (write paths use family currentDocumentState).
 // Per-entity history lives on GET <family>/:id/versions/ and
-// family-scoped derives (derive*StateHistory, invitation
-// sources).
+// family-scoped derives (derive*StateHistory). Invitation
+// history is that versions read.

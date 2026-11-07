@@ -1,6 +1,5 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
-    deriveInvitationStates,
     resolveOwningOrganization,
 } from '../api/derive-states.ts';
 import {
@@ -11,8 +10,8 @@ import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
-import { deriveInvitations } from
-    '../api/derive-invitations.ts';
+import { getOrganizationInvitations } from
+    '../api/invitations-domain.ts';
 import { deriveOrganizations } from
     '../api/derive-organizations.ts';
 import {
@@ -359,11 +358,6 @@ Deno.test('an invitation event is owned by the inviting org',
 async () => {
     const db = await seed();
     const id = await inviteSarahToWayne(db);
-    const rows = await deriveInvitationStates(db);
-    assert(
-        rows.some((r) => r.entity_id === id),
-        'invitation lifecycle events derive for the grant',
-    );
     assertStrictEquals(
         await resolveOwningOrganization(db, id, 'BBjWJsjYIDkTRKIIPrzWRw'),
         'BBjWJsjYIDkTRKIIPrzWRw',
@@ -408,7 +402,17 @@ async () => {
             tok, body, operationId));
     assertStrictEquals(r2.status, 200);
     await r2.body?.cancel();
-    assertStrictEquals((await deriveInvitations(db)).length, 4);
+    const stark = await getOrganizationInvitations(
+        db, [STARK], STARK, undefined, ['admin'],
+    );
+    const wayne = await getOrganizationInvitations(
+        db, [WAYNE], WAYNE, undefined, ['admin'],
+    );
+    assert(stark.kind === 'collection');
+    assert(wayne.kind === 'collection');
+    assertStrictEquals(
+        stark.heads.length + wayne.heads.length, 4,
+    );
     const versions = await versionsOf(db, SARAH_WAYNE);
     assertStrictEquals(versions.length, 1);
     const ev = versions[0]!;
