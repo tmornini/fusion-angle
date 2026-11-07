@@ -21,6 +21,7 @@ import {
     apiRequest,
     pairIdOf,
 } from './http-fixtures.ts';
+import { headResponseId } from './flow-head-fixtures.ts';
 
 // Flow tags: the codebase's FIRST message-plane-ONLY document
 // family (Phase 14 Task 9) — no backing table, derived entirely
@@ -115,21 +116,6 @@ async function createFlow(
             graphDelta: emptyDelta(),
         },
     ));
-}
-
-async function headResponseId(
-    db: MemoryDbAdapter,
-    token: string,
-    flowId: string,
-): Promise<string> {
-    const got = await handleRequest(db, req(
-        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
-    ));
-    const id = pairIdOf(got);
-    assert(id
-        , 'no Response-ID on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-        + '' + flowId);
-    return id!;
 }
 
 // --- commit 2: PUT/GET/DELETE lifecycle, marked delete ---

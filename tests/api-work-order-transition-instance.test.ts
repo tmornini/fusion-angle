@@ -27,7 +27,6 @@ import { seedCurrentMember } from './member-fixtures.ts';
 import {
     IF_MATCH_HEADER,
     strongEtagOf,
-    IF_NONE_MATCH_HEADER,
 } from '../api/message-pair.ts';
 import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
@@ -44,6 +43,14 @@ import {
 import { seedSeat } from './root-admin-fixture.ts';
 import { seedCreatedWorkOrder } from
     './work-order-fixtures.ts';
+import {
+    seedInstance,
+    seedMember1,
+} from './instance-fixtures.ts';
+import { seedWritableTextAttr } from
+    './record-attribute-fixtures.ts';
+import { seedFlowTypeJoin } from
+    './flow-record-fixtures.ts';
 
 // POST organizations/:id/work-orders/:id/transition — instance-head shape
 // (Task 4 dual-accept; Task 8 gate cut). Value-bearing
@@ -241,25 +248,6 @@ async function seedOrganizationB(
 
 }
 
-async function seedMember1(
-    db: MemoryDbAdapter,
-): Promise<void> {
-    const memBody = {
-        organization_id: ORGANIZATION,
-        identity_id: 'nkgaOHZISTQrILTfPThWCA',
-        type: 'member',
-        at: AT,
-    };
-    await seedSeat(
-        db,
-        String(memBody['organization_id'] ?? memBody.organization_id),
-        String(memBody['identity_id'] ?? memBody.identity_id),
-        (memBody['type'] ?? memBody.type) as 'admin' | 'member',
-        String(memBody['at'] ?? memBody.at),
-    );
-
-}
-
 async function seedFlow(
     db: MemoryDbAdapter,
     token: string,
@@ -343,59 +331,6 @@ async function seedAttribute(
     assertStrictEquals(put.status, 201);
 }
 
-async function seedWritableText(
-    db: MemoryDbAdapter,
-    token: string,
-): Promise<void> {
-    await seedAttribute(db, token, ATTR_ID, {
-        name: 'Title',
-        attribute_type: 'text',
-        sort_order: 0,
-        options: [],
-        constraints: [],
-        read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-        write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-    });
-}
-
-async function seedInstance(
-    db: MemoryDbAdapter,
-    token: string,
-    set: readonly {
-        attribute_id: string;
-        value: string;
-    }[] = [
-        { attribute_id: ATTR_ID, value: 'Hello' },
-    ],
-): Promise<string> {
-    const put = await handleRequest(db, req(
-        'PATCH', INSTANCE_DETAIL, token,
-        { set: [...set] },
-        { [IF_NONE_MATCH_HEADER]: '*' },
-    ));
-    assertStrictEquals(put.status, 201);
-    return put.headers.get('ETag')!;
-}
-
-async function seedFlowTypeJoin(
-    db: MemoryDbAdapter,
-    token: string,
-): Promise<void> {
-    const put = await handleRequest(db, req(
-        'PUT',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID + '/records/'
-            + '' + FR_ID,
-        token,
-        {
-            id: FR_ID,
-            flow_id: FLOW_ID,
-            record_id: TYPE_ID,
-            at: AT,
-        },
-    ));
-    assertStrictEquals(put.status, 201);
-}
-
 async function bindInstance(
     db: MemoryDbAdapter,
     token: string,
@@ -443,9 +378,17 @@ async function seededBound(): Promise<{
     await seedWorkOrder(db, adminToken, WO_ID);
     await seedWorkOrder(db, adminToken, WO_UNBOUND);
     await seedLiveType(db, adminToken);
-    await seedWritableText(db, adminToken);
-    const etag = await seedInstance(db, adminToken);
-    await seedFlowTypeJoin(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS + ATTR_ID,
+    );
+    const etag = await seedInstance(
+        db, adminToken, INSTANCE_DETAIL, [
+            { attribute_id: ATTR_ID, value: 'Hello' },
+        ],
+    );
+    await seedFlowTypeJoin(
+        db, adminToken, FLOW_ID, TYPE_ID, FR_ID,
+    );
     await bindInstance(db, adminToken);
     return {
         db, adminToken, memberToken, tokenB, etag,

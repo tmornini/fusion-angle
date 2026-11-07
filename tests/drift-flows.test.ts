@@ -46,6 +46,7 @@ import {
     partsOf,
     storedPutBodyText,
 } from './http-fixtures.ts';
+import { headResponseId } from './flow-head-fixtures.ts';
 
 const SEED_FLOW_ORGANIZATION_TWO = seedIdentifier('seed-flow-org2');
 const FLOW_DRIFT_JOIN = generateIdentifier();
@@ -243,21 +244,6 @@ function documentBody(
         revivals: [],
         ...(overrides ?? {}),
     };
-}
-
-async function headResponseId(
-    db: MemoryDbAdapter,
-    token: string,
-    flowId: string,
-): Promise<string> {
-    const got = await handleRequest(db, req(
-        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
-    ));
-    const id = pairIdOf(got);
-    assert(id
-        , 'no Response-ID on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-        + '' + flowId);
-    return id!;
 }
 
 async function headEtag(

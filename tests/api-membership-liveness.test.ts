@@ -12,6 +12,8 @@ import {
     framedRequest,
     invitationLatched,
 } from './http-fixtures.ts';
+import { putDefaultOrganization } from
+    './default-organization-fixtures.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
 
@@ -53,24 +55,6 @@ async function removeMembership(
     );
     assertStrictEquals(res.status, 200);
     await res.body?.cancel();
-}
-
-function putDefaultOrganization(
-    token: string, identityId: string, organization: string,
-): Request {
-    return framedRequest(
-        `${BASE}/identities/${identityId}`
-            + '/default-organization', {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + token,
-                'operation-id': generateIdentifier(),
-            },
-            body: JSON.stringify({
-                organization_id: organization,
-            }),
-        });
 }
 
 // A second admin seat: the tests below remove the root
