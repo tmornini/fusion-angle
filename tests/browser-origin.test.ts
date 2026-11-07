@@ -15,7 +15,7 @@ import { partBodiesOf } from './http-fixtures.ts';
 
 // The list route the API actually exposes: there is no
 // /api/organizations/ collection, so the origin proves
-// itself on the seats route tests/api-human-members.ts
+// itself on the seats route tests/api-human-members.test.ts
 // reads, in the same organization adminToken() scopes to.
 const MEMBERS_PATH = '/api/organizations/'
     + STARK_ORGANIZATION + '/memberships/?state=accepted';

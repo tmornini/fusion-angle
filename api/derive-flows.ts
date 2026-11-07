@@ -48,11 +48,10 @@ import { liveHeadId, messageStore } from
 //
 // THREE HEAD notions coexist over a flow's message-plane rows
 // and must never be conflated (IV Logic):
-//   - The LOCK head: the latest pair at the document by envelope
-//     (at, id), ANY method — the store's document head read
-//     (`messageStore(db).get`), serving Supersedes
-//     provenance. A DAG under races; provenance-only,
-//     never consulted here.
+//   - The store document head:
+//     messageStore(db).getDocumentHead
+//     (api/message-store.ts) returns a head only when
+//     method === 'PUT'. This reduction does not call it.
 //   - The DOCUMENT head: the latest PUT/DELETE pair by envelope
 //     (at, id) — documentMessagePairsAt/deriveDocumentsAt's own
 //     reduction (derive-documents.ts). THIS is what `graph`
