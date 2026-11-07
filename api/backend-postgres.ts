@@ -69,18 +69,6 @@ export const ORGANIZATION_ROW_FOR_UPDATE_SQL =
     ORGANIZATION_ROW_SQL + 'FOR UPDATE';
 const NIL_UUID = uuidTextOfIdentifier(NIL_IDENTIFIER);
 
-export interface PostgresTx extends Tx {
-    getDocumentHistory<T extends { id: string }>(
-        path: string,
-        name: string,
-    ): Promise<T[]>;
-    getHead(path: string, name: string): Promise<{
-        readonly id: string;
-        readonly method: string;
-    } | null>;
-    notify(event: NotificationEvent): Promise<void>;
-}
-
 export class PostgresBackend implements StorageBackend {
     readonly #sql: SqlClient;
 

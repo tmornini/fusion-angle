@@ -111,22 +111,8 @@ import {
 } from './membership-gate.ts';
 
 export {
-    ApiError,
     UnauthorizedError,
     RequestError,
-    HTTP_OK,
-    HTTP_CREATED,
-    HTTP_NO_CONTENT,
-    HTTP_BAD_REQUEST,
-    HTTP_UNAUTHORIZED,
-    HTTP_FORBIDDEN,
-    HTTP_NOT_FOUND,
-    HTTP_METHOD_NOT_ALLOWED,
-    HTTP_CONFLICT,
-    HTTP_PRECONDITION_FAILED,
-    HTTP_UNPROCESSABLE_ENTITY,
-    HTTP_INTERNAL_ERROR,
-    HTTP_NOT_IMPLEMENTED,
 } from '../shared/http-errors.ts';
 
 const routeTable: readonly Route[] = routes;
