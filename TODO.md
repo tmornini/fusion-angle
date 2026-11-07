@@ -909,13 +909,6 @@ Off the critical path; each with its oracle.
   TEST-PLAN case claims the feedback survives. Oracle: a
   Layer 1 test asserting the typed feedback reaches the
   transition
-- Claim-on-load with no release-on-leave plus the
-  8-hour `DEFAULT_LOCK_TIMEOUT` turns a drive-by
-  work-order view into an 8-hour claim
-  (the page shows the claim; the 8-hour hold is the
-  defect) —
-  `web-app/workbox/detail.ts:598-616`,
-  `shared/types.ts:1087`
 - Bind the record instance at work order creation.
   The action-screen Bind instance control is gone
   (`WorkboxDetailPresenter` has no `#bindButton`;
@@ -2216,11 +2209,6 @@ Off the critical path; each with its oracle.
     class="flow-node-danger">` / `.flow-node-warning` and
     its `<title>` copy (F73) — Layer 1, `buildGraphSvg`;
     only the predicate is pinned
-  - The Workbox page's title, subtitle, and tab shell
-    text (WB1) — Layer 1 or 2; no presenter or browser
-    test asserts the shell copy
-  - `emptyStateFor`'s rendered copy (WB2) — Layer 1; it
-    is unexported page glue in `web-app/workbox/index.ts`
   - The seeded completed-work-order count, 129 of the
     145 across `buildWorkOrders()` and
     `buildLeadToCloseWorkload()` (WB3) — Layer 1, an
@@ -2242,8 +2230,6 @@ Off the critical path; each with its oracle.
     API and asserts it is refused or impossible
   - Workbox data surviving a page navigation (WB17) —
     Layer 2
-  - The second tab's rendered read-only, already-claimed
-    view (WB18) — Layer 2
   - The client-side 412 recovery on the WORKBOX action
     screen — re-GET, conflict notice, warning toast, no
     auto-retry (WB19a) — Layer 1 first:

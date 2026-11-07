@@ -447,8 +447,7 @@ async function showAllLists(
     paintInboxLists(lists, listsFrom(rows), NO_FILTER);
 }
 
-// The answer's members are the last full GET's, read
-// first when no GET has landed yet.
+// Text asks the work-orders QUERY and paints its answer.
 async function showMatchedLists(
     lists: InboxListElements,
     ctx: RequestContext,
@@ -458,10 +457,7 @@ async function showMatchedLists(
 ): Promise<void> {
     let rows: InboxRows;
     try {
-        const all = inboxRows ?? await fetchInboxRows(ctx);
-        rows = await queryInboxRows(
-            ctx, text, all.memberMap,
-        );
+        rows = await queryInboxRows(ctx, text);
     } catch (err) {
         if (sequence !== listsSequence) return;
         log.error('inbox search failed', 'workbox', err);

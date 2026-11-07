@@ -6,7 +6,6 @@ import {
     assertThrows,
 } from '@std/assert';
 import {
-    nowUtc,
     storedWorkOrderFlowGraph,
     DEFAULT_LOCK_TIMEOUT,
     type WorkOrderFlowGraph,
@@ -240,13 +239,6 @@ function makePresenter(
             instanceId: string;
             recordTypeId: string;
         } | null;
-        pickerItems?: readonly {
-            id: string;
-            fields: readonly {
-                name: string;
-                value: string;
-            }[];
-        }[];
         conflictNotice?: string | null;
     } = {},
 ): WorkboxDetailPresenter {
@@ -279,7 +271,6 @@ function makePresenter(
         makeAttributeMap(attributes),
         instanceValues,
         binding,
-        args.pickerItems ?? [],
         args.conflictNotice ?? null,
     );
 }
@@ -588,11 +579,10 @@ Deno.test(
 // WorkboxDetailPresenter: getters + buildPage
 
 Deno.test(
-    'WorkboxDetailPresenter exposes id, display'
-    + ' id, and flow name from the work order',
+    'WorkboxDetailPresenter exposes display'
+    + ' id and flow name from the work order',
     () => {
         const presenter = makePresenter();
-        assertStrictEquals(presenter.idValue(), 'wo-1');
         assertStrictEquals(
             presenter.displayIdText(), 'WO-42',
         );
@@ -967,61 +957,6 @@ Deno.test(
                 '>Notes</span>\\s*<span class="text-muted'
                 + ' italic">cleared</span>',
             ),
-        );
-    },
-);
-
-Deno.test(
-    'an active claim by the current member is'
-    + ' reported as claimed with byCurrentMember',
-    () => {
-        const presenter = makePresenter({
-            activeClaim: {
-                memberId: 'pjQzgITAPDQVyvCVpzpIfQ',
-                at: nowUtc(),
-            },
-            currentMemberId: 'pjQzgITAPDQVyvCVpzpIfQ',
-        });
-        const status = presenter.claimStatus();
-        assertStrictEquals(status.state, 'claimed');
-        if (status.state === 'claimed') {
-            assertStrictEquals(
-                status.byCurrentMember, true,
-            );
-        }
-    },
-);
-
-Deno.test(
-    'an active claim by another member is claimed'
-    + ' but not by the current member',
-    () => {
-        const presenter = makePresenter({
-            activeClaim: {
-                memberId: 'pnKMhTzcIZVQQBIoQlyAfw',
-                at: nowUtc(),
-            },
-            currentMemberId: 'pjQzgITAPDQVyvCVpzpIfQ',
-        });
-        const status = presenter.claimStatus();
-        assertStrictEquals(status.state, 'claimed');
-        if (status.state === 'claimed') {
-            assertStrictEquals(
-                status.byCurrentMember, false,
-            );
-        }
-    },
-);
-
-Deno.test(
-    'a null active claim leaves the work order'
-    + ' unclaimed',
-    () => {
-        const presenter = makePresenter({
-            activeClaim: null,
-        });
-        assertStrictEquals(
-            presenter.claimStatus().state, 'unclaimed',
         );
     },
 );
