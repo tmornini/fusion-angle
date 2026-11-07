@@ -14,14 +14,9 @@ import {
     navigateTo,
 } from '../app/navigation.ts';
 import {
-    postClipboardCopy,
     subscribeResize,
     putLocation,
 } from '../app/adapters/index.ts';
-import {
-    getFlowMermaid,
-    getFlowZip,
-} from '../app/flow-export.ts';
 import {
     getHumanMembers,
     getAIMembers,
@@ -49,9 +44,6 @@ import type {
 } from '../../shared/types.ts';
 import type { HttpMessage } from
     '../../shared/http-message/http-message.ts';
-import {
-    postBlobDownload,
-} from '../app/adapters/blob-download.ts';
 import {
     bindInteractions,
     withCanvasFocusRestore,
@@ -1118,7 +1110,6 @@ function bindCanvasInteractions(
 
 function bindToolbarActions(
     container: HTMLElement,
-    flowId: string,
     signal: AbortSignal,
 ): void {
     const slot = $(
@@ -1157,97 +1148,12 @@ function bindToolbarActions(
                         .withZoomedOut(),
                 );
             } else if (
-                action === 'copy-mermaid'
-            ) {
-                void handleCopyMermaid(flowId);
-            } else if (
-                action === 'export-zip'
-            ) {
-                void handleExportZip(flowId);
-            } else if (
                 action === 'delete-selected'
             ) {
                 void handleDeleteSelected();
             }
         },
         { signal },
-    );
-}
-
-async function handleCopyMermaid(
-    flowId: string,
-): Promise<void> {
-    let text: string;
-    try {
-        text =
-            await getFlowMermaid(
-                sessionContext(), flowId,
-            );
-    } catch (err) {
-        log.error(
-            'getFlowMermaid failed',
-            'flow-detail',
-            err,
-        );
-        showToast(
-            'Failed to export Mermaid',
-            'error',
-        );
-        return;
-    }
-    try {
-        await postClipboardCopy(text);
-    } catch (err) {
-        log.error(
-            'clipboard write failed',
-            'flow-detail',
-            err,
-        );
-        showToast(
-            'Failed to copy to clipboard',
-            'error',
-        );
-        return;
-    }
-    showToast(
-        'Mermaid copied to clipboard',
-        'success',
-    );
-}
-
-async function handleExportZip(
-    flowId: string,
-): Promise<void> {
-    let result: {
-        data: Uint8Array;
-        name: string;
-    };
-    try {
-        result =
-            await getFlowZip(
-                sessionContext(), flowId,
-            );
-    } catch (err) {
-        log.error(
-            'getFlowZip failed',
-            'flow-detail',
-            err,
-        );
-        showToast(
-            'Failed to export flow',
-            'error',
-        );
-        return;
-    }
-    const blob = new Blob(
-        [result.data as
-            unknown as ArrayBuffer],
-        { type: 'application/zip' },
-    );
-    postBlobDownload(blob, result.name);
-    showToast(
-        'Flow exported',
-        'success',
     );
 }
 
@@ -1755,7 +1661,7 @@ function onFlowLoaded(
         panelStateRef, signal,
     );
     bindToolbarActions(
-        container, flowId, signal,
+        container, signal,
     );
     bindPanelActions(
         container, panelStateRef, signal,

@@ -101,7 +101,7 @@ export function currentNodeAttributes(
 // live (tombstone-filtered) entity rows handed in; members and
 // attributes derive from their ledgers per node. The domain
 // GraphNode/GraphEdge shape is preserved exactly, so the
-// canvas, stats, mermaid, and hazard readers are untouched.
+// canvas, stats, and hazard readers are untouched.
 export function reassembleStoredGraph(
     nodeRows: readonly FlowNodeEntity[],
     edgeRows: readonly FlowEdgeEntity[],

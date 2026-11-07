@@ -22,9 +22,6 @@ canvas with pan, marquee, drag, and edge connection.
   carry `role="button"`; this overrides the ARIA
   Space-as-activate default deliberately — pan is the
   canvas Space binding.
-- `mermaid-{generate,parse}.ts` — round-trip text format
-- `zip.ts` — in-browser ZIP
-- `adapters/flow-export.ts` — integration point
 
 The canvas operates on the domain `GraphNode` /
 `GraphEdge` (`memberIds`, `agentIds`, `attributes`). The
@@ -142,17 +139,12 @@ open panel re-fits the camera under Auto Fit."
 The two special nodes (`isCreate` / `isArchive`) persist
 their `name` field directly as "Create" and "Archive" —
 no constants, no render-time override. The flow renderer,
-the stats renderer, the properties panel header, and the
-mermaid generator all read `node.name` and emit it
-verbatim; persistence and presentation share one
-vocabulary. `isCreate` and `isArchive` are properties of
-the graph node, not state values. Work-order node id
-versus the claim alphabet lives in ARCHITECTURE.md
-`## Work orders`. The mermaid parser does not translate
-either: a legacy `.mmd` file that names its special nodes
-`[Start]` / `[End]` imports with those literal names,
-surfacing the staleness rather than masking it via a
-shim.
+the stats renderer, and the properties panel header
+all read `node.name` and emit it verbatim; persistence
+and presentation share one vocabulary. `isCreate` and
+`isArchive` are properties of the graph node, not state
+values. Work-order node id versus the claim alphabet
+lives in ARCHITECTURE.md `## Work orders`.
 
 ## Members and attributes
 
@@ -252,9 +244,8 @@ FlowWithGraph) or its stored positions are degenerate —
 so the stats renderer and the designer both start from
 real coordinates, not the persisted (0,0) placeholders.
 `runFlowLayout` / `runLayoutFromInputs` is the one
-`computeLayout` wrapper, shared by `getFlowGraph`, the
-designer's `applyAutoLayout`, and `flow-export`'s
-mermaid-import path.
+`computeLayout` wrapper, shared by `getFlowGraph` and the
+designer's `applyAutoLayout`.
 
 Its emitted SVG carries none of the editor's
 interactivity tells (no `<animate>`, `role="button"`,

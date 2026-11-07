@@ -717,8 +717,7 @@ code comments cite; specs and plans written before the
   retires or keeps by decision: READY gate on dangling
   refs (`tests/adapters-flow-publish.test.ts`);
   the flow-tag designer UI (TEST-PLAN "Flow Designer —
-  Flow Tags", API-only today); F6's ZIP import not
-  rebinding `flow_records` (TEST-PLAN F6); page
+  Flow Tags", API-only today); page
   selection writes behind the FSM at four sites in
   `web-app/flows/detail.ts` (`canvasFocusOf`'s walk
   among them); in-place
@@ -1962,7 +1961,7 @@ Off the critical path; each with its oracle.
     `getProjects().length` in
     `tests/adapters-projects.test.ts`
   - The flow designer's toolbar and header chrome — Undo,
-    Redo, Zoom −/+, Copy Mermaid, Export ZIP, Delete, and
+    Redo, Zoom −/+, Delete, and
     the Locked / Auto Layout / Auto Fit switches (AA26) —
     Layer 2; no presenter test enumerates these labels
   - Every member unassigned on a brand-new node, the
@@ -2134,15 +2133,6 @@ Off the critical path; each with its oracle.
     following the pointer mid-drag (E11) — Layer 2,
     extending `tests/browser/list-reorder.test.ts` past
     the before/after order
-  - The import dialog's Project selector, hidden file
-    input, and Choose-File trigger (F4) — Layer 1, a
-    markup test over `web-app/flows/index.html` in the
-    shape of `tests/flow-detail-toast-overflow.test.ts`
-  - The ZIP resolution dialog's four shapes — Overwrite,
-    Create New, Create, and the description (F6, F44) —
-    Layer 1, a pure test of `buildDialogConfig`
-    (`web-app/app/flow-export.ts:172`), already pure
-    and only unexported
   - Which node kind wears which colour, the Archive
     node's red 3-px border, the centred special label,
     and the attribute-count subtitle (F8, F40, AA26) —
@@ -2205,19 +2195,6 @@ Off the critical path; each with its oracle.
     locked or when nothing is free (F40, F71) — Layer 1,
     `tests/flow-designer-presenter.test.ts` and
     `tests/presenter-misc.test.ts`
-  - The "Mermaid copied to clipboard" toast and the
-    clipboard write itself (F41) — Layer 2,
-    `tests/browser/toasts.test.ts`
-  - The real archive round trip — the four-entry manifest
-    as a set and `flow.txt` (F42), and members and
-    attribute refs surviving `getFlowZip` →
-    `getBackupFromZip` (F6, F44) — Layer 1,
-    `tests/adapters-flow-export.test.ts`; `flow.json`'s
-    presence rides 'zip Create New keeps begin edges and
-    sidecar positions with Auto Layout off' (`:457`),
-    whose nodes carry no members or attributes, and the
-    members-and-attributes round trip builds its backup
-    as an in-memory literal
   - The canvas itself changing after each Undo, as
     distinct from the server state (F45, F46) — Layer 2,
     `tests/browser/canvas-*.test.ts`

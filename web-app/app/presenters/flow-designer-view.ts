@@ -12,8 +12,6 @@ import {
     iconCheck,
     iconMinus,
     iconPlus,
-    iconCopy,
-    iconDownload,
 } from '../icons.ts';
 import type { RecordAttribute } from '../../../client/index.ts';
 import type {
@@ -417,21 +415,6 @@ class="flow-toolbar">
     title="Zoom in"
     aria-label="Zoom in"
     >${iconPlus(ICON_SIZE.lg, '')}</button>
-</div>
-<div class="flow-toolbar-spacer"></div>
-<div class="flow-toolbar-group">
-<button
-    class="btn btn-ghost btn-icon"
-    data-action="copy-mermaid"
-    title="Copy Mermaid"
-    aria-label="Copy Mermaid"
-    >${iconCopy(ICON_SIZE.lg, '')}</button>
-<button
-    class="btn btn-ghost btn-icon"
-    data-action="export-zip"
-    title="Export ZIP"
-    aria-label="Export ZIP"
-    >${iconDownload(ICON_SIZE.lg, '')}</button>
 </div>
 <div class="flow-toolbar-spacer"></div>
 <div class="flow-toolbar-group">

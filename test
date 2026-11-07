@@ -120,7 +120,6 @@ run_lint() {
     # Reject the vocabulary of the retired browser-resident
     # storage tiers. `localStorage` alone is legal (UI
     # preferences); its backend/tier compounds are not.
-    # `in-browser ZIP` is the live flow export (zip.ts).
     PATTERN='indexeddb|IDBTransaction|non-IDB|\bIDB\b'
     PATTERN="$PATTERN|LocalStorageBackend"
     PATTERN="$PATTERN|localStorage (backend|tier|simulated|demo)"
@@ -138,7 +137,7 @@ run_lint() {
             find . -maxdepth 1 -type f -name '*.md' \
                 -exec grep -nEi "$PATTERN" {} + \
                 || true
-        } | grep -v 'in-browser ZIP' || true
+        } || true
     )
 
     if [ -n "$RETIRED_VOCAB" ]; then
@@ -164,8 +163,7 @@ run_lint() {
     # Later work has one home (run-four remediation §10):
     # the section lives in TODO.md and nowhere else, and no
     # other root doc defers work in prose. Rows that POINT
-    # at TODO.md are the sanctioned exception (the
-    # in-browser-ZIP precedent above).
+    # at TODO.md are the sanctioned exception.
     LATER_HOME_FAIL=
     if [ "$(grep -c '^## Later work' ARCHITECTURE.md)" \
         != "0" ]; then

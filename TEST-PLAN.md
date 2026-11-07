@@ -253,8 +253,6 @@ not repeat the note in every case.
   its own narrower pattern, and answers its one
   paused GET with a 500 instead of continuing it.
 - Reduced motion is `Emulation.setEmulatedMedia`.
-- Downloads are intercepted at `URL.createObjectURL`;
-  uploads are built with `DataTransfer`.
 - List pages wait on the card count — never screenshot
   early.
 - Authentication is throttled to five hits per 60 seconds
@@ -551,7 +549,7 @@ limit that note already names.
 | C. Core: Dashboard | 7 |
 | D. Core: Ideas Workflow | 38 |
 | E. Core: Projects | 12 |
-| F. Tools | 80 |
+| F. Tools | 73 |
 | F2. Workbox | 32 |
 | FS. Flow Statistics | 9 |
 | G. Admin Pages | 41 |
@@ -561,15 +559,15 @@ limit that note already names.
 | R. Records | 26 |
 | J. Teardown | 3 |
 | SV. Server (Deno + Postgres) | 9 |
-| **Total** | **399** |
+| **Total** | **392** |
 
 A3 **is** SV1 — counted once, in A. The explorer
-skips SV1. F is 80 (F1–F75 plus F37a, F37b, F38a,
-F38b, F57a).
+skips SV1. F is 73 (F1–F75 less F4–F6 and F41–F44,
+plus F37a, F37b, F38a, F38b, F57a).
 
 ### Combined Totals (CLI + Browser)
 
-The per-section table above counts 399 distinct
+The per-section table above counts 392 distinct
 TEST-PLAN cases (A3 is SV1; not counted twice). The
 CLI count is the most recent `./test` (AT2)
 report — the main `tests/*.test.ts` suite plus the
@@ -1225,8 +1223,8 @@ the second organization.
   canvas shows two nodes: "Create" (start, top-left
   with green border) and "Archive" (end, bottom-right
   with red 3-px border) connected by no edges. Toolbar
-  shows Undo, Redo, Zoom −/+, Copy Mermaid, Export ZIP,
-  and Delete (trash icon); the header above the canvas
+  shows Undo, Redo, Zoom −/+, and Delete (trash
+  icon); the header above the canvas
   hosts the Locked, Auto Layout, and Auto Fit switches.
   Changes auto-save (no explicit Save button).
   Pin: tests/api-flows-create-relations.test.ts
@@ -2799,75 +2797,6 @@ rather than looking for the reminders here.
        handler reads); exploratory — the live click and
        the resulting URL
 
-### Flow Import
-
-(Mermaid parse/serialize round-trip is covered by
-`tests/mermaid.test.ts` and ZIP read/write by
-`tests/zip-guards.test.ts` — the cases below verify the import
-dialog, the file-upload affordance, and that the imported flow
-opens and renders.)
-
-- [ ] **F4** Click "Import Flow" on the flows list page.
-  PASS: the import dialog opens with a Project selector
-  (`#import-project`) and a "Choose File" button; the file
-  input itself is hidden and triggered by that button.
-  Pin: exploratory — the import dialog's markup carries
-       no CLI or browser test
-- [ ] **F5** Choose a project from the dropdown, click
-  "Choose File", and select a `.mmd` file — hand-write a
-  two-line `stateDiagram-v2` (`[*] --> Draft`,
-  `Draft --> [*]`) if you have none. Selecting the file
-  imports it directly, with no separate confirm button.
-  PASS: a flow is created, a "Flow imported" toast
-  confirms, and the browser lands on the designer for the
-  imported flow.
-  Pin: tests/adapters-flow-export.test.ts
-       'postFlowFromMermaid creates a flow with a
-       message-plane graph from simple .mmd' (decides a
-       `.mmd` import writes a flow whose message-plane
-       graph carries a start node, a complete node, and at
-       least one auto-wired edge); exploratory — the live
-       file picker, the toast, and the navigation
-- [ ] **F6** Repeat with a `.zip`. Take one first: open
-  **Customer Onboarding** and click Export ZIP (F42's
-  gesture) — it is the flow that carries attribute refs;
-  Layout Test carries none, so an archive of Layout Test
-  cannot show this case's attributes. Return to `flows/`
-  and choose that archive. Because the archive names a flow
-  and a project that both still exist, the dialog replaces
-  "Choose File" with **Overwrite** and **Create New** —
-  there is no direct import for this shape. Click
-  **Overwrite**: it re-PUTs the same flow id with the same
-  graph, so Customer Onboarding is unchanged and no
-  duplicate row appears on `flows/`. PASS: a "Flow
-  overwritten" toast fires, the designer opens on that
-  flow, and it renders with nodes, edges, and attributes.
-  NOTE: the export ZIP
-  carries graph + positions (`flow.mmd` / `flow.json` /
-  `sidecar.json`) only — it does **not** rebind
-  `flow_records`, so the designer's Record control may read
-  **(none)** until the operator rebinds it; that is scope,
-  not a failed import.
-  Pin: tests/api-flows-save-relations.test.ts
-       'PUT /organizations/:id/flows/:id ROUND-TRIP:
-       message-plane graph equals the intended saved graph'
-       (decides all three thirds of this PASS on the path
-       Overwrite actually walks — `handleOverwrite` calls
-       the same `putFlow` this test calls: after the PUT
-       the message-plane graph carries the intended nodes,
-       the intended edge, each node's `memberIds`, and each
-       attribute ref's `attributeId`, `mode` and
-       `isRequired`); exploratory — the Overwrite /
-       Create New resolution dialog, and the
-       `getFlowZip` -> `getBackupFromZip` parse that feeds
-       the PUT: no test carries members or attribute refs
-       through a real archive. (The sibling
-       `postFlowFromBackup round-trip preserves node
-       members AND attributes` is NOT cited here: it
-       exercises the POST-to-create path Create New takes,
-       from an in-memory backup literal, so it stays green
-       however Overwrite breaks.)
-
 ### Flow Designer (`flows/detail.html?flowId=...`)
 
 - [ ] **F7** Open the Layout Test: Proposal Review Cycle
@@ -2877,9 +2806,8 @@ opens and renders.)
   with the designer occupying the remaining content
   area. The toolbar runs vertically along the left
   edge of the canvas (inside the content area, not the
-  global sidebar): Undo/Redo, Zoom −/+, Copy Mermaid,
-  Export ZIP, and Delete (trash), top to bottom. The header
-  above the canvas hosts the Back button, a Stats button,
+  global sidebar): Undo/Redo, Zoom −/+, and Delete (trash), top to
+  bottom. The header above the canvas hosts the Back button, a Stats button,
   and three switches (Locked, Auto Layout, Auto Fit). The
   SVG canvas sits to the right of the toolbar with a
   dot-grid background. With Auto Fit on, the view-changing
@@ -2890,9 +2818,8 @@ opens and renders.)
   Changes auto-save (no Save button).
   Pin: tests/presenter-misc.test.ts 'buildToolbar leaves
        undo, redo, and delete enabled when their actions
-       are available' (decides the toolbar carries the
-       copy-mermaid and export-zip actions with nothing
-       disabled when every action is available);
+       are available' (decides nothing on the toolbar is disabled
+       when every action is available);
        tests/flow-fsm-reduce.test.ts 'wheel with autofit
        shows toast and does not zoom' (decides wheel zoom
        under Auto Fit leaves the zoom at 1.0);
@@ -3835,93 +3762,8 @@ that the canvas re-renders after each step.)
        disappearing; the Delete button's own disabled
        attribute; the edge-label backgrounds; and the dot
        grid
-- [ ] **F41** With a non-trivial flow loaded,
-  click "Copy Mermaid" in the toolbar. PASS: a
-  visible success toast "Mermaid copied to
-  clipboard" confirms the copy (toasts sit on
-  `document.body`, outside `#page-root`), and
-  the clipboard holds Mermaid flowchart syntax
-  for the current graph.
-  Pin: tests/mermaid.test.ts 'generateMermaid emits
-       flowchart LR header' (decides what the clipboard
-       receives is flowchart syntax);
-       tests/mermaid.test.ts 'generateMermaid emits labeled
-       edges' (decides the named transitions ride along);
-       tests/flow-detail-toast-overflow.test.ts
-       'flow-detail html/body do not clip fixed toasts'
-       (decides this page does not clip the toast this case
-       must see); exploratory — the clipboard write and the
-       toast's own text
-- [ ] **F42** Turn Auto Layout **off** on Layout Test first
-  (F37b left it on): `postFlowFromBackup` copies
-  `is_auto_layout` verbatim, and all four seeded flows ship
-  it ON, so F44's preserved-position check is only
-  observable from an archive taken with the flag off. Then
-  click "Export ZIP" in the toolbar. PASS: a `.zip` file
-  downloads. Unzip the archive — it contains `flow.mmd` (Mermaid
-  source), `flow.json` (graph with node positions), `sidecar.json`,
-  and a human-readable `flow.txt`.
-  Pin: tests/adapters-flow-export.test.ts 'zip sidecar
-       mermaid ids stay injective' (decides the archive
-       this button writes carries a readable `sidecar.json`
-       entry whose mermaid ids do not collide);
-       tests/adapters-flow-export.test.ts 'zip mermaid path
-       reads sidecar.json positions and begin edges'
-       (decides the same archive's `flow.mmd` and
-       `sidecar.json` both read back — the import path
-       parses them straight out of `getFlowZip`'s output);
-       tests/adapters-refresh-mutex.test.ts
-       'cookie refresh re-scopes the session to the
-       dead token org' (decides a cookie refresh
-       exchanges the flat successor onto the dead
-       token's org before `getFlowZip` reads
-       `activeOrganization`); exploratory — the
-       download itself, `flow.json` and `flow.txt`,
-       and the four-entry manifest as a set
-- [ ] **F43** On `flows/index.html` click "Import Flow", choose a
-  project, click "Choose File", and select a `.mmd` file taken
-  from a known flow — unzip F42's archive and use its
-  `flow.mmd` — selecting the file imports it
-  directly (no separate submit/confirm button; same shape as F5).
-  PASS: the imported flow opens in the designer and renders
-  nodes and edges. Do **not** look for attributes: mermaid
-  is topology only, so a `.mmd` import carries no attribute
-  refs on any node and their absence is the product working.
-  Pin: tests/adapters-flow-export.test.ts 'flowchart mmd
-       with begin round-trips through postFlowFromMermaid'
-       (decides that `generateMermaid`'s own flowchart
-       output — which is exactly what `flow.mmd` is —
-       imports back with its edges intact:
-       `assert.deepEqual(names, ['begin', 'submit'])`);
-       tests/mermaid.test.ts 'mermaid drops node task
-       instructions' (`assert.ok(!text.includes('SECRET
-       INSTRUCTIONS'))` — decides that per-node payload
-       beyond topology does not survive `generateMermaid`;
-       attributes are a step further out still, absent from
-       the format entirely, which is a source fact no test
-       states); exploratory — the dialog drive, the
-       designer opening on the import, and the absence of
-       attribute rows
-- [ ] **F44** Repeat F43 with F42's `.zip` archive — the one
-  taken with Auto Layout off; an archive of any seeded flow
-  as shipped carries `is_auto_layout: true` and the import
-  copies that verbatim, so the imported flow would re-lay
-  out and this case would read as a fail on healthy
-  product. Because the
-  archive names a flow and a project that both still exist,
-  click **Create New** in the resolution dialog (F6's
-  shape). PASS: the imported flow renders with node
-  positions preserved, its Auto Layout switch off.
-  Pin: tests/adapters-flow-export.test.ts 'zip Create New
-       keeps begin edges and sidecar positions with Auto
-       Layout off' (decides the Create New path yields
-       `isAutoLayout === false` and every node's exported
-       positionX/positionY verbatim); exploratory — the
-       resolution dialog drive
-- [ ] **F45** Return to Layout Test — F43 and F44 left
-  the designer on an imported flow. The 11-step walk is
-  required, not
-  optional. Rename 11 nodes one at a time; after
+- [ ] **F45** Open Layout Test. The 11-step walk is
+  required, not optional. Rename 11 nodes one at a time; after
   each name, wait for that flow's `PUT /api/
   organizations/:id/flows/:id` in the network log
   (the save fires `SAVE_DELAY_MS` = 800 ms after
