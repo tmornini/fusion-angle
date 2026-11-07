@@ -18,6 +18,7 @@ import { landMembership } from
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
+    putDefaultOrganization,
     apiRequest,
     framedRequest,
     invitationLatched,
@@ -59,26 +60,6 @@ async function seedMembership(
     await seedSeat(
         db, organization, identityId, 'member', AT,
     );
-}
-
-function putDefaultOrganization(
-    token: string,
-    identityId: string,
-    organization: string,
-) {
-    return framedRequest(
-        `${BASE}/identities/${identityId}`
-            + '/default-organization', {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + token,
-                'operation-id': generateIdentifier(),
-            },
-            body: JSON.stringify({
-                organization_id: organization,
-            }),
-        });
 }
 
 function getDefaultOrganization(token: string, identityId: string) {

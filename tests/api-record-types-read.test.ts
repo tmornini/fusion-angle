@@ -23,7 +23,7 @@ import {
     partBodiesOf,
     partsOf,
 } from './http-fixtures.ts';
-import { seedSeat } from './root-admin-fixture.ts';
+import { seedSeatFromBody } from './root-admin-fixture.ts';
 
 // Nested record-types READ surface (Task 2): collection,
 // detail, lifecycle history, member tier, and the shared
@@ -56,20 +56,6 @@ function req(
         token,
         body,
     });
-}
-
-async function seedMembershipPair(
-    db: MemoryDbAdapter,
-    _id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    await seedSeat(
-        db,
-        String(body['organization_id'] ?? body.organization_id),
-        String(body['identity_id'] ?? body.identity_id),
-        (body['type'] ?? body.type) as 'admin' | 'member',
-        String(body['at'] ?? body.at),
-    );
 }
 
 function recordTypeBody(
@@ -127,13 +113,12 @@ async function seedOrganizationWithMember(
     organization: string,
     identityId: string,
     name: string,
-    membershipId: string,
     type: 'admin' | 'member' = 'admin',
 ): Promise<string> {
     await seedOrganizationDocument(
         db, organization, name,
     );
-    await seedMembershipPair(db, membershipId, {
+    await seedSeatFromBody(db, {
         organization_id: organization,
         identity_id: identityId,
         type,
@@ -148,7 +133,7 @@ async () => {
     await db.postSchemaCreation();
     const token = await seedOrganizationWithMember(
         db, 'AjdvjuECVZEgZoFajaIEkg', 'nkgaOHZISTQrILTfPThWCA', 'Org One'
-            , generateIdentifier(), 'member',
+            , 'member',
     );
     const res = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', token,
@@ -164,7 +149,7 @@ async () => {
     await db.postSchemaCreation();
     const token = await seedOrganizationWithMember(
         db, 'AjdvjuECVZEgZoFajaIEkg', 'nkgaOHZISTQrILTfPThWCA', 'Org One'
-            , generateIdentifier(), 'member',
+            , 'member',
     );
     // Seed out of id-lex order so (at, id) is observable.
     const typeB = generateIdentifier();
@@ -201,7 +186,7 @@ async () => {
     await db.postSchemaCreation();
     const token = await seedOrganizationWithMember(
         db, 'AjdvjuECVZEgZoFajaIEkg', 'nkgaOHZISTQrILTfPThWCA', 'Org One'
-            , generateIdentifier(), 'member',
+            , 'member',
     );
     await seedRecordTypePair(
         db, 'AjdvjuECVZEgZoFajaIEkg', 'sjWcXwYGlgxxJOHxzMoUow',
@@ -235,7 +220,7 @@ async () => {
     await db.postSchemaCreation();
     const token = await seedOrganizationWithMember(
         db, 'AjdvjuECVZEgZoFajaIEkg', 'nkgaOHZISTQrILTfPThWCA', 'Org One'
-            , generateIdentifier(), 'member',
+            , 'member',
     );
     const res = await handleRequest(db, req(
         'GET',
@@ -256,7 +241,7 @@ async () => {
     await db.postSchemaCreation();
     const token = await seedOrganizationWithMember(
         db, 'AjdvjuECVZEgZoFajaIEkg', 'nkgaOHZISTQrILTfPThWCA', 'Org One'
-            , generateIdentifier(), 'member',
+            , 'member',
     );
     await seedRecordTypePair(
         db, 'AjdvjuECVZEgZoFajaIEkg', 'sjWcXwYGlgxxJOHxzMoUow',
@@ -296,11 +281,11 @@ async () => {
     const organizationB = generateIdentifier();
     const tokenA = await seedOrganizationWithMember(
         db, organizationA, generateIdentifier(), 'Acme',
-        generateIdentifier(), 'member',
+        'member',
     );
     await seedOrganizationWithMember(
         db, organizationB, generateIdentifier(), 'Beta',
-        generateIdentifier(), 'admin',
+        'admin',
     );
     await seedRecordTypePair(
         db, organizationB, generateIdentifier(),
@@ -323,7 +308,7 @@ async () => {
     await db.postSchemaCreation();
     const token = await seedOrganizationWithMember(
         db, generateIdentifier(), generateIdentifier(),
-        'Acme', generateIdentifier(), 'member',
+        'Acme', 'member',
     );
     const res = await handleRequest(db, req(
         'GET',
@@ -342,7 +327,7 @@ async () => {
     await db.postSchemaCreation();
     const token = await seedOrganizationWithMember(
         db, 'AjdvjuECVZEgZoFajaIEkg', 'nkgaOHZISTQrILTfPThWCA', 'Org One'
-            , generateIdentifier(), 'member',
+            , 'member',
     );
     await seedRecordTypePair(
         db, 'AjdvjuECVZEgZoFajaIEkg', 'sjWcXwYGlgxxJOHxzMoUow',
@@ -374,7 +359,7 @@ async () => {
     await db.postSchemaCreation();
     const token = await seedOrganizationWithMember(
         db, 'AjdvjuECVZEgZoFajaIEkg', 'nkgaOHZISTQrILTfPThWCA',
-        'Org One', generateIdentifier(), 'member',
+        'Org One', 'member',
     );
     const id = generateIdentifier();
     await seedRecordTypePair(

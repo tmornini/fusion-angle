@@ -15,21 +15,21 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest, UnauthorizedError } from '../api/api.ts';
 import type { Client } from '../client/create-client.ts';
 import { createAppClient } from '../web-app/app/client.ts';
 import { inPageClient } from './in-page-facade.ts';
 import { captureConsole } from './fixtures/console-capture.ts';
 import {
+    freshStorage,
     withLocalStorageAsync,
 } from './fixtures/local-storage.ts';
 import { STORAGE_KEY_AUTHORIZATION } from '../client/session-storage-keys.ts';
 import {
-    ideaBody, organizationRow, seedAdminSchema,
+    freshDb,
+    ideaBody,
+    organizationRow,
     seedOrganizationDocument as seedOrganizationDocumentMessagePair,
 } from './test-fixtures.ts';
 import {
@@ -71,7 +71,7 @@ import { seedPersonIdentity } from './identity-fixtures.ts';
 import {
     postInvitationAcceptance,
 } from '../client/invitations.ts';
-import { seedSeat } from './root-admin-fixture.ts';
+import { seedSeatFromBody, seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { deleteNotificationChannel } from
@@ -97,35 +97,6 @@ const ORGANIZATION_A = generateIdentifier();
 const ORGANIZATION_B = generateIdentifier();
 
 const BASE = 'http://localhost';
-
-// A fresh Map-backed fake per test — bodies below call
-// localStorage.getItem/setItem directly; clear() is the
-// fake's own reset, which no body calls.
-function freshStorage(): Partial<Storage> {
-    const store = new Map<string, string>();
-    return {
-        getItem: (k: string) => store.get(k) ?? null,
-        setItem: (k: string, v: string) => {
-            store.set(k, v);
-        },
-        removeItem: (k: string) => {
-            store.delete(k);
-        },
-        clear: () => {
-            store.clear();
-        },
-        key: () => null,
-        get length() {
-            return store.size;
-        },
-    };
-}
-
-async function freshDb() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
-}
 
 async function issuePair(db: MemoryDbAdapter): Promise<{
     access_token: string; refresh_token: string;
@@ -162,20 +133,6 @@ async function issuePair(db: MemoryDbAdapter): Promise<{
 // so a raw row here would go derivation-invisible. Every
 // id/field value stays IDENTICAL to the raw puts these replace —
 // only the write mechanism changes.
-async function seedMembershipMessagePair(
-    db: MemoryDbAdapter,
-    _id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    await seedSeat(
-        db,
-        String(body['organization_id'] ?? body.organization_id),
-        String(body['identity_id'] ?? body.identity_id),
-        (body['type'] ?? body.type) as 'admin' | 'member',
-        String(body['at'] ?? body.at),
-    );
-}
-
 // Authorize `current` as admin of `org` and stamp the
 // membership the gate fences on — the per-org grant the
 // facade reads (mirrors api-org-isolation's twoOrganizations).
@@ -192,7 +149,7 @@ async function seedOrganizationAdmin(
     // resolve.
     await seedOrganizationDocumentMessagePair(
         db, organization, organization);
-    await seedMembershipMessagePair(db, generateIdentifier(), {
+    await seedSeatFromBody(db, {
         organization_id: organization, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         type: 'admin',
         at: '2026-06-04T00:00:00.000000Z',

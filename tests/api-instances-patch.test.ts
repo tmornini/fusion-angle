@@ -49,11 +49,12 @@ import {
     apiRequest,
     pairIdOf,
 } from './http-fixtures.ts';
-import { seedSeat } from './root-admin-fixture.ts';
+import { seedSeatFromBody } from './root-admin-fixture.ts';
 import {
     generateIdentifier,
     isIdentifier,
 } from '../shared/identifier.ts';
+import { seedWritableTextAttr } from './record-seed-fixtures.ts';
 
 // Instance PATCH — If-Match + full-state revision (R5).
 // Two pairs per PATCH: wire delta + PUT {values} revision.
@@ -102,20 +103,6 @@ function req(
     });
 }
 
-async function seedMembershipMessagePair(
-    db: MemoryDbAdapter,
-    _id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    await seedSeat(
-        db,
-        String(body['organization_id'] ?? body.organization_id),
-        String(body['identity_id'] ?? body.identity_id),
-        (body['type'] ?? body.type) as 'admin' | 'member',
-        String(body['at'] ?? body.at),
-    );
-}
-
 async function adminDb(): Promise<{
     db: MemoryDbAdapter;
     adminToken: string;
@@ -123,7 +110,7 @@ async function adminDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedMembershipMessagePair(db, generateIdentifier(), {
+    await seedSeatFromBody(db, {
         organization_id: ORGANIZATION,
         identity_id: 'nkgaOHZISTQrILTfPThWCA',
         type: 'member',
@@ -169,21 +156,6 @@ async function putAttribute(
         'PUT', ATTRS + attrId, adminToken, body,
     ));
     assertStrictEquals(put.status, 201);
-}
-
-async function seedWritableTextAttr(
-    db: MemoryDbAdapter,
-    adminToken: string,
-): Promise<void> {
-    await putAttribute(db, adminToken, ATTR_ID, {
-        name: 'Title',
-        attribute_type: 'text',
-        sort_order: 0,
-        options: [],
-        constraints: [],
-        read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-        write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-    });
 }
 
 async function putInstance(
@@ -257,7 +229,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
@@ -321,7 +295,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
@@ -389,7 +365,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
@@ -411,7 +389,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'A' },
     ]);
@@ -459,7 +439,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
@@ -500,7 +482,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         { set: [{ attribute_id: ATTR_ID, value: 'x' }] },
@@ -561,7 +545,9 @@ Deno.test('PATCH foreign instance id with the foreign head\'s'
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     await seedOrganizationDocument(db, ORGANIZATION_B, 'Beta');
     const foreign = await appendInstanceMessagePair(
         db, ORGANIZATION_B, FOREIGN_TYPE_ID, INSTANCE_ID,
@@ -598,7 +584,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
@@ -627,7 +615,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
@@ -653,7 +643,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
@@ -674,7 +666,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
@@ -699,7 +693,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
@@ -727,7 +723,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     await putAttribute(db, adminToken, ATTR_LOCKED, {
         name: 'Secret',
         attribute_type: 'text',
@@ -766,7 +764,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     // Known attribute never present on the head.
     await putAttribute(db, adminToken, ATTR_NUM, {
         name: 'Amount',
@@ -852,7 +852,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'A' },
     ]);
@@ -914,7 +916,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'base' },
     ]);
@@ -961,7 +965,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'H0' },
     ]);
@@ -1061,7 +1067,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'A' },
     ]);
@@ -1103,7 +1111,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     await putAttribute(db, adminToken, ATTR_LOCKED, {
         name: 'Secret',
         attribute_type: 'text',
@@ -1191,7 +1201,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'A' },
     ]);
@@ -1238,7 +1250,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     await putAttribute(db, adminToken, ATTR_SUBMIT, SUBMIT_ONLY);
     const hidden = { attribute_id: ATTR_SUBMIT, value: 's1' };
     const shown = { attribute_id: ATTR_ID, value: 'Hello' };
@@ -1273,7 +1287,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     await putAttribute(db, adminToken, ATTR_SUBMIT, SUBMIT_ONLY);
     const hidden = { attribute_id: ATTR_SUBMIT, value: 's1' };
     const shown = { attribute_id: ATTR_ID, value: 'Hello' };
@@ -1306,7 +1322,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     await putAttribute(db, adminToken, ATTR_SUBMIT, SUBMIT_ONLY);
     const shown = { attribute_id: ATTR_ID, value: 'Hello' };
     const hidden = { attribute_id: ATTR_SUBMIT, value: 's1' };

@@ -40,6 +40,7 @@ import { deriveProjectFlows } from
     '../api/derive-project-flows.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
+    headResponseId,
     apiRequest,
     assertPartsAreHeads,
     pairIdOf,
@@ -243,21 +244,6 @@ function documentBody(
         revivals: [],
         ...(overrides ?? {}),
     };
-}
-
-async function headResponseId(
-    db: MemoryDbAdapter,
-    token: string,
-    flowId: string,
-): Promise<string> {
-    const got = await handleRequest(db, req(
-        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
-    ));
-    const id = pairIdOf(got);
-    assert(id
-        , 'no Response-ID on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-        + '' + flowId);
-    return id!;
 }
 
 async function headEtag(

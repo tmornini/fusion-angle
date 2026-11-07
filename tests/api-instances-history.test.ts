@@ -31,7 +31,7 @@ import {
     messageOfResponse,
     partsOf,
 } from './http-fixtures.ts';
-import { seedSeat } from './root-admin-fixture.ts';
+import { seedSeatFromBody } from './root-admin-fixture.ts';
 import {
     generateIdentifier,
     isIdentifier,
@@ -39,6 +39,7 @@ import {
 import {
     deriveInstanceHead,
 } from '../api/derive-record-instances.ts';
+import { seedPublicAndSecretAttrs } from './record-seed-fixtures.ts';
 
 // Instance versions — every stored PUT, oldest first, each
 // part the instance projected by the CURRENT read ACL.
@@ -79,20 +80,6 @@ function req(
     });
 }
 
-async function seedMembershipPair(
-    db: MemoryDbAdapter,
-    _id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    await seedSeat(
-        db,
-        String(body['organization_id'] ?? body.organization_id),
-        String(body['identity_id'] ?? body.identity_id),
-        (body['type'] ?? body.type) as 'admin' | 'member',
-        String(body['at'] ?? body.at),
-    );
-}
-
 async function adminDb(): Promise<{
     db: MemoryDbAdapter;
     adminToken: string;
@@ -100,7 +87,7 @@ async function adminDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedMembershipPair(db, generateIdentifier(), {
+    await seedSeatFromBody(db, {
         organization_id: ORGANIZATION,
         identity_id: 'nkgaOHZISTQrILTfPThWCA',
         type: 'member',
@@ -146,30 +133,6 @@ async function putAttribute(
         'PUT', ATTRS + attrId, adminToken, body,
     ));
     assertStrictEquals(put.status, 201);
-}
-
-async function seedPublicAndSecretAttrs(
-    db: MemoryDbAdapter,
-    adminToken: string,
-): Promise<void> {
-    await putAttribute(db, adminToken, ATTR_PUBLIC, {
-        name: 'Title',
-        attribute_type: 'text',
-        sort_order: 0,
-        options: [],
-        constraints: [],
-        read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-        write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-    });
-    await putAttribute(db, adminToken, ATTR_SECRET, {
-        name: 'Secret',
-        attribute_type: 'text',
-        sort_order: 1,
-        options: [],
-        constraints: [],
-        read_roles: ['admin'],
-        write_roles: ['admin'],
-    });
 }
 
 async function putInstance(
@@ -384,7 +347,10 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedPublicAndSecretAttrs(db, adminToken);
+    await seedPublicAndSecretAttrs(
+        db, adminToken, ATTRS,
+        ATTR_PUBLIC, ATTR_SECRET,
+    );
     const put = await putInstance(db, adminToken, [
         {
             attribute_id: ATTR_PUBLIC,
@@ -427,7 +393,10 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedPublicAndSecretAttrs(db, adminToken);
+    await seedPublicAndSecretAttrs(
+        db, adminToken, ATTRS,
+        ATTR_PUBLIC, ATTR_SECRET,
+    );
     const put = await putInstance(db, adminToken, [
         {
             attribute_id: ATTR_PUBLIC,
@@ -495,7 +464,10 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedPublicAndSecretAttrs(db, adminToken);
+    await seedPublicAndSecretAttrs(
+        db, adminToken, ATTRS,
+        ATTR_PUBLIC, ATTR_SECRET,
+    );
 
     const put = await putInstance(db, adminToken, [
         {

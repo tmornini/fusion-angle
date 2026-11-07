@@ -162,6 +162,21 @@ export async function seedSeat(
     );
 }
 
+// The seat the copied membership seeders built. The id
+// they accepted was never stored.
+export async function seedSeatFromBody(
+    db: DbAdapter,
+    body: Record<string, unknown>,
+): Promise<void> {
+    await seedSeat(
+        db,
+        String(body['organization_id'] ?? body.organization_id),
+        String(body['identity_id'] ?? body.identity_id),
+        (body['type'] ?? body.type) as 'admin' | 'member',
+        String(body['at'] ?? body.at),
+    );
+}
+
 // Seed the demo `current` identity as a root admin directly
 // below the gate: an accepted membership in organization
 // 'AjdvjuECVZEgZoFajaIEkg', which lands the seat sibling.
