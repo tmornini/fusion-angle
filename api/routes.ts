@@ -368,10 +368,9 @@ export { param, requireOrganization, withoutId };
 // FULL document — the entity's own fields plus state —
 // validated once at the gate (documentWriteResponseSpec, via
 // validateDocument). Phase Final Task 2: the ideas ROW half is
-// stripped; the pair + states.postEvent land in ONE transaction
-// (states ROW half stripped (message plane only)). Genesis
-// is head-presence-defined — a fresh id's PUT simply finds no
-// head, so it authors like any other transition.
+// stripped (states ROW half stripped (message plane only)).
+// Genesis is head-presence-defined — a fresh id's PUT simply
+// finds no head, so it authors like any other transition.
 const IDEAS_WIRING: DocumentFamilyWiring = {
     family: 'ideas',
     httpNest: 'organization',
@@ -1074,7 +1073,7 @@ async function postRecordTypeEditOp(
 // Phase Final Task 2: writeFlowGraphDelta RETIRED. The four
 // graph relation tables no longer receive dual-write puts;
 // graphDelta/revivals stay in document-pair bodies
-// (SIDECAR-KEEP) feeding deriveFlowGraphStates. Flow lifecycle
+// (SIDECAR-KEEP). Flow lifecycle
 // Phase Final Task 2: states ROW half stripped.
 
 // The organization_id extraction/merge shape every document op
@@ -1103,9 +1102,8 @@ function documentOperationOrganization(
 // edit, and transition — genesis is head-presence-defined (a
 // fresh id's PUT simply finds no head, authoring the birth
 // like any other transition). Phase Final Task 2: the ideas
-// ROW half is stripped — the pair + states.postEvent commit as
-// ONE transaction (states ROW half stripped — message plane
-// only).
+// ROW half is stripped (states ROW half stripped — message
+// plane only).
 // WRITE_RESPONSE_SPECS successBody forms the wire
 // bytes; the reconstructed return is for below-facade callers
 // and type parity. `messagePair` is optional so the seed's
@@ -1138,8 +1136,7 @@ export async function postIdeaDocumentOp(
 // create, edit, and transition — genesis is head-presence-
 // defined (a fresh id's PUT simply finds no head, authoring
 // the birth like any other transition). Phase Final Task 2:
-// the projects ROW half is stripped — the pair +
-// states.postEvent commit as ONE transaction (states ROW half
+// the projects ROW half is stripped (states ROW half
 // stripped — message plane only).
 // WRITE_RESPONSE_SPECS successBody forms the wire
 // bytes; the reconstructed return is for below-facade callers
@@ -1179,9 +1176,8 @@ export async function postProjectDocumentOp(
 // (postRecordWriteOp, POST .../record-types) rather than
 // this PUT —
 // this op's genesis arm exists for a live PUT-first flow.
-// Phase Final Task 2: the records ROW half is stripped — the
-// pair + states.postEvent commit as ONE transaction (states
-// row half strips with the states-trace group).
+// Phase Final Task 2: the records ROW half is stripped
+// (states row half strips with the states-trace group).
 // WRITE_RESPONSE_SPECS successBody forms the wire bytes; the
 // reconstructed return is for below-facade callers and type
 // parity. `messagePair` is optional so the seed's below-facade call
@@ -1358,7 +1354,7 @@ function flowGraphOf(graph: unknown): StoredGraph {
 // Final Task 2: flows + graph relation ROW halves stripped —
 // the graph law's reads and the pair commit as ONE
 // transaction. graphDelta/revivals stay in the
-// document-pair body (SIDECAR-KEEP → deriveFlowGraphStates);
+// document-pair body (SIDECAR-KEEP);
 // graph is the client-authored snapshot carried on the pair
 // for GET reassembly via flowEntityOf. UNLIKE ideas/projects,
 // this op carries NO member_id ternary: flows mint a FRESH
@@ -1386,9 +1382,6 @@ export async function postFlowDocumentOp(
     } as unknown as Omit<FlowEntity, 'id'>;
     // Phase Final Task 2: flows + graph ROW halves
     // stripped; states ROW half stripped (message plane only).
-    // Revival states events dual-write until the
-    // states-trace strip; pair body also carries
-    // revivals for deriveFlowGraphStates (SIDECAR-KEEP).
     // The statement judges the received PUT's own tag.
     // Preconditions precede the content (RFC 9110 §13.2.2):
     // a latch the head already refuses skips the law, and
@@ -1492,8 +1485,8 @@ function undoneFlowBody(
         'flows/:id/undo target.graph',
     );
     // graphDelta/revivals still computed for the document-pair
-    // body (SIDECAR-KEEP → deriveFlowGraphStates); no row-plane
-    // graph writer remains after writeFlowGraphDelta's strip.
+    // body (SIDECAR-KEEP); no row-plane graph writer remains
+    // after writeFlowGraphDelta's strip.
     const delta = buildFlowGraphDelta(
         currentGraph, targetGraph, id,
         generateIdentifier, b.at,
@@ -4402,7 +4395,7 @@ export const routes: Route[] = [
     documentVersionSelectRoute(FLOWS_WIRING),
     // Undo-as-replay (Phase 14 Task 8): the restored state,
     // graphDelta/revivals server-computed into it
-    // (SIDECAR-KEEP → deriveFlowGraphStates), lands through
+    // (SIDECAR-KEEP), lands through
     // the former on the client's tag. No flow_versions row
     // is read or written.
     route('organizations/:id/flows/:id/undo', {

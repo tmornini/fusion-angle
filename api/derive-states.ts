@@ -64,13 +64,9 @@ import type { WorkOrderVersion } from './work-order-version.ts';
 
 // ---- resolveOwningOrganization — the MESSAGE-PLANE fence (gate 4) -
 
-// The org-owned, org-nested document families whose OWN id can
-// appear as a states.entity_id — mirrors
-// api/store-parent-scoped.ts's rawOrganizationOwnedProbes table
-// exactly (ideas, projects, flows, records, objectives,
-// work-orders); invitations is handled separately below (its
-// path is flat, never organization-nested — message-pair.ts's
-// canonicalPath / family-registry.ts has no entry for it).
+// The org-owned, org-nested document families. invitations
+// is handled separately below (its path is flat, never
+// organization-nested).
 const ORGANIZATION_NESTED_ENTITY_FAMILIES = [
     'ideas', 'projects', 'flows',
     'work-orders', 'record-types', 'objectives',
@@ -124,15 +120,11 @@ async function resolveInvitationOwner(
 
 // flow_nodes/flow_edges carry NO document of their own
 // (message-pair.ts: absent from
-// MESSAGE_PAIR_WIRED_ROUTE_PATTERNS) — they ride folded inside the
-// flow's own document body, as graphDelta.nodes/.edges upserts
-// (api/routes.ts's writeFlowGraphDelta). A node/edge that is later
-// removed from the client's CURRENT graph snapshot still keeps its
-// row forever (writeFlowGraphDelta only ever PUTs flow_nodes/
-// flow_edges; a 'deleted' entity is a states-log event ALONGSIDE
-// the row, never a splice of it) — so scanning graphDelta across a
-// flow's FULL pair history, not merely its head document, finds
-// every node/edge that ever existed, including ones later deleted.
+// MESSAGE_PAIR_WIRED_ROUTE_PATTERNS). They ride inside the
+// flow document body as graphDelta.nodes and .edges.
+// Scanning that delta across a flow's FULL pair history,
+// not merely its head, finds every node or edge that ever
+// appeared, including ones later removed.
 function graphDeltaHasMember(
     body: Record<string, unknown>,
     entityId: Id,
@@ -185,16 +177,13 @@ async function resolveFlowGraphOwner(
 // other row from membershipsOfIdentity.
 //
 // ASKER-RELATIVE BY NECESSITY: an identity can hold memberships in
-// MULTIPLE organizations at once. api/store-parent-scoped.ts's own
-// viaMembership resolver is (necessarily) closed over the ASKING
-// org for exactly this reason — a co-member of the asking org must
-// read as visible even when the SAME identity also belongs
-// elsewhere. boundOrganization is checked first (co-membership is
-// the common, cheap case); only when that misses does this widen
-// to every other organization, purely to distinguish "belongs
-// elsewhere" (hidden) from "belongs nowhere" (a genuine orphan,
-// visible) — which OTHER org it resolves to in that case is never
-// observed by fenceStatesByOwner's isVisible check, so no further
+// MULTIPLE organizations at once — a co-member of the asking
+// organization must read as visible even when the SAME identity
+// also belongs elsewhere. boundOrganization is checked first
+// (co-membership is the common, cheap case); only when that
+// misses does this widen to every other organization, purely
+// to distinguish "belongs elsewhere" (hidden) from "belongs
+// nowhere" (a genuine orphan, visible), so no further
 // tie-break is needed.
 async function organizationHasMemberMessagePair(
     db: DbAdapter,
@@ -300,20 +289,17 @@ async function computeOwningOrganization(
 // genuine orphan (no pair anywhere names the entity).
 //
 // MEMOIZATION SCOPE: memoized per distinct entityId WITHIN one
-// derivation pass — `memo` is a Map created per call chain (a
-// fresh one per fenceStatesByOwner call below), NEVER a
+// derivation pass — `memo` is a Map created per call, NEVER a
 // module-global cache (module-global memoization is the Cache
 // abomination: cross-request staleness across writes). A caller
 // invoking this standalone (as several tests below do) gets a
 // fresh, one-shot memo by default — still correct, merely
 // unmemoized across calls.
 //
-// boundOrganization is a required argument, not merely
-// fenceStatesByOwner's own concern: the membership-message-plane leg
-// is intrinsically asker-relative (see
-// resolveViaMembershipPairPlane's own header), exactly like
-// api/store-parent-scoped.ts's ownerOrganizationOfEntity already
-// threads boundOrganization through to its own viaMembership call.
+// boundOrganization is a required argument: the
+// membership-message-plane leg is intrinsically
+// asker-relative (see resolveViaMembershipPairPlane's own
+// header).
 export async function resolveOwningOrganization(
     db: DbAdapter,
     entityId: Id,
