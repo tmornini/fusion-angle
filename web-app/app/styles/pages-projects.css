@@ -99,7 +99,7 @@
     margin-top: var(--space-4);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
     .project-objective-row {
         grid-template-columns: 1fr;
         grid-template-areas:

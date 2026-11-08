@@ -172,7 +172,7 @@ input[type="range"] {
     font-weight: 400;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
     .convert-scores-row {
         grid-template-columns: 1fr;
     }
