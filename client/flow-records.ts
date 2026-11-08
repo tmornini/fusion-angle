@@ -43,7 +43,7 @@ async function getFlowRecordsForFlow(
 // record can be bound by flows the caller never named. The
 // flows list is org-scoped; each flow's records are fetched in
 // parallel and concatenated.
-async function getAllFlowRecordEntities(
+export async function getAllFlowRecordEntities(
     ctx: RequestContext,
     flows?: readonly HttpMessage<FlowEntity>[],
 ): Promise<FlowRecordEntity[]> {
