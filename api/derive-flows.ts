@@ -36,10 +36,7 @@ import { liveHeadId, messageStore } from
 // Flows' own reshaping of the generic message-plane reduction
 // (derive-documents.ts): the async fetching (one prefix scan per
 // derivation, per family document) plus the entity/lifecycle
-// knowledge only this family has. Read-only and additive — no
-// route, adapter, or seed row reads any of this yet (Task 8
-// wires the route); tests/drift-flows.test.ts is the proof of
-// equality against the old plane. Structurally mirrors
+// knowledge only this family has. Structurally mirrors
 // derive-ideas.ts/derive-projects.ts (same private helper
 // shapes, renamed for flows) through the shared Task 2 helpers;
 // the graph re-sort (normalizedStoredGraph, flow-graph-
@@ -374,10 +371,7 @@ export async function deriveFlowStateHistory(
 // Replays every graphDelta.attributeEvents / memberEvents
 // entry across this organization's flow document-pair history
 // (full history, never merely the head — resolveFlowGraphOwner's
-// own precedent). writeFlowGraphDelta folds the SAME events
-// into flow_node_attributes / flow_node_members, so the
-// latestByKey/relationFailClosed reduction over either source
-// is byte-equal by construction.
+// own precedent).
 //
 // nodeFlowIds is the CURRENT flow_id stamp per node id —
 // graphDelta.nodes upserts set it, graphDelta.deletions drop

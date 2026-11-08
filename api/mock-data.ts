@@ -880,11 +880,10 @@ async function postMockDataLoadIn(
     // state and the member credited with creating it.
     // Phase Final Task 2: records + record_attributes +
     // flow_records ROW halves stripped — seed drives
-    // through postRecordWriteOp / postFlowRecordDocumentOp
-    // (pairs + states.postEvent only). recordGenesis
-    // is imported from seed-message-pairs.ts — pass 1
-    // there needs the SAME array to form each record's
-    // pair before the rehearsal's writes.
+    // through postRecordWriteOp / postFlowRecordDocumentOp.
+    // recordGenesis is imported from seed-message-pairs.ts
+    // — pass 1 there needs the SAME array to form each
+    // record's pair before the rehearsal's writes.
     const recordGenesisById = new Map(
         recordGenesis.map(g => [g.entityId, g]),
     );

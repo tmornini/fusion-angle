@@ -1261,10 +1261,9 @@ export interface FlowDocumentBody {
     // re-serializes it.
     readonly graph: Record<string, unknown>;
     // SIDECAR-KEEP: graphDelta/revivals stay on the document
-    // pair body permanently — deriveFlowGraphStates is the
-    // sole ledger source of flow-node/edge deleted/restored
-    // history. Phase Final Task 2 retired writeFlowGraphDelta
-    // (the old-plane relation writer half).
+    // pair body permanently. Phase Final Task 2 retired
+    // writeFlowGraphDelta (the old-plane relation writer
+    // half).
     readonly graphDelta: FlowGraphDelta;
     readonly revivals: readonly GraphRevival[];
 }
