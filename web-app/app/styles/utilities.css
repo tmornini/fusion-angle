@@ -99,7 +99,6 @@
 /* Overflow */
 .overflow-hidden { overflow: hidden; }
 .overflow-visible { overflow: visible; }
-.break-all { word-break: break-all; }
 
 /* Position */
 .relative { position: relative; }

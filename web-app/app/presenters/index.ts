@@ -10,7 +10,6 @@ export {
     type IdeaListState,
     type IdeaFieldKey,
     type IdeaDraftFields,
-    type IdeaEntityPatch,
 } from './idea.ts';
 export {
     IdeaConversionPresenter,
@@ -20,8 +19,6 @@ export {
     conversionIsReady,
     conversionFieldIsReady,
     ALL_CONVERSION_FIELDS,
-    type ConversionField,
-    type ConversionFields,
     type ConversionDraft,
     type ObjectiveDefinition,
 } from './idea-conversion.ts';
@@ -39,15 +36,11 @@ export {
     applyProjectFilterToggle,
     applyProjectSortToggle,
     type ProjectListState,
-    type ProjectListFilter,
-    type ProjectListSort,
 } from './project.ts';
 export {
     GaugePresenter,
 } from './gauge.ts';
 export {
-    HumanMemberRowPresenter,
-    AIMemberRowPresenter,
     ManagedMembersPresenter,
     buildInitialManagedMembersState,
     applyManagedMembersSearch,
@@ -85,8 +78,6 @@ export {
     isHumanMemberFieldKey,
     seatRemovalOf,
     type HumanMemberDraftFields,
-    type HumanMemberCreationDraft,
-    type HumanMemberFieldKey,
     type SeatRemoval,
 } from './human-member-detail.ts';
 export {
@@ -97,7 +88,6 @@ export {
     isAIMemberFieldKey,
     buildModelOptgroups,
     type AIMemberDraftFields,
-    type AIMemberFieldKey,
 } from './ai-member-detail.ts';
 export {
     ServiceMemberDetailPresenter,
@@ -106,7 +96,6 @@ export {
     serviceMemberPatchFromDraft,
     isServiceMemberFieldKey,
     type ServiceMemberDraftFields,
-    type ServiceMemberFieldKey,
 } from './service-member-detail.ts';
 export {
     FlowDesignerPresenter,
@@ -156,12 +145,10 @@ export {
 } from './dashboard-objective-projects.ts';
 export {
     RecordListPresenter,
-    RecordPresenter,
     buildInitialRecordListState,
     applyRecordListUpdate,
     applyRecordFilterToggle,
     type RecordListState,
-    type RecordListFilter,
 } from './record-list.ts';
 export {
     RecordDetailPresenter,
@@ -169,7 +156,6 @@ export {
     RecordInstancesPresenter,
     recordDraftFromView,
     allowedConstraintKinds,
-    formatConstraint,
     projectInstanceFields,
     instanceListItems,
     INSTANCE_CONFLICT_NOTICE,
@@ -177,11 +163,8 @@ export {
     type RecordDetailDraft,
     type AttributeDraft,
     type InstancesSectionView,
-    type InstanceEditView,
     type InstanceFieldView,
     type InstanceListItemView,
-    type InstanceFieldAccess,
-    type InstanceAttributeAcl,
 } from './record-detail.ts';
 export {
     IdentityDetailPresenter,

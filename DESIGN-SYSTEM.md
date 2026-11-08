@@ -54,11 +54,6 @@ closes, and light-dismisses by those attributes — one voice
 across every dialog. Submit/confirm stay page-specific (a
 `#{id}-submit` listener or a `data-*-action`).
 
-**Tab pattern.** Use `initTabs('[data-tab]', '.tab-panel',
-'active')` from `dialog.ts` — the third arg is the
-active-state class. Tab buttons use `data-tab="{name}"`
-attribute, panels use `id="tab-{name}"`.
-
 **Segmented control.** A `role="group"` of
 `btn btn-secondary btn-sm` buttons. Each carries
 `aria-pressed`; one is `true`. No inline style. The
