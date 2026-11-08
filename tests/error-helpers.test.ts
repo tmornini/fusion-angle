@@ -1,9 +1,7 @@
 import { assert, assertStrictEquals } from '@std/assert';
+import { extractErrorMessage } from
+    '../shared/error-helpers.ts';
 import {
-    extractErrorMessage as apiExtract,
-} from '../shared/error-helpers.ts';
-import {
-    extractErrorMessage as webExtract,
     isAbortFault,
     shouldSurfaceFault,
     reportFault,
@@ -14,31 +12,40 @@ import type { RequestContext } from
 import { captureConsole } from
     './fixtures/console-capture.ts';
 
-const layers = [
-    ['api', apiExtract] as const,
-    ['web-app', webExtract] as const,
-];
+Deno.test(
+    'extractErrorMessage uses an Error message',
+    () => {
+        assertStrictEquals(
+            extractErrorMessage(new Error('boom')),
+            'boom',
+        );
+    },
+);
 
-for (const [layer, extract] of layers) {
-    Deno.test(layer + ' extractErrorMessage uses an Error message',
-        () => {
-            assertStrictEquals(extract(new Error('boom')), 'boom');
-        });
+Deno.test(
+    'extractErrorMessage stringifies a non-Error',
+    () => {
+        assertStrictEquals(
+            extractErrorMessage('plain'), 'plain',
+        );
+        assertStrictEquals(extractErrorMessage(42), '42');
+    },
+);
 
-    Deno.test(layer + ' extractErrorMessage stringifies a non-Error',
-        () => {
-            assertStrictEquals(extract('plain'), 'plain');
-            assertStrictEquals(extract(42), '42');
-        });
-
-    Deno.test(layer + ' extractErrorMessage prefers a fallback for'
-        + ' a non-Error', () => {
-            assertStrictEquals(extract('x', 'Import failed'),
-                'Import failed');
-            assertStrictEquals(extract(new Error('boom'), 'fb'),
-                'boom');
-        });
-}
+Deno.test(
+    'extractErrorMessage prefers a fallback for'
+        + ' a non-Error',
+    () => {
+        assertStrictEquals(
+            extractErrorMessage('x', 'Import failed'),
+            'Import failed',
+        );
+        assertStrictEquals(
+            extractErrorMessage(new Error('boom'), 'fb'),
+            'boom',
+        );
+    },
+);
 
 Deno.test('isAbortFault is true for AbortError', () => {
     assertStrictEquals(
