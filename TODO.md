@@ -3461,13 +3461,11 @@ Off the critical path; each with its oracle.
   `FA_ENVIRONMENT` is exactly `local` and
   `FA_LATENCY` is a millisecond count,
   both present and non-empty, every API request
-  takes the existing log-normal sampler
-  (`api/latency.ts:17-54`) with
+  waits a log-normal delay with
   `mu = ln(FA_LATENCY)`; otherwise the
   no-op. Includes: the shim's "both presets pass a
-  no-op today" (`api/latency.ts:1-5`,
-  `api/db-backed.ts:31-35` — revise both comments when
-  done). Oracle:
+  no-op today" (`api/db-backed.ts:31-35` — revise
+  the comment when done). Oracle:
   `FA_LATENCY=200` under `local` lifts every
   `./bin/measure` median by about 200 ms; unset leaves
   the no-op.

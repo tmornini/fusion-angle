@@ -7,7 +7,7 @@ import {
     RetiredEntityError,
     UniqueConstraintError,
 } from './db.ts';
-import type { LatencySimulation } from './latency.ts';
+import type { LatencySimulation } from './db-backed.ts';
 import {
     ValidationError,
     msSinceMonotonic,
