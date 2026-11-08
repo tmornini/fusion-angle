@@ -283,10 +283,6 @@ export class FlowDesignerPresenter {
         return next;
     }
 
-    isAutoLayout(): boolean {
-        return this.#snapshot.isAutoLayout;
-    }
-
     withAutoLayoutToggled(): FlowSnapshot {
         const toggled =
             !this.#snapshot.isAutoLayout;
@@ -299,10 +295,6 @@ export class FlowDesignerPresenter {
             next = this.#applyLayoutReconcile(next);
         }
         return next;
-    }
-
-    isAutoFit(): boolean {
-        return this.#snapshot.isAutoFit;
     }
 
     buildGestureContext(
@@ -865,15 +857,6 @@ Auto Fit</label>
         return next;
     }
 
-    selectedNodeName(): string {
-        const nodeId = this
-            .#singleSelectedNodeId();
-        if (!nodeId) return '';
-        return this.#snapshot.nodes.find(
-            n => n.id === nodeId,
-        )!.name;
-    }
-
     withZoomedIn(): FlowSnapshot {
         if (this.#guardAutoFit()) {
             return this.#snapshot;
@@ -1062,11 +1045,6 @@ Auto Fit</label>
             ...this.#snapshot,
             recordAttributes: [...attributes],
         };
-    }
-
-    recordAttributes():
-        readonly RecordAttribute[] {
-        return this.#snapshot.recordAttributes;
     }
 
     #buildPropsPanel(): SafeHtml {

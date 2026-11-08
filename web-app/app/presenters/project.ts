@@ -413,10 +413,6 @@ export class ProjectListPresenter {
             : null;
     }
 
-    activeSort(): ProjectListSort {
-        return this.#sort;
-    }
-
     renderBadges(
         container: HTMLElement,
     ): void {
