@@ -1,8 +1,7 @@
 import { ICON_SIZE, iconAlertTriangle } from './icons.ts';
 import { $ } from './dom.ts';
-import {
-    extractErrorMessage,
-} from './error-helpers.ts';
+import { extractErrorMessage } from
+    '../../shared/error-helpers.ts';
 import {
     fetchMeasureName,
     markEnd,

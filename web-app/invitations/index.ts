@@ -1,7 +1,8 @@
 import { $required } from '../app/dom.ts';
 import { showToast } from '../app/toast.ts';
 import { createPageAbort } from '../app/page-lifecycle.ts';
-import { extractErrorMessage } from '../app/error-helpers.ts';
+import { extractErrorMessage } from
+    '../../shared/error-helpers.ts';
 import {
     buildSkeleton, loadInto,
 } from '../app/loading-states.ts';

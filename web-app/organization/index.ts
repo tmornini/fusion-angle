@@ -16,7 +16,8 @@ import {
 } from '../../shared/http-errors.ts';
 import { showToast } from '../app/toast.ts';
 import { log } from '../app/logger.ts';
-import { extractErrorMessage } from '../app/error-helpers.ts';
+import { extractErrorMessage } from
+    '../../shared/error-helpers.ts';
 import { trimStrings } from '../app/format.ts';
 import {
     openDialog, closeDialog,

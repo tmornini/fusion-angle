@@ -8,10 +8,9 @@ import {
     createPageAbort,
     bindPageListeners,
 } from '../app/page-lifecycle.ts';
-import {
-    extractErrorMessage,
-    reportFault,
-} from '../app/error-helpers.ts';
+import { reportFault } from '../app/error-helpers.ts';
+import { extractErrorMessage } from
+    '../../shared/error-helpers.ts';
 import {
     makeFieldKeyValidator,
 } from '../app/field-key-validator.ts';
