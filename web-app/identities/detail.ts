@@ -12,7 +12,6 @@ import {
 import {
     getIdentity,
     getMemberPii,
-    getServiceFacet,
     deleteIdentityPii,
     getClientRegistration,
     putClientRegistration,
@@ -60,7 +59,7 @@ async function loadIdentity(
         getIdentity(ctx, identityId),
         getMemberPii(ctx, identityId),
     ]);
-    // Wave 2: service facets only when kind is service.
+    // Wave 2: client registration, only for a service.
     if (!identity.isService()) {
         return {
             identity,
@@ -69,15 +68,13 @@ async function loadIdentity(
             registration: { registered: false },
         };
     }
-    const [service, registration] =
-        await Promise.all([
-            getServiceFacet(ctx, identityId),
-            getClientRegistration(ctx, identityId),
-        ]);
+    const registration = await getClientRegistration(
+        ctx, identityId,
+    );
     return {
         identity,
         pii,
-        service,
+        service: { named: false },
         registration,
     };
 }
