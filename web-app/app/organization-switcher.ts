@@ -5,6 +5,10 @@ import {
     ACTIVE_ORGANIZATION_ID,
 } from '../../client/organization-session.ts';
 import { putPreference } from './adapters/preferences.ts';
+import {
+    putLocation,
+    reloadLocation,
+} from './adapters/location.ts';
 import { showToast } from './toast.ts';
 
 interface OrganizationOption {
@@ -78,10 +82,10 @@ function switchToOrganization(organization: string): void {
         + location.search
         + location.hash;
     if (next !== here) {
-        location.assign(next);
+        putLocation(next);
         return;
     }
-    location.reload();
+    reloadLocation();
 }
 
 // Select the active organization and wire every

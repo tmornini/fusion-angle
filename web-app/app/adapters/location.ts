@@ -8,3 +8,8 @@ export function putLocation(url: string): void {
     latchPageLeaving();
     window.location.href = url;
 }
+
+export function reloadLocation(): void {
+    latchPageLeaving();
+    window.location.reload();
+}

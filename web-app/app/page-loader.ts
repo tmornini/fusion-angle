@@ -11,6 +11,7 @@ import {
 } from './error-helpers.ts';
 import { redirectToLogin } from './auth-redirect.ts';
 import { navigateTo } from './navigation.ts';
+import { reloadLocation } from './adapters/location.ts';
 import {
     getUrlParams,
 } from './adapters/url-params.ts';
@@ -73,7 +74,7 @@ export function handlePageLoadError(
         $('[data-retry-btn]', container)
             ?.addEventListener(
                 'click',
-                () => location.reload(),
+                () => reloadLocation(),
             );
     }
 }
