@@ -10,6 +10,8 @@ import {
 } from '@std/path';
 import { handleRequest } from '../api/api.ts';
 import type { DbAdapter } from '../api/db.ts';
+import { isHashedAssetName } from
+    '../shared/hashed-asset.ts';
 import {
     HTTP_INTERNAL_ERROR,
     HTTP_METHOD_NOT_ALLOWED,
@@ -109,12 +111,6 @@ type BodyRead =
     }
     | { readonly kind: 'empty' }
     | { readonly kind: 'too-large' };
-
-// name.hash.ext — eight or more hex digits. Fixed names
-// such as app.js must not match.
-export function isHashedAssetName(name: string): boolean {
-    return /\.[0-9a-f]{8,}\.[a-z0-9]+$/i.test(name);
-}
 
 export function staticCacheControl(name: string): string {
     const ext = extname(name).toLowerCase();

@@ -5,18 +5,15 @@ import {
     join,
 } from '@std/path';
 import { sha256HexOfBytes } from '../../shared/digest.ts';
+import { isHashedAssetName } from
+    '../../shared/hashed-asset.ts';
 
-const HASHED_NAME = /\.[0-9a-f]{8,}\.[a-z0-9]+$/i;
 const HASH_SLICE = /\.[0-9a-f]{8,}(?=\.[a-z0-9]+$)/i;
 const JS_SPEC =
     /(from|import\(|import)(['"])(\.\/[^'"]+)\2/g;
 const GZIP_EXTS = new Set([
     '.html', '.js', '.css', '.svg',
 ]);
-
-function isHashedAssetName(name: string): boolean {
-    return HASHED_NAME.test(name);
-}
 
 function logicalAssetName(name: string): string {
     if (!isHashedAssetName(name)) return name;
