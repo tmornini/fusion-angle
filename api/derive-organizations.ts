@@ -12,13 +12,6 @@ import {
     type DerivedDocument,
 } from './derive-documents.ts';
 
-// The tenant root's own reduction over the message ledger —
-// Phase 12 Task 2: the derive module lands ahead of both the
-// family's registration (this commit's sibling) and its seed
-// pairs (Task 3). organizations is the THIRTEENTH family and
-// the last unflipped in-scope one — the reads flip at Task 5;
-// nothing reads this module in production yet.
-//
 // GLOBAL plane, like members/ai-members/human-members/
 // identities: organizations IS the tenant root, so it is never
 // itself organization-nested — canonicalPath(undefined,
