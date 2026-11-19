@@ -319,6 +319,63 @@ Deno.test('injected clock expires the 60s throttle window',
     );
 });
 
+Deno.test(
+    'an idle address leaves after the window',
+    () => {
+        let now = 1_000_000;
+        const throttle = createAuthThrottle(
+            undefined,
+            () => now,
+        );
+        assertStrictEquals(
+            throttle.limited(
+                '10.0.0.1', undefined, undefined,
+            ),
+            false,
+        );
+        assertStrictEquals(
+            throttle.limited(
+                '10.0.0.2', undefined, undefined,
+            ),
+            false,
+        );
+        assertStrictEquals(throttle.trackedClients(), 2);
+        now += 60_000;
+        assertStrictEquals(
+            throttle.limited(
+                '10.0.0.3', undefined, undefined,
+            ),
+            false,
+        );
+        assertStrictEquals(throttle.trackedClients(), 1);
+    },
+);
+
+Deno.test(
+    'a client inside the window stays tracked',
+    () => {
+        let now = 1_000_000;
+        const throttle = createAuthThrottle(
+            undefined,
+            () => now,
+        );
+        assertStrictEquals(
+            throttle.limited(
+                '10.0.0.1', undefined, undefined,
+            ),
+            false,
+        );
+        now += 30_000;
+        assertStrictEquals(
+            throttle.limited(
+                '10.0.0.2', undefined, undefined,
+            ),
+            false,
+        );
+        assertStrictEquals(throttle.trackedClients(), 2);
+    },
+);
+
 Deno.test('trusted hop keys the rightmost X-Forwarded-For',
 () => {
     const throttle = createAuthThrottle('10.0.0.1');
