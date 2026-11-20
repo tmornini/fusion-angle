@@ -17,7 +17,7 @@ import {
 } from './token-fixtures.ts';
 import { seedCreatedWorkOrder } from
     './work-order-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
     nowUtc,
@@ -71,12 +71,6 @@ const FLOW_C4 = generateIdentifier();
 // so a body carrying state/state_at/state_event_id 400s at
 // the gate (validateWorkOrderDocumentBody), and the op
 // posts no states event of its own.
-
-async function freshDb() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
-}
 
 // The frozen flow graph a work order carries, stored as a
 // native object on work_orders.flow_graph — the SAME fixture

@@ -15,13 +15,12 @@ import { getWorkOrderEvents } from
 import {
     apiRequest,
 } from './http-fixtures.ts';
-import { seedSeat } from './root-admin-fixture.ts';
+import { seedSeatFromBody } from './root-admin-fixture.ts';
 import { seedCreatedWorkOrder } from
     './work-order-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-const M_A = generateIdentifier();
 const FLOW_X = generateIdentifier();
 const N_START = generateIdentifier();
 const N_MIDDLE = generateIdentifier();
@@ -104,20 +103,6 @@ Deno.test.afterEach(() => {
 // a raw row here would go derivation-invisible. Every id/field
 // value stays IDENTICAL to the raw puts these replace — only the
 // write mechanism changes.
-async function seedMembershipPair(
-    db: MemoryDbAdapter,
-    _id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    await seedSeat(
-        db,
-        String(body['organization_id'] ?? body.organization_id),
-        String(body['identity_id'] ?? body.identity_id),
-        (body['type'] ?? body.type) as 'admin' | 'member',
-        String(body['at'] ?? body.at),
-    );
-}
-
 async function seed(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -126,7 +111,7 @@ async function seed(): Promise<MemoryDbAdapter> {
     // derivation-invisible to deriveMembershipsForIdentity's own
     // enumerate-then-probe (via deriveOrganizations).
     await seedOrganizationDocument(db, ORGANIZATION_A, 'Acme');
-    await seedMembershipPair(db, M_A, {
+    await seedSeatFromBody(db, {
         organization_id: ORGANIZATION_A, identity_id: ADMIN_A,
         type: 'admin', at: AT,
     });

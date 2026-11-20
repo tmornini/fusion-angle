@@ -36,16 +36,14 @@ import {
 import {
     documentMessagePairsAt,
 } from '../api/derive-documents.ts';
-import {
-    nowUtc,
-    DEFAULT_ATTRIBUTE_ACL_ROLES,
-} from '../shared/types.ts';
+import { nowUtc } from '../shared/types.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';
-import { seedSeat } from './root-admin-fixture.ts';
+import { seedSeatFromBody } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { seedWritableTextAttr } from './record-seed-fixtures.ts';
 
 // Instance DELETE — tombstone posture (Task 18 / R4 / R9).
 // Absent → missedReadError; live OR already-tombstoned →
@@ -86,20 +84,6 @@ function req(
     });
 }
 
-async function seedMembershipMessagePair(
-    db: MemoryDbAdapter,
-    _id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    await seedSeat(
-        db,
-        String(body['organization_id'] ?? body.organization_id),
-        String(body['identity_id'] ?? body.identity_id),
-        (body['type'] ?? body.type) as 'admin' | 'member',
-        String(body['at'] ?? body.at),
-    );
-}
-
 async function adminDb(): Promise<{
     db: MemoryDbAdapter;
     adminToken: string;
@@ -107,7 +91,7 @@ async function adminDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedMembershipMessagePair(db, generateIdentifier(), {
+    await seedSeatFromBody(db, {
         organization_id: ORGANIZATION,
         identity_id: 'nkgaOHZISTQrILTfPThWCA',
         type: 'member',
@@ -153,21 +137,6 @@ async function putAttribute(
         'PUT', ATTRS + attrId, adminToken, body,
     ));
     assertStrictEquals(put.status, 201);
-}
-
-async function seedWritableTextAttr(
-    db: MemoryDbAdapter,
-    adminToken: string,
-): Promise<void> {
-    await putAttribute(db, adminToken, ATTR_ID, {
-        name: 'Title',
-        attribute_type: 'text',
-        sort_order: 0,
-        options: [],
-        constraints: [],
-        read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-        write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-    });
 }
 
 async function putInstance(
@@ -223,7 +192,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
@@ -415,7 +386,9 @@ Deno.test('a stale If-Match on an instance DELETE is 412;'
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
@@ -442,7 +415,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
@@ -467,7 +442,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS, ATTR_ID,
+    );
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'live' },
     ]);

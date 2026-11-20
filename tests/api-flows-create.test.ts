@@ -2,11 +2,8 @@ import { assertStrictEquals } from '@std/assert';
 import { deriveFlowStateHistory } from
     '../api/derive-flows.ts';
 import { GET, GETCollection, POST } from './in-page-facade.ts';
-import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
-import {
-    seedAdminSchema,
-} from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../shared/types.ts';
@@ -18,12 +15,6 @@ import { generateIdentifier } from
 import { operationIdHeader } from
     './operation-id-header.ts';
 
-
-async function freshDb() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
-}
 
 // The flow body OMITS organization_id — the org fence stamps it
 // from the verified token before the store validates. It also

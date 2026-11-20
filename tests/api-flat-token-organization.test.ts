@@ -10,9 +10,7 @@ import {
 } from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
-import { framedRequest } from './http-fixtures.ts';
+import { putDefaultOrganization, framedRequest } from './http-fixtures.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-06-04T00:00:00.000000Z';
@@ -55,24 +53,6 @@ function getSeats(token: string, organization: string) {
 }
 
 // Seeding a SET default rides the live PUT route.
-function putDefaultOrganization(
-    token: string, identityId: string, organization: string,
-) {
-    return framedRequest(
-        `${BASE}/identities/${identityId}`
-            + '/default-organization', {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + token,
-                'operation-id': generateIdentifier(),
-            },
-            body: JSON.stringify({
-                organization_id: organization,
-            }),
-        });
-}
-
 Deno.test('a flat token resolves its org from the set default',
 async () => {
     const db = await freshDb();

@@ -45,6 +45,26 @@ export function pairIdOf(response: Response): string | null {
         : raw;
 }
 
+// The flow document's head, read the way the client
+// does: GET the flow and take the strong ETag.
+export async function headResponseId(
+    db: DbAdapter,
+    token: string,
+    flowId: string,
+): Promise<string> {
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET',
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + flowId,
+        token,
+    }));
+    const id = pairIdOf(got);
+    assert(id
+        , 'no Response-ID on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+        + '' + flowId);
+    return id!;
+}
+
 export function setCookieHeader(res: Response): string {
     const cookies = typeof res.headers.getSetCookie
         === 'function'
@@ -108,6 +128,48 @@ export function withoutCredentialFields(
         delete next.refresh_token;
     }
     return { body: next, headers };
+}
+
+export function jsonPost(path: string, body: unknown): Request {
+    const record = body !== null
+        && typeof body === 'object'
+        && !Array.isArray(body)
+        ? body as Record<string, unknown>
+        : {};
+    const lifted = withoutCredentialFields(record);
+    const raw = JSON.stringify(lifted.body);
+    return framedRequest(`${BASE}/${path}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'content-length': String(
+                new TextEncoder().encode(raw).byteLength,
+            ),
+            'operation-id': generateIdentifier(),
+            ...lifted.headers,
+        },
+        body: raw,
+    });
+}
+
+export function putDefaultOrganization(
+    token: string,
+    identityId: string,
+    organization: string,
+): Request {
+    return framedRequest(
+        `${BASE}/identities/${identityId}`
+            + '/default-organization', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token,
+                'operation-id': generateIdentifier(),
+            },
+            body: JSON.stringify({
+                organization_id: organization,
+            }),
+        });
 }
 
 export async function presentedFields(

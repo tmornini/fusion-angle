@@ -1,5 +1,6 @@
 import { assertEquals, assertStrictEquals, assertThrows } from '@std/assert';
 import {
+    freshStorage,
     withLocalStorage,
     withLocalStorageAsync,
 } from './fixtures/local-storage.ts';
@@ -15,29 +16,6 @@ const KEY = STORAGE_KEY_AUTHORIZATION;
 
 // The session under test: one client's credential store.
 const client = inPageClient(memoryDbAdapter());
-
-// A fresh Map-backed fake per test — bodies below call
-// localStorage.getItem/setItem directly; clear() is the
-// fake's own reset, which no body calls.
-function freshStorage(): Partial<Storage> {
-    const store = new Map<string, string>();
-    return {
-        getItem: (k: string) => store.get(k) ?? null,
-        setItem: (k: string, v: string) => {
-            store.set(k, v);
-        },
-        removeItem: (k: string) => {
-            store.delete(k);
-        },
-        clear: () => {
-            store.clear();
-        },
-        key: () => null,
-        get length() {
-            return store.size;
-        },
-    };
-}
 
 Deno.test('an unset credential reads as null (honest absence)',
 () => withLocalStorage(freshStorage(), () => {

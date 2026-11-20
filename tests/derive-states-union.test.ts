@@ -39,7 +39,7 @@ import {
     apiRequest,
     invitationLatched,
 } from './http-fixtures.ts';
-import { seedSeat } from './root-admin-fixture.ts';
+import { seedSeatFromBody, seedSeat } from './root-admin-fixture.ts';
 import { landMembership } from
     './membership-fixtures.ts';
 import { membershipOf } from '../api/memberships.ts';
@@ -154,20 +154,6 @@ async function leftoverMemberParent(
     );
 }
 
-async function seedMembershipMessagePair(
-    db: MemoryDbAdapter,
-    _id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    await seedSeat(
-        db,
-        String(body['organization_id'] ?? body.organization_id),
-        String(body['identity_id'] ?? body.identity_id),
-        (body['type'] ?? body.type) as 'admin' | 'member',
-        String(body['at'] ?? body.at),
-    );
-}
-
 // Two orgs (A, B), one admin identity each — the derive-states-
 // events.test.ts precedent, reused so every write below (ideas,
 // ai-members, work-orders, flows, invitations, memberships) rides
@@ -191,11 +177,11 @@ async function seed(): Promise<{
     // enumerate-then-probe (via deriveOrganizations).
     await seedOrganizationDocument(db, organizationA, 'Acme');
     await seedOrganizationDocument(db, organizationB, 'Beta');
-    await seedMembershipMessagePair(db, generateIdentifier(), {
+    await seedSeatFromBody(db, {
         organization_id: organizationA, identity_id: adminA,
         type: 'admin', at: AT,
     });
-    await seedMembershipMessagePair(db, generateIdentifier(), {
+    await seedSeatFromBody(db, {
         organization_id: organizationB, identity_id: adminB,
         type: 'admin', at: AT,
     });

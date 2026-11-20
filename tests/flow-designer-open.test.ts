@@ -3,10 +3,7 @@ import {
 } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     documentMessagePairsAt,
@@ -17,7 +14,7 @@ import {
 import {
     DEV_TOKEN,
 } from './token-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import { inPageContext } from './in-page-facade.ts';
 import {
@@ -82,12 +79,6 @@ function req(
         ...(headers !== undefined
             ? { headers } : {}),
     });
-}
-
-async function freshDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
 }
 
 function flowFields(name: string) {

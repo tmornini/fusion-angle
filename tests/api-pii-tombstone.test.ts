@@ -5,10 +5,7 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
@@ -23,9 +20,7 @@ import {
     piiEntityOf,
 } from '../api/derive-identity-spine.ts';
 import { documentHeadAt } from '../api/message-pair.ts';
-import {
-    seedAdminSchema,
-} from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { seedIdentityCredential } from
@@ -57,12 +52,6 @@ function req(
         body,
         ...(operationId !== undefined ? { operationId } : {}),
     });
-}
-
-async function freshDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
 }
 
 function humanPii(name: string) {

@@ -22,7 +22,7 @@ import {
     compareIdentifiers,
     generateIdentifier,
 } from '../shared/identifier.ts';
-import { partBodiesOf } from './http-fixtures.ts';
+import { setCookieHeader, partBodiesOf } from './http-fixtures.ts';
 import { captureConsole } from './fixtures/console-capture.ts';
 import {
     makeAssertionSigner,
@@ -281,17 +281,6 @@ async () => {
         { error: INVALID_CODE_ERROR },
     );
 });
-
-function setCookieHeader(res: Response): string {
-    const cookies = typeof res.headers.getSetCookie
-        === 'function'
-        ? res.headers.getSetCookie()
-        : [];
-    if (cookies.length > 0) {
-        return cookies.join('\n');
-    }
-    return res.headers.get('Set-Cookie') ?? '';
-}
 
 function refreshTokenFromSetCookie(res: Response): string {
     const cookie = setCookieHeader(res);

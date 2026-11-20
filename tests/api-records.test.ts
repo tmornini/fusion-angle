@@ -1,10 +1,7 @@
 import { assertRejects, assertStrictEquals } from '@std/assert';
 import { DELETE, GET, PUT } from './in-page-facade.ts';
-import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
-import {
-    seedAdminSchema,
-} from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
 
@@ -12,12 +9,6 @@ import { operationIdHeader } from
 // Nested record-types + attributes (Task 23);
 // organizations/:id/flows/:id/records
 // join family stays (decision 9 — UNTOUCHED).
-
-async function freshDb() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
-}
 
 const TYPES = 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/';
 const TYPE = TYPES + 'rbfHGatkwQzGZJVXKJEeyw';

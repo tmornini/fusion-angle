@@ -13,15 +13,9 @@ import { seedOrganizationDocument } from './test-fixtures.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
 import { deriveInvitations } from
     '../api/derive-invitations.ts';
-import { deriveOrganizations } from
-    '../api/derive-organizations.ts';
 import {
     documentMessagePairsAt,
 } from '../api/derive-documents.ts';
-import {
-    membershipOfHead,
-    organizationMembershipHeads,
-} from '../api/memberships.ts';
 import {
     apiRequest,
     invitationLatched,
@@ -34,6 +28,7 @@ import { generateIdentifier } from
 import { membershipNameOf } from
     '../shared/membership-name.ts';
 import type { MembershipEntity } from '../shared/types.ts';
+import { allMemberships } from './membership-fixtures.ts';
 
 const WAYNE = 'BBjWJsjYIDkTRKIIPrzWRw';
 const STARK = 'AjdvjuECVZEgZoFajaIEkg';
@@ -41,37 +36,6 @@ const SARAH = 'toccYYkLEABmlbpHJalgtQ';
 const SARAH_WAYNE = membershipNameOf(WAYNE, SARAH);
 const SARAH_STARK = membershipNameOf(STARK, SARAH);
 // Phase Final Task 2: memberships on the message plane.
-async function allMemberships(db: MemoryDbAdapter) {
-    const organizations = await deriveOrganizations(db);
-    const rows: Array<{
-        id: string;
-        organization_id: string;
-        identity_id: string;
-        type: string;
-        at: string;
-    }> = [];
-    const accepted = {
-        kind: 'state' as const,
-        state: 'accepted' as const,
-    };
-    for (const organization of organizations) {
-        const heads = await organizationMembershipHeads(
-            db, organization.id, accepted,
-        );
-        for (const head of heads) {
-            const membership = membershipOfHead(head);
-            rows.push({
-                id: membership.id,
-                organization_id: membership.organization_id,
-                identity_id: membership.identity_id,
-                type: membership.type,
-                at: membership.at,
-            });
-        }
-    }
-    return rows;
-}
-
 const AT = '2026-01-01T00:00:00.000000Z';
 const EXPIRES_AT = '2099-12-31T00:00:00.000000Z';
 

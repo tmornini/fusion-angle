@@ -1,16 +1,13 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
 import { GET, GETCollection } from './in-page-facade.ts';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     claimToken,
     DEV_TOKEN,
     organizationToken,
 } from './token-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { freshDb, seedAdminSchema } from './test-fixtures.ts';
 import { firstProviderModel } from './member-fixtures.ts';
 import { getModelsByProvider } from '../api/provider-models.ts';
 import {
@@ -58,12 +55,6 @@ function req(
         token,
         body,
     });
-}
-
-async function freshDb() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
 }
 
 function emptyDelta() {

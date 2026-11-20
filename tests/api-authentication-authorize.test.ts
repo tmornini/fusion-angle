@@ -11,8 +11,6 @@ import {
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { GET } from './in-page-facade.ts';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
 import { canonicalPath } from '../api/message-pair.ts';
 import {
     setPasswordHasher,
@@ -35,14 +33,8 @@ import {
     scryptDerive,
 } from '../server/scrypt-hash.ts';
 import { testHashPassword } from './mock-seed.ts';
-import {
-    framedRequest,
-    presentedFields,
-    withoutCredentialFields,
-} from './http-fixtures.ts';
+import { jsonPost, presentedFields } from './http-fixtures.ts';
 import { operationIdHeader } from './operation-id-header.ts';
-
-const BASE = 'http://localhost';
 
 Deno.test.afterEach(() => {
     setPasswordHasher(testHashPassword);
@@ -52,28 +44,6 @@ Deno.test.afterEach(() => {
 Deno.test.beforeEach(() => {
     setPasswordHasher(testHashPassword);
 });
-
-function jsonPost(path: string, body: unknown): Request {
-    const record = body !== null
-        && typeof body === 'object'
-        && !Array.isArray(body)
-        ? body as Record<string, unknown>
-        : {};
-    const lifted = withoutCredentialFields(record);
-    const raw = JSON.stringify(lifted.body);
-    return framedRequest(`${BASE}/${path}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'content-length': String(
-                new TextEncoder().encode(raw).byteLength,
-            ),
-            'operation-id': generateIdentifier(),
-            ...lifted.headers,
-        },
-        body: raw,
-    });
-}
 
 const authorize = (b: unknown) =>
     jsonPost('authentication/authorize', b);

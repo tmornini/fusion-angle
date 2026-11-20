@@ -30,7 +30,7 @@ import {
     storedPutBodyText,
 } from './http-fixtures.ts';
 import { DEFAULT_ATTRIBUTE_ACL_ROLES } from '../shared/types.ts';
-import { seedSeat } from './root-admin-fixture.ts';
+import { seedSeatFromBody } from './root-admin-fixture.ts';
 
 // Nested composed POST .../record-types (Task 9): admin-only
 // create/edit of the type and its nested attribute documents,
@@ -63,20 +63,6 @@ function req(
     });
 }
 
-async function seedMembershipPair(
-    db: MemoryDbAdapter,
-    _id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    await seedSeat(
-        db,
-        String(body['organization_id'] ?? body.organization_id),
-        String(body['identity_id'] ?? body.identity_id),
-        (body['type'] ?? body.type) as 'admin' | 'member',
-        String(body['at'] ?? body.at),
-    );
-}
-
 async function adminDb(): Promise<{
     db: MemoryDbAdapter;
     adminToken: string;
@@ -84,7 +70,7 @@ async function adminDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedMembershipPair(db, generateIdentifier(), {
+    await seedSeatFromBody(db, {
         organization_id: ORGANIZATION,
         identity_id: 'nkgaOHZISTQrILTfPThWCA',
         type: 'member',

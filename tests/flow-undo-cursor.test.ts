@@ -30,7 +30,7 @@ import {
 import {
     organizationToken, DEV_TOKEN,
 } from './token-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { freshDb, seedAdminSchema } from './test-fixtures.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
     storedGraph,
@@ -129,12 +129,6 @@ function req(
         ...(headers !== undefined
             ? { headers } : {}),
     });
-}
-
-async function freshDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
 }
 
 function flowFields(name: string) {
