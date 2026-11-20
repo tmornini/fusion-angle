@@ -4,6 +4,8 @@ import {
 } from './derive-documents.ts';
 import { deriveFlows } from './derive-flows.ts';
 import { deriveFlowRecords } from './derive-flow-records.ts';
+import { instancesUriPrefix } from
+    './derive-record-instances.ts';
 
 // Destroying a record type must not orphan its covenants:
 // live instances under the type (Task 15) and live
@@ -13,21 +15,11 @@ import { deriveFlowRecords } from './derive-flow-records.ts';
 // die (409) until its referrers are gone. This module counts
 // the referrers inside the SAME transaction that would
 // delete, so no writer can slip a new reference between the
-// check and the tombstone. The instances leg is empty until
-// Task 15; the predicate is real from birth.
+// check and the tombstone.
 
 export interface RecordTypeReferrers {
     readonly instanceIds: readonly string[];
     readonly flowIds: readonly string[];
-}
-
-function instancesUriPrefix(
-    organization: string,
-    recordTypeId: string,
-): string {
-    return '/organizations/' + organization
-        + '/record-types/' + recordTypeId
-        + '/instances/';
 }
 
 // Referrers for one record type. `view` is the open

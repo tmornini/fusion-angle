@@ -30,6 +30,7 @@ export type AuthThrottle = {
         forwarded: string | undefined,
         xForwardedFor: string | undefined,
     ): boolean;
+    trackedClients(): number;
 };
 
 function normalizeAddress(address: string): string {
@@ -128,6 +129,22 @@ function clientAddress(
     return remote;
 }
 
+// An address whose hits have all left the window
+// loses its key. A long-lived serve must not keep
+// every address that has ever authenticated.
+function dropExpired(
+    hits: Map<string, number[]>,
+    start: number,
+): void {
+    for (const [key, stamps] of hits) {
+        let live = 0;
+        for (const hit of stamps) {
+            if (hit > start) live += 1;
+        }
+        if (live === 0) hits.delete(key);
+    }
+}
+
 export function createAuthThrottle(
     trustedProxyHops?: string,
     now: () => number = Date.now,
@@ -146,6 +163,7 @@ export function createAuthThrottle(
             const start = at - AUTH_THROTTLE_WINDOW_MS;
             const prior = hits.get(address) ?? [];
             const recent = prior.filter((hit) => hit > start);
+            dropExpired(hits, start);
             if (recent.length >= AUTH_THROTTLE_LIMIT) {
                 hits.set(address, recent);
                 return true;
@@ -153,6 +171,9 @@ export function createAuthThrottle(
             recent.push(at);
             hits.set(address, recent);
             return false;
+        },
+        trackedClients() {
+            return hits.size;
         },
     };
 }

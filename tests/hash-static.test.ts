@@ -5,7 +5,7 @@ import {
 } from '@std/assert';
 import { join } from '@std/path';
 import { isHashedAssetName } from
-    '../server/http-server.ts';
+    '../shared/hashed-asset.ts';
 
 const JS_SPEC =
     /(from|import\(|import)(['"])(\.\/[^'"]+)\2/g;
