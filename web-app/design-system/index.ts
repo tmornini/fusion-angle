@@ -1103,7 +1103,7 @@ export function buildDesignSystemPage(): SafeHtml {
                                 'text-sm font-medium '
                                 + 'text-error'
                                 }">Changes could not be saved</p>
-                            <p class="text-xs text-muted mt-0.5">${
+                            <p class="text-xs text-muted mt-1">${
                                 'Please check your connection '
                                 + 'and try again.'
                                 }</p>
@@ -1123,7 +1123,7 @@ export function buildDesignSystemPage(): SafeHtml {
                                 'text-sm font-medium '
                                 + 'text-warning'
                                 }">Connection interrupted</p>
-                            <p class="text-xs text-muted mt-0.5">${
+                            <p class="text-xs text-muted mt-1">${
                                 'Reconnecting automatically...'
                                 }</p>
                         </div>
@@ -1142,7 +1142,7 @@ export function buildDesignSystemPage(): SafeHtml {
                             'text-sm font-medium '
                             + 'text-error'
                             }">Something went wrong</p>
-                        <p class="text-xs text-muted mt-0.5">${
+                        <p class="text-xs text-muted mt-1">${
                             'An unexpected error occurred '
                             + 'while loading this section. '
                             + 'Our team has been notified.'
