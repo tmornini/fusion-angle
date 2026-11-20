@@ -22,6 +22,8 @@ import {
     framedRequest,
     invitationLatched,
 } from './http-fixtures.ts';
+import { putDefaultOrganization } from
+    './default-organization-fixtures.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
 import { responseRecordOf } from '../api/message-pair.ts';
@@ -59,26 +61,6 @@ async function seedMembership(
     await seedSeat(
         db, organization, identityId, 'member', AT,
     );
-}
-
-function putDefaultOrganization(
-    token: string,
-    identityId: string,
-    organization: string,
-) {
-    return framedRequest(
-        `${BASE}/identities/${identityId}`
-            + '/default-organization', {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + token,
-                'operation-id': generateIdentifier(),
-            },
-            body: JSON.stringify({
-                organization_id: organization,
-            }),
-        });
 }
 
 function getDefaultOrganization(token: string, identityId: string) {

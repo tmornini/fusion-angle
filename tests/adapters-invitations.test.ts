@@ -7,6 +7,7 @@ import {
     assertThrows,
 } from '@std/assert';
 import {
+    freshStorage,
     withLocalStorage,
     withLocalStorageAsync,
 } from './fixtures/local-storage.ts';
@@ -76,12 +77,8 @@ import {
 import { deleteBellSession } from '../client/channels.ts';
 import { deriveInvitations } from
     '../api/derive-invitations.ts';
-import { deriveOrganizations } from
-    '../api/derive-organizations.ts';
-import {
-    membershipOfHead,
-    organizationMembershipHeads,
-} from '../api/memberships.ts';
+import { acceptedMemberships } from
+    './membership-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -106,33 +103,11 @@ async function invitationOf(
     return row;
 }
 
-// A fresh Map-backed fake per test — session-token adapters
-// used throughout this file read/write it lazily.
 function accessAnswer<T>(token: string): HttpMessage<T> {
     return responseMessage({ token_type: 'Bearer' }, {
         'authentication-info':
             'access_token="' + token + '"',
     }) as HttpMessage<T>;
-}
-
-function freshStorage(): Partial<Storage> {
-    const store = new Map<string, string>();
-    return {
-        getItem: (k: string) => store.get(k) ?? null,
-        setItem: (k: string, v: string) => {
-            store.set(k, v);
-        },
-        removeItem: (k: string) => {
-            store.delete(k);
-        },
-        clear: () => {
-            store.clear();
-        },
-        key: () => null,
-        get length() {
-            return store.size;
-        },
-    };
 }
 
 // Below-facade pair formation (the member-fixtures.ts idiom,
@@ -240,38 +215,6 @@ async function seedPerson(
     await seedPersonIdentity(db, id, {
         name, email, phone: '', bio: '',
     });
-}
-
-// Phase Final Task 2: all membership documents (every org).
-async function deriveMembershipsAll(db: DbAdapter) {
-    const organizations = await deriveOrganizations(db);
-    const rows: Array<{
-        id: string;
-        organization_id: string;
-        identity_id: string;
-        type: string;
-        at: string;
-    }> = [];
-    const accepted = {
-        kind: 'state' as const,
-        state: 'accepted' as const,
-    };
-    for (const organization of organizations) {
-        const heads = await organizationMembershipHeads(
-            db, organization.id, accepted,
-        );
-        for (const head of heads) {
-            const membership = membershipOfHead(head);
-            rows.push({
-                id: membership.id,
-                organization_id: membership.organization_id,
-                identity_id: membership.identity_id,
-                type: membership.type,
-                at: membership.at,
-            });
-        }
-    }
-    return rows;
 }
 
 async function ctxFor(sub: string, organization: string) {
@@ -608,7 +551,7 @@ Deno.test('accept writes a membership in the invitation org',
             held.message.query('header.etag').toText(),
         ]],
     );
-    const memberships = (await deriveMembershipsAll(db))
+    const memberships = (await acceptedMemberships(db))
         .filter(m => m.identity_id === 'toccYYkLEABmlbpHJalgtQ');
     const organizations = memberships.map(m => m.organization_id).sort();
     assertEquals(organizations, ['AjdvjuECVZEgZoFajaIEkg'
@@ -664,7 +607,7 @@ Deno.test('decline records declined and writes no membership',
     const views = await getInvitations(dave);
     assertStrictEquals(
         views.find(v => v.id === inv.id)?.state, 'declined');
-    const memberships = (await deriveMembershipsAll(db))
+    const memberships = (await acceptedMemberships(db))
         .filter(m => m.identity_id === daveId);
     assertStrictEquals(memberships.length, 0);
 }));
@@ -738,7 +681,7 @@ Deno.test('accept after revoke is rejected, no membership',
         )) as RequestError;
     assertInstanceOf(err, RequestError);
     assertStrictEquals(err.status, HTTP_CONFLICT);
-    const wayne = (await deriveMembershipsAll(db))
+    const wayne = (await acceptedMemberships(db))
         .filter(m => m.identity_id === 'toccYYkLEABmlbpHJalgtQ'
             && m.organization_id === 'BBjWJsjYIDkTRKIIPrzWRw');
     assertStrictEquals(wayne.length, 0);
@@ -772,7 +715,7 @@ Deno.test('a stale accept refuses with the invitation'
         !== stale.message.query('header.etag').toText(),
         'the refusal carries the fresh head',
     );
-    const wayne = (await deriveMembershipsAll(db))
+    const wayne = (await acceptedMemberships(db))
         .filter(m => m.identity_id === SARAH
             && m.organization_id === WAYNE);
     assertStrictEquals(wayne.length, 0);
@@ -1042,7 +985,7 @@ Deno.test('accept: event author is server-derived, membership lands',
     assert(ev.at !== '');
     assertStrictEquals(ev.member_id, 'toccYYkLEABmlbpHJalgtQ');
     // Membership landed at a non-empty id.
-    const wayne = (await deriveMembershipsAll(db))
+    const wayne = (await acceptedMemberships(db))
         .filter(m => m.identity_id === 'toccYYkLEABmlbpHJalgtQ'
             && m.organization_id === 'BBjWJsjYIDkTRKIIPrzWRw');
     assertStrictEquals(wayne.length, 1);
@@ -1277,7 +1220,7 @@ Deno.test('a failed re-mint after accept surfaces, seat kept',
         assertInstanceOf(err, SessionRemintFailedError);
         assertStrictEquals(err.cause, refused);
         const organizations =
-            (await deriveMembershipsAll(db))
+            (await acceptedMemberships(db))
                 .filter(m =>
                     m.identity_id === 'toccYYkLEABmlbpHJalgtQ')
                 .map(m => m.organization_id)

@@ -33,6 +33,8 @@ import {
     assertPartsAreHeads,
     partsOf,
 } from './http-fixtures.ts';
+import { seedPublicAndSecretAttrs } from
+    './record-attribute-fixtures.ts';
 import {
     instanceReader,
     loadAttributeSchemaById,
@@ -154,30 +156,6 @@ async function putAttribute(
     assertStrictEquals(put.status, 201);
 }
 
-async function seedPublicAndSecretAttrs(
-    db: MemoryDbAdapter,
-    adminToken: string,
-): Promise<void> {
-    await putAttribute(db, adminToken, ATTR_PUBLIC, {
-        name: 'Title',
-        attribute_type: 'text',
-        sort_order: 0,
-        options: [],
-        constraints: [],
-        read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-        write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-    });
-    await putAttribute(db, adminToken, ATTR_SECRET, {
-        name: 'Secret',
-        attribute_type: 'text',
-        sort_order: 1,
-        options: [],
-        constraints: [],
-        read_roles: ['admin'],
-        write_roles: ['admin'],
-    });
-}
-
 async function putInstance(
     db: MemoryDbAdapter,
     token: string,
@@ -249,7 +227,11 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedPublicAndSecretAttrs(db, adminToken);
+    await seedPublicAndSecretAttrs(
+        db, adminToken,
+        ATTRS + ATTR_PUBLIC,
+        ATTRS + ATTR_SECRET,
+    );
     const put = await putInstance(
         db, adminToken, INSTANCE_A, [
             {
@@ -335,7 +317,11 @@ Deno.test('GET detail admin → 200 all values (bypass)',
 async () => {
     const { db, adminToken } = await adminDb();
     await putLiveType(db, adminToken);
-    await seedPublicAndSecretAttrs(db, adminToken);
+    await seedPublicAndSecretAttrs(
+        db, adminToken,
+        ATTRS + ATTR_PUBLIC,
+        ATTRS + ATTR_SECRET,
+    );
     const put = await putInstance(
         db, adminToken, INSTANCE_A, [
             {
@@ -367,7 +353,11 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedPublicAndSecretAttrs(db, adminToken);
+    await seedPublicAndSecretAttrs(
+        db, adminToken,
+        ATTRS + ATTR_PUBLIC,
+        ATTRS + ATTR_SECRET,
+    );
     const put = await putInstance(
         db, adminToken, INSTANCE_A, [
             {
@@ -692,7 +682,11 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedPublicAndSecretAttrs(db, adminToken);
+    await seedPublicAndSecretAttrs(
+        db, adminToken,
+        ATTRS + ATTR_PUBLIC,
+        ATTRS + ATTR_SECRET,
+    );
     // Genesis delta (set only) — incomplete vs later head.
     await appendInstanceMessagePair(
         db, ORGANIZATION, TYPE_ID, INSTANCE_A,

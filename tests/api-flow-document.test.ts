@@ -37,6 +37,7 @@ import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import {
     apiRequest, pairIdOf, storedPutBodyText,
 } from './http-fixtures.ts';
+import { headResponseId } from './flow-head-fixtures.ts';
 import { messageStore } from '../api/message-store.ts';
 
 // The flows-specific below-gate op + conditional-PUT e2e
@@ -146,27 +147,6 @@ async function createFlow(
             graphDelta: emptyDelta(),
         },
     ));
-}
-
-// Task 5: create's own operation message pair (204, no
-// body) is no longer the document's head — its synthesized
-// document message pair (appended after, so strictly later)
-// is. A save must echo THIS id, read fresh via GET, exactly
-// as the real client (buildFlowPutBody's ctx.GET)
-// does.
-async function headResponseId(
-    db: MemoryDbAdapter,
-    token: string,
-    flowId: string,
-): Promise<string> {
-    const got = await handleRequest(db, req(
-        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
-    ));
-    const id = pairIdOf(got);
-    assert(id
-        , 'no Response-ID on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-        + '' + flowId);
-    return id!;
 }
 
 async function headEtag(

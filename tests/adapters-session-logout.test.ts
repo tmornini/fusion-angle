@@ -4,6 +4,7 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import {
+    freshStorage,
     withLocalStorageAsync,
 } from './fixtures/local-storage.ts';
 import {
@@ -18,29 +19,6 @@ import { devToken, organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import { deriveTokenRevocationsFor } from
     '../api/derive-identity-spine.ts';
-
-// A fresh Map-backed fake per test — bodies below reach
-// localStorage only through the session adapter; clear()
-// is the fake's own reset, which no body calls.
-function freshStorage(): Partial<Storage> {
-    const store = new Map<string, string>();
-    return {
-        getItem: (k: string) => store.get(k) ?? null,
-        setItem: (k: string, v: string) => {
-            store.set(k, v);
-        },
-        removeItem: (k: string) => {
-            store.delete(k);
-        },
-        clear: () => {
-            store.clear();
-        },
-        key: () => null,
-        get length() {
-            return store.size;
-        },
-    };
-}
 
 Deno.test('logout revokes this identity and clears credentials',
 () => withLocalStorageAsync(freshStorage(), async () => {

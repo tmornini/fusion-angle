@@ -5,6 +5,7 @@ import {
     assertThrows,
 } from '@std/assert';
 import {
+    freshStorage,
     withLocalStorage,
     withLocalStorageAsync,
 } from './fixtures/local-storage.ts';
@@ -13,27 +14,6 @@ import {
     putPreference,
 } from '../web-app/app/adapters/preferences.ts';
 import { captureConsole } from './fixtures/console-capture.ts';
-
-// A fresh Map-backed fake per test.
-function freshStorage(): Partial<Storage> {
-    const store = new Map<string, string>();
-    return {
-        getItem: (k: string) => store.get(k) ?? null,
-        setItem: (k: string, v: string) => {
-            store.set(k, v);
-        },
-        removeItem: (k: string) => {
-            store.delete(k);
-        },
-        clear: () => {
-            store.clear();
-        },
-        key: () => null,
-        get length() {
-            return store.size;
-        },
-    };
-}
 
 Deno.test(
     'getPreference returns null for an unset key',
