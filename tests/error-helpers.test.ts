@@ -9,8 +9,10 @@ import {
     reportFault,
     initErrorSurfacing,
 } from '../web-app/app/error-helpers.ts';
-import { putLocation } from
-    '../web-app/app/adapters/location.ts';
+import {
+    putLocation,
+    reloadLocation,
+} from '../web-app/app/adapters/location.ts';
 import type { RequestContext } from
     '../client/request-context.ts';
 import { captureConsole } from
@@ -148,7 +150,10 @@ function installFaultDom(): {
     g.setTimeout = () => 0;
     const listeners = new Map<string, WindowListener[]>();
     g.window = {
-        location: { href: '' },
+        location: {
+            href: '',
+            reload() {},
+        },
         addEventListener(
             type: string,
             fn: WindowListener,
@@ -291,6 +296,27 @@ Deno.test(
         try {
             initErrorSurfacing();
             putLocation('/workbox/index.html');
+            reportFault(
+                faultCtx,
+                'Work order detail refresh failed',
+                new TypeError('Load failed'),
+            );
+            assertStrictEquals(messages.length, 0);
+        } finally {
+            dispatch('pageshow');
+            restore();
+        }
+    },
+);
+
+Deno.test(
+    'reportFault skips Load failed after reloadLocation',
+    () => {
+        const { messages, dispatch, restore } =
+            installFaultDom();
+        try {
+            initErrorSurfacing();
+            reloadLocation();
             reportFault(
                 faultCtx,
                 'Work order detail refresh failed',
