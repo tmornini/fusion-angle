@@ -6,6 +6,7 @@
 
 import { dirname, join } from '@std/path';
 
+import { exists } from './deno-file.ts';
 import {
     buildPayload,
     parseBudgetsJson,
@@ -13,18 +14,6 @@ import {
     VIZ_PAYLOAD_VERSION,
     type VizPayload,
 } from './measure-viz-core.ts';
-
-function exists(path: string): boolean {
-    try {
-        Deno.statSync(path);
-        return true;
-    } catch (error) {
-        if (error instanceof Deno.errors.NotFound) {
-            return false;
-        }
-        throw error;
-    }
-}
 
 export const HISTORY_PATH =
     'measurements/history.jsonl';
