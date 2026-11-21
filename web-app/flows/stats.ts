@@ -152,11 +152,9 @@ async function load(host: HTMLElement): Promise<void> {
             // and its canvas measures — before the flow
             // is arranged for that canvas, as the
             // designer's shell does.
-            new FlowStatsPresenter(
-                model,
-                arrangeFlow(graph, { kind: 'unmeasured' }),
-                graph.isAutoFit,
-            ).renderShell(host);
+            FlowStatsPresenter.renderShell(
+                host, model, graph.isAutoFit,
+            );
 
             // Presenter is deliberately name-agnostic;
             // page module writes the graph's own values

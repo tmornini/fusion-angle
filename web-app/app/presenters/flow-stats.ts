@@ -52,17 +52,36 @@ export interface FlowStatsUi {
 
 export class FlowStatsPresenter {
     readonly #model: FlowStatsModel;
-    readonly #arrangement: FlowArrangement;
+    // Null only for the shell, which draws no flow.
+    // The presenter that draws holds the arrangement
+    // the page measured the canvas for.
+    readonly #arrangement: FlowArrangement | null;
     readonly #isAutoFit: boolean;
 
     constructor(
         model: FlowStatsModel,
-        arrangement: FlowArrangement,
+        arrangement: FlowArrangement | null,
         isAutoFit: boolean,
     ) {
         this.#model = model;
         this.#arrangement = arrangement;
         this.#isAutoFit = isAutoFit;
+    }
+
+    // The shell draws no flow, so it takes the model and
+    // Auto Fit and no arrangement. The title is left
+    // empty; the page writes the flow's name.
+    static renderShell(
+        container: HTMLElement,
+        model: FlowStatsModel,
+        isAutoFit: boolean,
+    ): void {
+        setHtml(
+            container,
+            new FlowStatsPresenter(
+                model, null, isAutoFit,
+            ).buildShell(),
+        );
     }
 
     buildShell(): SafeHtml {
@@ -254,21 +273,6 @@ export class FlowStatsPresenter {
         }"${describedBy}>${steps}${detailSpan}</div>${legend}</div>`;
     }
 
-    renderShell(container: HTMLElement): void {
-        setHtml(container, this.buildShell());
-        // The aggregate is deliberately
-        // flow-name-agnostic; the page module
-        // sets it from the FlowGraph it
-        // already holds (Task 18).
-        const nameEl = $(
-            '.flow-stats-flow-name', container,
-        );
-        if (nameEl) {
-            nameEl.textContent =
-                this.#flowName();
-        }
-    }
-
     renderUpdate(
         container: HTMLElement,
         ui: FlowStatsUi,
@@ -280,12 +284,18 @@ export class FlowStatsPresenter {
         const canvasHost = $(
             '.flow-stats-canvas-host', container,
         );
+        const arrangement = this.#arrangement;
+        if (arrangement === null) {
+            throw new Error(
+                'the stats shell holds no arrangement',
+            );
+        }
         if (canvasHost) {
             setHtml(
                 canvasHost,
                 buildStatsGraphSvg(
                     this.#model,
-                    this.#arrangement,
+                    arrangement,
                     ui.camera.viewBox,
                     highlight,
                 ),
@@ -481,8 +491,4 @@ export class FlowStatsPresenter {
         }
         return null;
     }
-
-    // Stub — the page module fills the name from
-    // the FlowGraph it already holds (Task 18).
-    #flowName(): string { return ''; }
 }
