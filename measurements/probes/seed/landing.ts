@@ -15,6 +15,8 @@ import { POSTGRES_SCHEMA } from '../../../api/schema-postgres.ts';
 import { statementText } from
     '../../../api/ledger-statement-sql.ts';
 import { rootBind } from '../../../api/ledger-root.ts';
+import { SEED_ROWS_PER_STATEMENT } from
+    '../../../api/ledger-seed.ts';
 import { STATEMENT_TIMEOUT_MS } from
     '../../../server/postgres-gate.ts';
 import {
@@ -32,11 +34,7 @@ if (url === undefined) {
 }
 const fail = Deno.args[0] === 'fail';
 const full = Deno.args[0] === 'full';
-const MAX_PARAMETERS = 65535;
-const LEADING_PARAMETERS = 1;
-const PARAMETERS_PER_ROW = 14;
-const ROWS_PER_STATEMENT = Math.floor(
-    (MAX_PARAMETERS - LEADING_PARAMETERS) / 2 / PARAMETERS_PER_ROW);
+const ROWS_PER_STATEMENT = SEED_ROWS_PER_STATEMENT;
 
 type Recorded = { rows: StatementBind[]; supersedes: string[] };
 const recorded: Recorded[] = [];
@@ -109,8 +107,9 @@ function parameters(rows: readonly StatementBind[]): unknown[] {
             uuidTextOfIdentifier(row.id),
             uuidTextOfIdentifier(row.operationId),
             row.path, row.name, row.requesterIdentityId, row.method,
-            row.request, row.requestSalt, row.secret,
+            row.request, row.requestSalt, row.requestSecrets,
             row.responsePrefix, row.responseSuffix, row.responseSalt,
+            row.responseSecrets,
             row.ifMatch === null ? null : uuidTextOfIdentifier(row.ifMatch),
             row.notify,
         );
