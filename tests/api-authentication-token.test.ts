@@ -44,7 +44,7 @@ import { membershipOf } from '../api/memberships.ts';
 import { landMembership } from
     './membership-fixtures.ts';
 import {
-    deriveIdentityTokensFor,
+    tokenHeadsFor,
 } from '../api/derive-identity-tokens.ts';
 import { sha256Bytes } from '../shared/digest.ts';
 import {
@@ -73,6 +73,14 @@ async function freshDb() {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     return db;
+}
+
+async function tokenEntities(
+    db: MemoryDbAdapter,
+    identityId: string,
+) {
+    return (await tokenHeadsFor(db, identityId))
+        .map((head) => head.entity);
 }
 
 // Below-facade pair formation (the member-fixtures.ts idiom):
@@ -377,7 +385,7 @@ Deno.test('replaying a consumed code is a 401 no-op', async () => {
         client_id: 'web',
     }));
     assertStrictEquals(first.status, 200);
-    const before = (await deriveIdentityTokensFor(
+    const before = (await tokenEntities(
         db, 'XXZruirZyAOoRpNxaDnpSA',
     )).length;
     const replay = await handleRequest(db, tokenRequest({
@@ -387,7 +395,7 @@ Deno.test('replaying a consumed code is a 401 no-op', async () => {
     assertStrictEquals(replay.status, 401);
     // no new token chain minted on the replay
     assertStrictEquals(
-        (await deriveIdentityTokensFor(
+        (await tokenEntities(
             db, 'XXZruirZyAOoRpNxaDnpSA',
         )).length, before);
 });
@@ -416,7 +424,7 @@ Deno.test(
             [a.status, b.status].sort(), [200, 401],
         );
         assertStrictEquals(
-            (await deriveIdentityTokensFor(
+            (await tokenEntities(
                 db, 'XXZruirZyAOoRpNxaDnpSA',
             )).length, 1,
             'exactly one token chain minted',
@@ -512,7 +520,7 @@ Deno.test(
             derivedId,
         );
         assertStrictEquals(spentHead?.method, 'DELETE');
-        const issued = (await deriveIdentityTokensFor(
+        const issued = (await tokenEntities(
             db, identityId,
         )).filter(r => r.action === 'issued');
         assertEquals(
@@ -865,7 +873,7 @@ Deno.test(
         await seedRootAdmin(db);
         const pair1 = await initialPair(db);
         const before =
-            (await deriveIdentityTokensFor(
+            (await tokenEntities(
                 db, 'XXZruirZyAOoRpNxaDnpSA',
             )).length;
         const res = await handleRequest(db, tokenRequest({
@@ -877,7 +885,7 @@ Deno.test(
         const body = await presentedFields(res) as { error: string };
         assertMatch(body.error, /not a member/);
         assertStrictEquals(
-            (await deriveIdentityTokensFor(
+            (await tokenEntities(
                 db, 'XXZruirZyAOoRpNxaDnpSA',
             )).length, before);
         const stillLive = await handleRequest(
@@ -970,7 +978,7 @@ async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
     const before =
-        (await deriveIdentityTokensFor(
+        (await tokenEntities(
             db, 'XXZruirZyAOoRpNxaDnpSA',
         )).length;
     const res = await handleRequest(db, tokenRequest({
@@ -986,7 +994,7 @@ async () => {
     );
     // grant-first: a denied exchange mints nothing
     assertStrictEquals(
-        (await deriveIdentityTokensFor(
+        (await tokenEntities(
             db, 'XXZruirZyAOoRpNxaDnpSA',
         )).length, before);
 });
@@ -1038,7 +1046,7 @@ async () => {
         at: '2026-06-04T00:00:00.000000Z',
     });
     const before =
-        (await deriveIdentityTokensFor(
+        (await tokenEntities(
             db, 'XXZruirZyAOoRpNxaDnpSA',
         )).length;
     const res = await handleRequest(db, tokenRequest({
@@ -1050,7 +1058,7 @@ async () => {
     assertStrictEquals(res.status, 403);
     // grant-first: a denied exchange mints nothing
     assertStrictEquals(
-        (await deriveIdentityTokensFor(
+        (await tokenEntities(
             db, 'XXZruirZyAOoRpNxaDnpSA',
         )).length, before);
 });

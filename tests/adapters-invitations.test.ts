@@ -74,8 +74,8 @@ import {
     subscribeHumanMemberChanges,
 } from '../client/members.ts';
 import { deleteBellSession } from '../client/channels.ts';
-import { deriveInvitations } from
-    '../api/derive-invitations.ts';
+import { getOrganizationInvitations } from
+    '../api/invitations-domain.ts';
 import { deriveOrganizations } from
     '../api/derive-organizations.ts';
 import {
@@ -92,15 +92,27 @@ const PAST_EXPIRES = '2026-01-02T00:00:00.000000Z';
 const WAYNE = 'BBjWJsjYIDkTRKIIPrzWRw';
 const SARAH = 'toccYYkLEABmlbpHJalgtQ';
 
+async function organizationMemberships(
+    db: DbAdapter,
+    organizationId: string,
+) {
+    const listed = await getOrganizationInvitations(
+        db, [organizationId], organizationId,
+        undefined, ['admin'],
+    );
+    assert(listed.kind === 'collection');
+    return listed.heads.map(membershipOfHead);
+}
+
 async function invitationOf(
     db: DbAdapter,
     organizationId: string,
     identityId: string,
 ) {
-    const row = (await deriveInvitations(db)).find(
-        (item) =>
-            item.organization_id === organizationId
-            && item.identity_id === identityId,
+    const row = (await organizationMemberships(
+        db, organizationId,
+    )).find(
+        (item) => item.identity_id === identityId,
     );
     assert(row !== undefined);
     return row;
@@ -485,8 +497,8 @@ Deno.test('grant by email appends a pending invitation',
     assertStrictEquals(
         await postInvitation(ctx, 'sarah@x.com'), 'sent');
     // Phase Final Task 2: invitations ROW half stripped.
-    const rows = await deriveInvitations(db);
-    assertStrictEquals(rows.length, 4);
+    const rows = await organizationMemberships(db, WAYNE);
+    assertStrictEquals(rows.length, 2);
     const grant = await invitationOf(db, WAYNE, SARAH);
     assertStrictEquals(grant.organization_id, WAYNE);
     assertStrictEquals(grant.identity_id, SARAH);
@@ -832,7 +844,9 @@ Deno.test('granting the same email twice is idempotent',
         , 'BBjWJsjYIDkTRKIIPrzWRw');
     await postInvitation(tony, 'sarah@x.com');
     await postInvitation(tony, 'sarah@x.com');
-    assertStrictEquals((await deriveInvitations(db)).length, 4);
+    assertStrictEquals(
+        (await organizationMemberships(db, WAYNE)).length, 2,
+    );
 }));
 
 // A declined membership is the same document. A later grant
@@ -856,8 +870,9 @@ Deno.test('re-inviting a declined invitee lands pending on the'
     assertStrictEquals(
         await postInvitation(tony, 'sarah@x.com'), 'sent');
 
-    const invs = await deriveInvitations(db);
-    assertStrictEquals(invs.length, 4);
+    assertStrictEquals(
+        (await organizationMemberships(db, WAYNE)).length, 2,
+    );
     const pending = await invitationOf(db, WAYNE, SARAH);
     assertStrictEquals(pending.id, first.id);
     assertStrictEquals(pending.state, 'pending');
@@ -1007,8 +1022,9 @@ Deno.test('grant: entity lands and event author is server-derived',
     const tony = await ctxOn(db, 'XXZruirZyAOoRpNxaDnpSA'
         , 'BBjWJsjYIDkTRKIIPrzWRw');
     await postInvitation(tony, 'sarah@x.com');
-    const invs = await deriveInvitations(db);
-    assertStrictEquals(invs.length, 4);
+    assertStrictEquals(
+        (await organizationMemberships(db, WAYNE)).length, 2,
+    );
     const grant = await invitationOf(db, WAYNE, SARAH);
     // Entity landed with a non-empty id.
     assert(grant.id !== '');

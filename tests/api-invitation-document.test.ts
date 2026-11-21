@@ -12,19 +12,21 @@ import { organizationToken } from './token-fixtures.ts';
 import { documentMessagePairsAt } from '../api/derive-documents.ts';
 import { withoutId } from '../api/document-family.ts';
 import { requestHashOfStored } from './ledger-row.ts';
-import { deriveInvitations } from '../api/derive-invitations.ts';
+import { getOrganizationInvitations } from
+    '../api/invitations-domain.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
 import {
     apiRequest,
     storedPutBodyText,
     invitationLatched,
 } from './http-fixtures.ts';
-import { membershipOf } from '../api/memberships.ts';
-import { seedSeat } from './root-admin-fixture.ts';
 import {
-    generateIdentifier,
-    compareIdentifiers,
-} from '../shared/identifier.ts';
+    membershipOf,
+    membershipOfHead,
+} from '../api/memberships.ts';
+import { seedSeat } from './root-admin-fixture.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
 
@@ -116,6 +118,16 @@ async function freshDb(): Promise<MemoryDbAdapter> {
     await person(db, 'XXZruirZyAOoRpNxaDnpSA', 'Tony', 'demo@example.com');
     await person(db, 'toccYYkLEABmlbpHJalgtQ', 'Sarah', 'sarah@x.com');
     return db;
+}
+
+async function listedInvitations(db: MemoryDbAdapter) {
+    const listed = await getOrganizationInvitations(
+        db, [STARK], STARK, undefined, ['admin'],
+    );
+    assert(listed.kind === 'collection');
+    return listed.heads.map(membershipOfHead).sort(
+        (a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+    );
 }
 
 async function invite(
@@ -387,7 +399,7 @@ async () => {
     );
 });
 
-// ── deriveInvitations: the message-plane reduction ──
+// ── organization invitation heads ──
 
 async function declineFor(
     db: MemoryDbAdapter,
@@ -416,9 +428,9 @@ async function revokeFor(
     )));
 }
 
-Deno.test('deriveInvitations round-trips every terminal state:'
-+ ' grant→pending, accept→accepted, decline→declined,'
-+ ' revoke→revoked', async () => {
+Deno.test('organization invitation heads round-trip every'
++ ' terminal state: grant→pending, accept→accepted,'
++ ' decline→declined, revoke→revoked', async () => {
     const db = await freshDb();
     await person(db, BRUCE, 'Bruce', 'bruce@x.com');
     await person(db, CLARK, 'Clark', 'clark@x.com');
@@ -450,7 +462,7 @@ Deno.test('deriveInvitations round-trips every terminal state:'
         '2026-01-01T00:00:01.000000Z',
     );
 
-    const derived = await deriveInvitations(db);
+    const derived = await listedInvitations(db);
     const byId = new Map(derived.map(row => [row.id, row]));
     assertStrictEquals(
         byId.get(SARAH_NAME)?.state, 'pending');
@@ -460,22 +472,16 @@ Deno.test('deriveInvitations round-trips every terminal state:'
         byId.get(CLARK_NAME)?.state, 'declined');
     assertStrictEquals(
         byId.get(DIANA_NAME)?.state, 'revoked');
-    // Identifier order (byIdAscending — the derivation's
-    // own order, never the backend's).
-    const ids = derived.map(row => row.id);
-    assertEquals(
-        ids,
-        [...ids].sort(compareIdentifiers),
-    );
 });
 
-Deno.test('a no-op replay changes nothing deriveInvitations reads',
+Deno.test('a no-op replay changes nothing the organization'
++ ' invitation list reads',
 async () => {
     const db = await freshDb();
     await invite(db);
-    const before = await deriveInvitations(db);
+    const before = await listedInvitations(db);
     await invite(db);
-    const after = await deriveInvitations(db);
+    const after = await listedInvitations(db);
     assertEquals(after, before);
 });
 

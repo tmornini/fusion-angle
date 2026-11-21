@@ -33,7 +33,6 @@ import {
     withoutCredentialFields,
 } from './http-fixtures.ts';
 import {
-    deriveIdentityToken,
     identityTokenEntityOf,
     tokenHeadFor,
 } from '../api/derive-identity-tokens.ts';
@@ -173,9 +172,11 @@ async () => {
     }, DEV_TOKEN,
         operationIdHeader());
 
-    const derived = await deriveIdentityToken(
+    const head = await tokenHeadFor(
         db, 'XXZruirZyAOoRpNxaDnpSA', JTI_ORDER,
     );
+    assert(head !== null);
+    const derived = head.entity;
     const expectedOrder = [
         'id', 'jti', 'identity_id', 'action', 'chain_id', 'at',
     ];
@@ -209,9 +210,11 @@ async () => {
     });
     assertStrictEquals(Object.keys(expected).at(0), 'id');
     assertEquals(stored, expected);
-    const derived = await deriveIdentityToken(
+    const head = await tokenHeadFor(
         db, 'XXZruirZyAOoRpNxaDnpSA', JTI_G4,
     );
+    assert(head !== null);
+    const derived = head.entity;
     assertEquals(stored, derived);
     const wire = await put.json();
     assertEquals(stored, wire);

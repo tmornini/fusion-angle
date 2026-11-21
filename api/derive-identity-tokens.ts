@@ -1,5 +1,4 @@
 import type { DbAdapter } from './db.ts';
-import { EntityNotFoundError } from './db.ts';
 import type {
     Id,
     IdentityTokenEntity,
@@ -9,9 +8,7 @@ import { validateIdentityTokenEntity } from './validators.ts';
 import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
-    deriveDocumentsAt,
     headDocumentOf,
-    byIdAscending,
     type DerivedDocument,
 } from './derive-documents.ts';
 
@@ -57,41 +54,6 @@ function nestedTokenEntityOf(
             identity_id: identityId,
         },
     });
-}
-
-// One identity's collection: the head of every document
-// there, id-lex.
-export async function deriveIdentityTokensFor(
-    db: DbAdapter,
-    identityId: Id,
-): Promise<IdentityTokenEntity[]> {
-    const prefix = tokensPrefixFor(identityId);
-    const documents = deriveDocumentsAt(
-        await db.messagePairs.getCollectionPairs(prefix),
-        prefix,
-    );
-    const rows: IdentityTokenEntity[] = [];
-    for (const document of documents.values()) {
-        rows.push(nestedTokenEntityOf(identityId, document));
-    }
-    return rows.sort(byIdAscending);
-}
-
-// One document: the jti's latest event.
-export async function deriveIdentityToken(
-    db: DbAdapter,
-    identityId: Id,
-    jti: Id,
-): Promise<IdentityTokenEntity> {
-    const prefix = tokensPrefixFor(identityId);
-    const document = deriveDocumentsAt(
-        await db.messagePairs.getDocumentHistory(prefix, jti),
-        prefix,
-    ).get(jti);
-    if (document === undefined) {
-        throw new EntityNotFoundError(IDENTITY_TOKENS_TABLE, jti);
-    }
-    return nestedTokenEntityOf(identityId, document);
 }
 
 // A token's head: its whole state, and the pair a later

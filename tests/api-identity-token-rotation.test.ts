@@ -24,8 +24,8 @@ import {
     latestActionForJti,
 } from '../shared/identity-tokens.ts';
 import {
-    deriveIdentityTokensFor,
     tokenHeadFor,
+    tokenHeadsFor,
 } from '../api/derive-identity-tokens.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -43,6 +43,14 @@ import { operationIdHeader } from
 
 const ROOT_JTI = generateIdentifier();
 const ROOT_CHAIN = generateIdentifier();
+
+async function tokenEntities(
+    db: MemoryDbAdapter,
+    identityId: string,
+) {
+    return (await tokenHeadsFor(db, identityId))
+        .map((head) => head.entity);
+}
 
 async function seededDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
@@ -79,7 +87,7 @@ Deno.test(
         const { jti: next } = await rotate(db, ROOT_JTI);
         assertNotStrictEquals(next, ROOT_JTI);
         // root head 'rotated' + successor head 'issued' = 2
-        const rows = await deriveIdentityTokensFor(
+        const rows = await tokenEntities(
             db, 'XXZruirZyAOoRpNxaDnpSA',
         );
         assertStrictEquals(rows.length, 2);
@@ -101,7 +109,7 @@ Deno.test(
         ) as RequestError;
         assertInstanceOf(err, RequestError);
         assertStrictEquals(err.status, 409);
-        const rows = await deriveIdentityTokensFor(
+        const rows = await tokenEntities(
             db, 'XXZruirZyAOoRpNxaDnpSA',
         );
         assertStrictEquals(
@@ -120,7 +128,7 @@ Deno.test(
         ) as RequestError;
         assertInstanceOf(err, RequestError);
         assertStrictEquals(err.status, 409);
-        const rows = await deriveIdentityTokensFor(
+        const rows = await tokenEntities(
             db, 'XXZruirZyAOoRpNxaDnpSA',
         );
         assertStrictEquals(rows.length, 1);
@@ -137,7 +145,7 @@ Deno.test(
             {},
             DEV_TOKEN,
             operationIdHeader());
-        const rows = await deriveIdentityTokensFor(
+        const rows = await tokenEntities(
             db, 'XXZruirZyAOoRpNxaDnpSA',
         );
         assertStrictEquals(
@@ -161,7 +169,7 @@ Deno.test(
         ) as RequestError;
         assertInstanceOf(err, RequestError);
         assertStrictEquals(err.status, 404);
-        const rows = await deriveIdentityTokensFor(
+        const rows = await tokenEntities(
             db, 'XXZruirZyAOoRpNxaDnpSA',
         );
         assertStrictEquals(rows.length, 1);
@@ -201,7 +209,7 @@ Deno.test(
         assertStrictEquals(
             err.message, outside('POST', path) + ' ()',
         );
-        const rows = await deriveIdentityTokensFor(
+        const rows = await tokenEntities(
             db, 'XXZruirZyAOoRpNxaDnpSA',
         );
         assertStrictEquals(rows.length, 1);
@@ -231,7 +239,7 @@ Deno.test(
         assertStrictEquals(
             err.message, outside('POST', path) + ' ()',
         );
-        const rows = await deriveIdentityTokensFor(
+        const rows = await tokenEntities(
             db, 'XXZruirZyAOoRpNxaDnpSA',
         );
         assertStrictEquals(rows.length, 1);
@@ -298,7 +306,7 @@ Deno.test('a refused rotation is not a rotation', async () => {
     const head = await tokenHeadFor(db, IDENTITY, ROOT_JTI);
     assert(head !== null);
     assertStrictEquals(head.entity.action, 'issued');
-    const rows = await deriveIdentityTokensFor(db, IDENTITY);
+    const rows = await tokenEntities(db, IDENTITY);
     assertStrictEquals(rows.length, 1);
 });
 
