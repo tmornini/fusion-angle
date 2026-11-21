@@ -11,7 +11,7 @@ import {
 import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
-    apiRequest,
+    req,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -44,20 +44,6 @@ async function getCollection(
 // head there).
 
 const STARK_ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();

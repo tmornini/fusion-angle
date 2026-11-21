@@ -11,22 +11,11 @@ import {
 } from './member-fixtures.ts';
 import {
     apiRequest,
+    req,
 } from './http-fixtures.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
 
-
-function req(
-    method: string, path: string, token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 function agentFields(name: string) {
     return {

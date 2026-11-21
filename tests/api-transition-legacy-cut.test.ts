@@ -27,7 +27,7 @@ import { STARK_ORGANIZATION } from
 import { getWorkOrderEvents } from
     './fixtures/work-order-events.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
 } from './http-fixtures.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
@@ -74,22 +74,6 @@ const NAMED_EXCEPTIONS: ReadonlySet<string> = new Set([
     'client/work-orders-queries.ts',
     'web-app/app/presenters/workbox-detail.ts',
 ]);
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    headers?: Readonly<Record<string, string>>,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(headers !== undefined ? { headers } : {}),
-    });
-}
 
 // An operation on a work order names the head it read.
 async function workOrderTag(

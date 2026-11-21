@@ -31,6 +31,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    reqWithOperationId as req,
     assertPartsAreHeads,
     membershipJoinReader,
     pairIdOf,
@@ -75,22 +76,6 @@ const HUMAN_DRIFT_METHOD_FILTER_1 = generateIdentifier();
 // is not a member lifecycle value — so old-plane and
 // derived-plane parity holds
 // throughout every case below.
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    operationId?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(operationId !== undefined ? { operationId } : {}),
-    });
-}
 
 function sortById<T extends { id: string }>(
     rows: readonly T[],

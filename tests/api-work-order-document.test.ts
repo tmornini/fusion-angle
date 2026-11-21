@@ -38,6 +38,7 @@ import {
 } from '../api/message-pair.ts';
 import {
     apiRequest,
+    req,
     pairIdOf,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
@@ -297,20 +298,6 @@ Deno.test('a same-body PUT resend under the head\'s tag to'
 // (PUT-shaped, at the
 // organizations/:id/flows/:id/work-orders/:woid document).
 // ----------------------
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 // The workOrder facet reuses documentFields() — the SAME
 // {flow_graph, position} shape section 1 above already

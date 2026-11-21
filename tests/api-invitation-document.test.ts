@@ -16,6 +16,7 @@ import { deriveInvitations } from '../api/derive-invitations.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
 import {
     apiRequest,
+    req,
     storedPutBodyText,
     invitationLatched,
 } from './http-fixtures.ts';
@@ -48,20 +49,6 @@ const DIANA = generateIdentifier();
 const BRUCE_NAME = membershipNameOf(STARK, BRUCE);
 const CLARK_NAME = membershipNameOf(STARK, CLARK);
 const DIANA_NAME = membershipNameOf(STARK, DIANA);
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 // Phase 15 gate 6: grantInvitation resolves email via
 // deriveIdentityPiiRows, which lists the identities collection

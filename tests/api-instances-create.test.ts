@@ -36,7 +36,7 @@ import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from '../shared/types.ts';
 import {
-    apiRequest,
+    reqWithExtraHeadersAndOperationId as req,
     pairIdOf,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
@@ -63,25 +63,6 @@ const TYPE_DETAIL =
 const ATTRS = TYPE_DETAIL + '/attributes/';
 const INSTANCES = TYPE_DETAIL + '/instances/';
 const INSTANCE_DETAIL = INSTANCES + INSTANCE_ID;
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    extraHeaders?: Record<string, string>,
-    operationId?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(extraHeaders !== undefined
-            ? { headers: extraHeaders } : {}),
-        ...(operationId !== undefined ? { operationId } : {}),
-    });
-}
 
 async function seedMembershipMessagePair(
     db: MemoryDbAdapter,

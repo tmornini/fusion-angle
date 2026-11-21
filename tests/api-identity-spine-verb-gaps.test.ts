@@ -12,7 +12,7 @@ import { organizationToken, devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import {
-    apiRequest,
+    req,
     partBodiesOf,
 } from './http-fixtures.ts';
 import { seedIdentityProvider } from './identity-fixtures.ts';
@@ -94,20 +94,6 @@ import { generateIdentifier } from
 // time enumeration, verified by a temporary observed-value probe
 // before every assertion below was pinned, per Step 0/Step 1 of
 // the task brief).
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();

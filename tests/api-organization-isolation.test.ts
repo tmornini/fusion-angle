@@ -39,6 +39,7 @@ import {
 } from '../api/derive-organizations.ts';
 import {
     apiRequest,
+    req,
     framedRequest,
     partBodiesOf,
     partsOf,
@@ -53,20 +54,6 @@ import { createArchiveGraph } from
     './fixtures/create-archive-graph.ts';
 
 const BASE = 'http://localhost';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 // `current` holds admin in org A (the administered org) and
 // in org 'AjdvjuECVZEgZoFajaIEkg' (seedRootAdmin), and is a member of both.

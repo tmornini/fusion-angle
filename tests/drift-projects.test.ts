@@ -28,6 +28,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    req,
     assertPartsAreHeads,
     partBodiesOf,
     partsOf,
@@ -88,20 +89,6 @@ const EV_DRIFT_CONVERSION_IDEA = generateIdentifier();
 // and non-lexical live fixtures (byIdAscending must diverge
 // from insertion order; never function-vs-function only).
 const EV_DRIFT_CONVERSION_PROJECT = generateIdentifier();
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 function projectDocument(title: string, state: string, position = 1) {
     return {

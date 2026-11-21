@@ -27,7 +27,7 @@ import {
 } from '../api/authentication.ts';
 import type { DbAdapter } from '../api/db.ts';
 import {
-    apiRequest,
+    req,
     pairIdOf,
     framedRequest,
     withoutCredentialFields,
@@ -65,20 +65,6 @@ const CURRENT_ID = 'XXZruirZyAOoRpNxaDnpSA';
 function tokenOpPath(op: string, trail = ''): string {
     return '/identities/' + CURRENT_ID
         + '/tokens/' + ROOT_JTI + '/' + op + trail;
-}
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
 }
 
 async function freshDb(): Promise<MemoryDbAdapter> {

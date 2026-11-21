@@ -37,6 +37,7 @@ import {
 } from '../api/message-pair.ts';
 import {
     apiRequest,
+    req,
     messageOfResponse,
     pairIdOf,
     partsOf,
@@ -206,20 +207,6 @@ Deno.test('registered families offer versions/ and :etag',
 
 const AT = '2026-01-01T00:00:00.000000Z';
 const EXPIRES_AT = '2099-12-31T00:00:00.000000Z';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 async function seedInviteeWorld(): Promise<DbAdapter> {
     const db = memoryDbAdapter();

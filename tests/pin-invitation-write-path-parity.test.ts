@@ -6,7 +6,7 @@ import { ORGANIZATION_TWO } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
-    apiRequest,
+    reqWithOperationId as req,
     invitationLatched,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
@@ -33,22 +33,6 @@ import { membershipNameOf } from
 // its statement (api/invitations-domain.ts); the parity test
 // below proves the message-plane derive agrees pre-tx and
 // in-tx, both before a membership exists and after one lands.
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    operationId?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(operationId !== undefined ? { operationId } : {}),
-    });
-}
 
 async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();

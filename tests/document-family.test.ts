@@ -60,7 +60,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { ApiError, HTTP_PRECONDITION_FAILED } from
     '../shared/http-errors.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
     pairIdOf,
     storedPutBodyText,
 } from './http-fixtures.ts';
@@ -79,23 +79,6 @@ const SL_3 = generateIdentifier();
 const SL_4 = generateIdentifier();
 
 const AT = '2026-01-01T00:00:00.000000Z';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    headers?: Record<string, string>,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(headers !== undefined
-            ? { headers } : {}),
-    });
-}
 
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();

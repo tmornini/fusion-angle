@@ -35,7 +35,7 @@ import {
     documentGetHandler,
 } from '../api/document-family.ts';
 import {
-    apiRequest,
+    req,
     storedPutBodyText,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
@@ -54,20 +54,6 @@ import { operationIdHeader } from
 // minted at create, and archive/reactivate ride this SAME
 // document. The states/:id event-append path for
 // objectives is dead.
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 function entityFields(position = 3) {
     return { position };
