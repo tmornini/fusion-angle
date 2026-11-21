@@ -2,9 +2,9 @@ import type { ViewBox } from './flow-interactions.ts';
 
 // The flow canvas camera: a zoom and the viewBox it
 // shows. One arithmetic for the zoom range and step, the
-// button zoom, the wheel zoom, the pan, and the
-// keep-center resize, so every canvas that moves a
-// camera agrees on step, range, and focal point. Pure:
+// button zoom, the wheel zoom, the pan, the point map,
+// and the keep-center resize, so every canvas that moves
+// a camera agrees on step, range, and focal point. Pure:
 // each function returns a new value and mutates nothing.
 
 export const MIN_ZOOM = 0.25;
@@ -21,6 +21,14 @@ export interface Camera {
 interface Point {
     readonly x: number;
     readonly y: number;
+}
+
+// A canvas viewport in client pixels.
+export interface CanvasRect {
+    readonly left: number;
+    readonly top: number;
+    readonly w: number;
+    readonly h: number;
 }
 
 // A scroll down (a positive delta) zooms out. Any other
@@ -114,6 +122,26 @@ export function viewBoxPannedBy(
         ...viewBox,
         x: viewBox.x - dxPx * scaleX,
         y: viewBox.y - dyPx * scaleY,
+    };
+}
+
+// The user-space point under a client point. Exact
+// when the viewBox shares the canvas's aspect, so
+// the rect is the viewport and each axis scales
+// from pixels to user units. It reads the viewBox
+// it is given, so a viewBox that moves mid-gesture
+// stays true where a cached screen CTM would not.
+export function viewBoxPointAt(
+    viewBox: ViewBox,
+    rect: CanvasRect,
+    clientX: number,
+    clientY: number,
+): Point {
+    return {
+        x: viewBox.x + (clientX - rect.left)
+            * (viewBox.w / rect.w),
+        y: viewBox.y + (clientY - rect.top)
+            * (viewBox.h / rect.h),
     };
 }
 

@@ -9,6 +9,7 @@ import {
     cameraZoomedAt,
     cameraZoomedToward,
     viewBoxPannedBy,
+    viewBoxPointAt,
     viewBoxResized,
     wheelZoomDirection,
 } from '../web-app/app/flow-camera.ts';
@@ -237,6 +238,36 @@ Deno.test(
                 );
             }
         });
+    },
+);
+
+const POINT_RECT = {
+    left: 100, top: 40, w: 900, h: 500,
+};
+
+Deno.test(
+    'viewBoxPointAt maps client pixels into the viewBox',
+    () => {
+        const viewBox = { x: 10, y: 20, w: 900, h: 500 };
+        assertEquals(
+            viewBoxPointAt(
+                viewBox, POINT_RECT, 100, 40,
+            ),
+            { x: 10, y: 20 },
+        );
+        assertEquals(
+            viewBoxPointAt(
+                viewBox, POINT_RECT, 130, 0,
+            ),
+            { x: 40, y: -20 },
+        );
+        assertEquals(
+            viewBoxPointAt(
+                { x: 10, y: 20, w: 1800, h: 1000 },
+                POINT_RECT, 130, 0,
+            ),
+            { x: 70, y: -60 },
+        );
     },
 );
 

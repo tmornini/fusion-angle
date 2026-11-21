@@ -2,8 +2,10 @@ import {
     cameraZoomedAt,
     cameraZoomedToward,
     viewBoxPannedBy,
+    viewBoxPointAt,
     wheelZoomDirection,
     type Camera,
+    type CanvasRect,
     type ZoomDirection,
 } from './flow-camera.ts';
 
@@ -42,13 +44,6 @@ const KEY_ZOOMS: Readonly<Record<string, ZoomDirection>> = {
 // The canvas as drawn: the wrap's inside, in client
 // pixels. The svg fills it, and its viewBox shares its
 // aspect, so this rect is the svg's viewport.
-interface CanvasRect {
-    readonly left: number;
-    readonly top: number;
-    readonly w: number;
-    readonly h: number;
-}
-
 function canvasRectOf(wrap: HTMLElement): CanvasRect {
     const rect = wrap.getBoundingClientRect();
     return {
@@ -56,21 +51,6 @@ function canvasRectOf(wrap: HTMLElement): CanvasRect {
         top: rect.top + wrap.clientTop,
         w: wrap.clientWidth,
         h: wrap.clientHeight,
-    };
-}
-
-// The content point under a client point, from the
-// camera alone, as the designer's gesturePointToSvg.
-function contentPointAt(
-    camera: Camera,
-    rect: CanvasRect,
-    clientX: number,
-    clientY: number,
-): { x: number; y: number } {
-    const viewBox = camera.viewBox;
-    return {
-        x: viewBox.x + (clientX - rect.left) * (viewBox.w / rect.w),
-        y: viewBox.y + (clientY - rect.top) * (viewBox.h / rect.h),
     };
 }
 
@@ -237,8 +217,8 @@ export function bindStatsPanZoom(
             onCamera(cameraZoomedAt(
                 current,
                 wheelZoomDirection(e.deltaY),
-                contentPointAt(
-                    current, canvasRectOf(wrap),
+                viewBoxPointAt(
+                    current.viewBox, canvasRectOf(wrap),
                     e.clientX, e.clientY,
                 ),
             ));

@@ -12,8 +12,12 @@ import {
     MIN_ZOOM,
     MAX_ZOOM,
     cameraZoomedToward,
+    viewBoxPointAt,
 } from './flow-camera.ts';
-import type { ZoomDirection } from './flow-camera.ts';
+import type {
+    CanvasRect,
+    ZoomDirection,
+} from './flow-camera.ts';
 
 const AUTOFIT_TOAST_MSG =
     'Disable Auto-Fit to change the view';
@@ -235,41 +239,6 @@ function screenToSvg(
     return { x: svgPt.x, y: svgPt.y };
 }
 
-// The canvas's screen placement, captured once at gesture
-// start so pointer-moves never force a layout read.
-interface GestureRect {
-    left: number;
-    top: number;
-    w: number;
-    h: number;
-}
-
-// Map a client point into the FSM's user space from state
-// alone — no layout read. EXACT, not approximate: the
-// viewBox always shares the canvas's aspect ratio
-// (fitBoxToCanvas constructs canvas-aspect boxes; pan and
-// zoom preserve the w/h ratio), so preserveAspectRatio
-// never letterboxes, and svg.flow-canvas carries no border
-// or padding, so its bounding rect IS the SVG viewport.
-// Deriving from the FSM's own viewBox keeps the mapping
-// true even when the viewBox moves mid-gesture, where a
-// cached CTM would silently go stale.
-function gesturePointToSvg(
-    viewBox: ViewBox,
-    rect: GestureRect,
-    clientX: number,
-    clientY: number,
-): { x: number; y: number } {
-    return {
-        x: viewBox.x
-            + (clientX - rect.left)
-                * (viewBox.w / rect.w),
-        y: viewBox.y
-            + (clientY - rect.top)
-                * (viewBox.h / rect.h),
-    };
-}
-
 function ancestorAttr(
     el: Element,
     attrName: string,
@@ -444,7 +413,10 @@ export function bindInteractions(
     let currentState: InteractionState =
         initialContext.interaction;
     let activePointerId: number | null = null;
-    let gestureRect: GestureRect | null = null;
+    // Captured once at gesture start so pointer-moves
+    // never force a layout read. The canvas has no
+    // border or padding, so this rect is the viewport.
+    let gestureRect: CanvasRect | null = null;
     let shiftHeld = false;
     if (currentState.isPanMode) {
         wrap.classList.add(
@@ -665,7 +637,7 @@ export function bindInteractions(
             ) return;
             const rect = gestureRect;
             if (!rect) return;
-            const svgPt = gesturePointToSvg(
+            const svgPt = viewBoxPointAt(
                 currentState.viewBox, rect,
                 e.clientX, e.clientY,
             );
