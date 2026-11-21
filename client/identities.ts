@@ -1,6 +1,5 @@
 import {
     Identity,
-    type AIMemberEntity,
     type ClientRegistrationEntity,
     type ClientStatus,
     type Id,
@@ -21,9 +20,8 @@ import {
     createSubscriptionChannel,
 } from './channels.ts';
 
-// The identity surfaces derive from these stores: roster
-// and detail read identities + PII + the AI facet; the
-// detail's credential state reads identity_credentials.
+// Roster and detail read identities and PII. A service
+// detail also reads its client registration.
 const identityChanges =
     createSubscriptionChannel();
 
@@ -81,22 +79,10 @@ export type IdentityRosterRow =
         readonly service: ServiceFacet;
     };
 
-function serviceFacet(
-    row: AIMemberEntity | undefined,
-): ServiceFacet {
-    return row
-        ? {
-            named: true,
-            name: row.name,
-            detail: row.description,
-        }
-        : { named: false };
-}
-
 // GET identities, then fill each person via nested
-// GET identities/:id/pii. Service rows stay unnamed
-// (serviceFacet(undefined)); an AI member has a service
-// identity, so it reads as a row too.
+// GET identities/:id/pii. Service rows stay unnamed.
+// An AI member has a service identity, so it reads
+// as a row too.
 export async function getIdentityRoster(
     ctx: RequestContext,
 ): Promise<IdentityRosterRow[]> {
@@ -108,7 +94,7 @@ export async function getIdentityRoster(
             ? {
                 kind: 'service',
                 id: identity.id,
-                service: serviceFacet(undefined),
+                service: { named: false },
             }
             : {
                 kind: 'person',
@@ -146,17 +132,6 @@ export async function getMemberPii(
         }
         throw error;
     }
-}
-
-// One service identity's display facet — its name from the
-// ai-members row, or { named: false } when that row is not
-// visible. Mirrors getMemberPii; the CALLER redacts an
-// absent name rather than leaking the id.
-export async function getServiceFacet(
-    _ctx: RequestContext,
-    _id: Id,
-): Promise<ServiceFacet> {
-    return serviceFacet(undefined);
 }
 
 // An erase over held PII names the head it replaces; over
