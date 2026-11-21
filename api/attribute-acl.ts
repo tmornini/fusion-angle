@@ -71,24 +71,3 @@ export function assertWritableAttributeIds(
         }
     }
 }
-
-// Drops values the caller may not read. An attribute
-// absent from the live schema is unreadable by every role.
-export function projectReadableValues(
-    values: readonly {
-        attribute_id: string;
-        value: string;
-    }[],
-    attributesById: ReadonlyMap<
-        string, AttributeSchemaRow
-    >,
-    roles: readonly string[],
-): { attribute_id: string; value: string }[] {
-    return values.filter((entry) => {
-        const attribute = attributesById.get(
-            entry.attribute_id,
-        );
-        return attribute !== undefined
-            && rolesCanRead(roles, attribute);
-    });
-}
