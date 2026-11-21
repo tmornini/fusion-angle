@@ -64,19 +64,14 @@ export interface DocumentMessagePair {
     readonly requesterIdentityId: Id;
 }
 
-// Every PUT/DELETE pair at `path`, decoded once —
-// ascending by the envelope (at, id), the SAME arrival order
-// the store's document head read (`messageStore(db).get`)
-// picks a single head from. That shared mechanism is
-// ordering ONLY: the store's document head read
-// (`messageStore(db).get`) filters by name/path
-// alone — every method, since it serves
-// Supersedes/Follows provenance (the LOCK head) — while
-// this function excludes every method but PUT/DELETE
-// (the DOCUMENT head — design decision 6).
-// POST/PATCH rows at the same document are not heads. Only
-// successful writes are stored, so there is no status
-// filter. Method comes from the pair's `method` column.
+// Every PUT/DELETE pair at `path`, decoded once, ascending
+// by the envelope (at, id). messageStore(db).getDocumentHead
+// picks one head by that same order, the latest PUT or
+// DELETE, and returns the row only when its method is PUT.
+// This function keeps every PUT and DELETE pair. POST/PATCH
+// rows at the same document are not heads. Only successful
+// writes are stored, so there is no status filter. Method
+// comes from the pair's `method` column.
 // DocumentMessagePair.at is the response stamp.
 export function documentMessagePairsAt(
     messagePairs: readonly MessagePairEntity[],
