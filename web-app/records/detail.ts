@@ -101,6 +101,10 @@ export async function init(
     );
 
     await load(root);
+    // setHtml replaces the root's children. These listeners
+    // sit on the root and on document for the page signal,
+    // so a later paint must not bind them again.
+    bindActions(root);
     const instance = params?.instance;
     if (instance) {
         scrollToInstance(root, instance);
@@ -229,7 +233,6 @@ async function load(
                 roles: heldRoles(),
             });
             render(root);
-            bindActions(root);
         },
     });
 }
@@ -339,7 +342,6 @@ function onKeydown(
     e.preventDefault();
     commitPendingAttribute();
     render(root);
-    bindActions(root);
     const next = $(
         '#record-pending-attribute-name', root,
     );
@@ -393,7 +395,6 @@ function onClick(
         if (pageState.kind === 'editing') {
             pageState = { kind: 'reading' };
             render(root);
-            bindActions(root);
             return;
         }
         navigateTo('records');
@@ -415,7 +416,6 @@ function onClick(
             pendingAttributeName: '',
         };
         render(root);
-        bindActions(root);
         return;
     }
     if (btn.id === 'record-save-btn') {
@@ -430,7 +430,6 @@ function onClick(
         }
         commitPendingAttribute();
         render(root);
-        bindActions(root);
         return;
     }
     if (btn.id === 'record-new-instance-btn') {
@@ -446,7 +445,6 @@ function onClick(
     ) {
         pageState = { kind: 'reading' };
         render(root);
-        bindActions(root);
         return;
     }
     const action = btn.getAttribute(
@@ -473,7 +471,6 @@ function onClick(
         if (!id) return;
         removeAttribute(id);
         render(root);
-        bindActions(root);
         return;
     }
     if (action === 'remove-constraint') {
@@ -500,7 +497,6 @@ function onClick(
         }
         removeConstraint(attrId, idx);
         render(root);
-        bindActions(root);
     }
 }
 
@@ -560,7 +556,6 @@ async function handleNewInstance(
         };
         loadedInstances = [...loadedInstances, created];
         render(root);
-        bindActions(root);
     } catch (err) {
         reportFault(
             ctx, 'Failed to create instance', err,
@@ -593,7 +588,6 @@ async function handleEditInstance(
             conflictNotice: null,
         };
         render(root);
-        bindActions(root);
     } catch (err) {
         reportFault(
             ctx, 'Failed to load instance', err,
@@ -670,7 +664,6 @@ async function handleInstanceSave(
                         INSTANCE_CONFLICT_NOTICE,
                 };
                 render(root);
-                bindActions(root);
                 showToast(
                     INSTANCE_CONFLICT_NOTICE,
                     'warning',
@@ -840,7 +833,6 @@ function onChange(
             ],
         );
         render(root);
-        bindActions(root);
         return;
     }
     if (action === 'constraint-kind'
@@ -853,7 +845,6 @@ function onChange(
         );
         target.value = '';
         render(root);
-        bindActions(root);
     }
 }
 
@@ -1100,7 +1091,6 @@ async function handleSave(
     if (!attributesChanged && !recordChanged) {
         pageState = { kind: 'reading' };
         render(root);
-        bindActions(root);
         return;
     }
     const ctx = sessionContext();
