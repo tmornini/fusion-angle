@@ -439,7 +439,7 @@ discover_render_ids() {
             );
         }
         Deno.stdout.writeSync(
-            enc.encode(owner + "\n" + serviceId + "\n"),
+            enc.encode(serviceId + "\n"),
         );
     ' | deno run --frozen \
         --allow-read="$TMP/postgres.json" \
@@ -447,6 +447,5 @@ discover_render_ids() {
         - "$TMP/postgres.json" "$TMP/services.json" \
         > "$TMP/ids.txt"
 
-    OWNER_ID=$(sed -n '1p' "$TMP/ids.txt")
-    SERVICE_ID=$(sed -n '2p' "$TMP/ids.txt")
+    SERVICE_ID=$(sed -n '1p' "$TMP/ids.txt")
 }
