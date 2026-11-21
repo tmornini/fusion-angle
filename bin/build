@@ -16,7 +16,7 @@ Examples:
   ./bin/build                      # server ZIP to ~/Desktop/
   ./bin/build dist/                # server ZIP to dist/
   ./bin/build --no-zip /tmp/test/  # server bundle to /tmp/test/
-  ./bin/build --no-zip             # server bundle to ~/Desktop/
+  ./bin/build --no-zip             # mktemp dir; prints Bundle:
 USAGE
 }
 
