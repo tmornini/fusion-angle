@@ -10,7 +10,19 @@ export * from './event-listener.ts';
 export * from './flow-defaults.ts';
 export * from './flow-mutations.ts';
 export * from './flow-queries.ts';
-export * from './flow-records.ts';
+// The shared per-flow records fan-out is not a page verb.
+export {
+    putFlowRecord,
+    deleteFlowRecord,
+    postFlowRecordBinding,
+    deleteFlowRecordForFlow,
+    getRecordForFlow,
+    getRecordForWorkOrder,
+    type BoundFlowSummary,
+    getFlowSummariesForRecord,
+    getWorkOrdersForRecord,
+    loadRecordFlowJoins,
+} from './flow-records.ts';
 export * from './flows.ts';
 export * from './http-facade.ts';
 export * from './ideas.ts';

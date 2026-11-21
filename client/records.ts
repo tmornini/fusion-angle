@@ -1,5 +1,4 @@
 import type {
-    FlowRecordEntity,
     RecordAttributeEntity,
     RecordEntity,
     RecordId,
@@ -14,31 +13,14 @@ import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import {
     activeOrganization,
-    organizationItem,
     type RequestContext,
 } from './request-context.ts';
 import {
     createSubscriptionChannel,
 } from './channels.ts';
-import { getFlowEntities } from './flows.ts';
-
-// The flow↔record bindings across EVERY flow the caller's org
-// can see — reassembled from the per-flow nested collections,
-// since a record may be bound by flows beyond any single one.
-// The flows list is org-scoped; each flow's records are fetched
-// in parallel and concatenated.
-async function getAllFlowRecords(
-    ctx: RequestContext,
-): Promise<FlowRecordEntity[]> {
-    const flows = await getFlowEntities(ctx);
-    const perFlow = await Promise.all(
-        flows.map(f => ctx.GETCollection<FlowRecordEntity>(
-            organizationItem(ctx, 'flows', f.body().toValue().id)
-                + '/records/',
-        ).then(parts => parts.map((m) => m.body().toValue()))),
-    );
-    return perFlow.flat();
-}
+import {
+    getAllFlowRecordEntities,
+} from './flow-records.ts';
 
 export interface RecordWithCounts {
     readonly record: RecordModel;
@@ -124,7 +106,7 @@ export async function getRecords(
 ): Promise<RecordWithCounts[]> {
     const [messages, flowRecords] = await Promise.all([
         getRecordEntities(ctx),
-        getAllFlowRecords(ctx),
+        getAllFlowRecordEntities(ctx),
     ]);
     const records = messages.map(recordOf);
     // Per-type nested attributes collection — server-side
