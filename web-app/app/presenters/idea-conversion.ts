@@ -37,14 +37,6 @@ export type ConversionField =
     | 'cost'
     | 'success-criteria';
 
-const REQUIRED_FIELDS:
-    readonly ConversionField[] = [
-    'project-name',
-    'time-days',
-    'cost',
-    'success-criteria',
-];
-
 export const ALL_CONVERSION_FIELDS:
     readonly ConversionField[] = [
     'project-name',
@@ -80,14 +72,14 @@ export function buildInitialConversionDraft(
 export function conversionRequiredCount(
     activeObjectiveCount: number,
 ): number {
-    return REQUIRED_FIELDS.length
+    return ALL_CONVERSION_FIELDS.length
         + activeObjectiveCount;
 }
 
 export function conversionCompletedCount(
     draft: ConversionDraft,
 ): number {
-    const filledFields = REQUIRED_FIELDS.filter(
+    const filledFields = ALL_CONVERSION_FIELDS.filter(
         f => draft.fields[f] !== '',
     ).length;
     return filledFields + draft.baselines.size;
@@ -97,7 +89,7 @@ export function conversionIsReady(
     draft: ConversionDraft,
     activeObjectives: readonly HttpMessage<ObjectiveEntity>[],
 ): boolean {
-    const allFieldsFilled = REQUIRED_FIELDS.every(
+    const allFieldsFilled = ALL_CONVERSION_FIELDS.every(
         f => draft.fields[f] !== '',
     );
     if (!allFieldsFilled) return false;
@@ -727,7 +719,6 @@ export class IdeaConversionPresenter {
                         + obj.id
                     }"
                     value="${value}"
-                    data-initial-value="${value}"
                     data-objective-id="${obj.id}"
                     class="baseline-slider">
                 <span class="slider-value">

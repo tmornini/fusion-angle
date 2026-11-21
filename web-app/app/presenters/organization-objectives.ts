@@ -9,7 +9,6 @@ import {
     ICON_SIZE,
     iconEdit, iconArchive, iconPlus, iconUndo,
 } from '../icons.ts';
-import { formatDate } from '../format.ts';
 
 interface Definition {
     name: string;
@@ -20,18 +19,15 @@ export class OrganizationObjectivesPresenter {
     readonly #active: HttpMessage<ObjectiveEntity>[];
     readonly #archived: HttpMessage<ObjectiveEntity>[];
     readonly #defs: Map<ObjectiveId, Definition>;
-    readonly #archivedAt: Map<ObjectiveId, string>;
 
     constructor(
         active: HttpMessage<ObjectiveEntity>[],
         archived: HttpMessage<ObjectiveEntity>[],
         defs: Map<ObjectiveId, Definition>,
-        archivedAt: Map<ObjectiveId, string>,
     ) {
         this.#active = active;
         this.#archived = archived;
         this.#defs = defs;
-        this.#archivedAt = archivedAt;
     }
 
     buildBox(): SafeHtml {
@@ -113,7 +109,6 @@ export class OrganizationObjectivesPresenter {
                     o.id}`,
             );
         }
-        const date = this.#archivedAt.get(o.id);
         return html`
             <li class="objective-list-item"
                 data-objective-id="${o.id}"
@@ -135,12 +130,6 @@ export class OrganizationObjectivesPresenter {
                     <span class="objective-desc">
                         ${def.description}
                     </span>
-                    ${isArchived && date
-                        ? html`<span class="meta">
-                            Archived ${
-                                formatDate(date)}
-                          </span>`
-                        : html``}
                 </div>
                 <div class="objective-actions">
                     ${isArchived

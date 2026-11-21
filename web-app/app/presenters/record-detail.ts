@@ -619,9 +619,7 @@ export class RecordDetailPresenter {
                 ${this.#view.workOrders.map(
                     w => html`<li>
                         <button type="button"
-                        class="${
-                            'link record-wo-link'
-                        }"
+                        class="link"
                         data-work-order-id="${
                             w.id
                         }"

@@ -154,7 +154,7 @@ function buildShell(
     container: HTMLElement,
 ): void {
     setHtml(container, html`
-<div class="idea-detail-host">
+<div>
     <div class="entity">
         <div class="${
             'flex items-start'
@@ -752,11 +752,7 @@ export class IdeaPresenter {
 
     #buildActions(): SafeHtml {
         return html`
-        <div
-            class="${
-                'flex idea-actions'
-                + ' idea-actions-stack'
-            }">
+        <div class="flex idea-actions-stack">
             ${this.#idea.isConvertible()
                 ? html`
             <button

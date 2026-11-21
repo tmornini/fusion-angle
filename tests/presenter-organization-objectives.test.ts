@@ -22,14 +22,10 @@ const defs = new Map([
     ['o2', { name: 'Lower expenses', description: 'd2' }],
     ['o3', { name: 'Old Quarterly', description: 'd3' }],
 ]);
-const archivedAt = new Map([
-    ['o3', '2026-03-15T00:00:00.000000Z'],
-]);
-
 Deno.test('renders active section with each active objective',
     () => {
         const p = new OrganizationObjectivesPresenter(
-            activeObjs, archivedObjs, defs, archivedAt,
+            activeObjs, archivedObjs, defs,
         );
         const html = p.buildBox().toString();
         assert(html.includes('Increase incomes'));
@@ -41,7 +37,7 @@ Deno.test('renders active section with each active objective',
 
 Deno.test('renders archived section under active', () => {
     const p = new OrganizationObjectivesPresenter(
-        activeObjs, archivedObjs, defs, archivedAt,
+        activeObjs, archivedObjs, defs,
     );
     const html = p.buildBox().toString();
     assert(html.includes('Old Quarterly'));
@@ -50,7 +46,7 @@ Deno.test('renders archived section under active', () => {
 
 Deno.test('renders add-objective affordance', () => {
     const p = new OrganizationObjectivesPresenter(
-        activeObjs, archivedObjs, defs, archivedAt,
+        activeObjs, archivedObjs, defs,
     );
     const html = p.buildBox().toString();
     assert(html.includes('data-action="add-objective"'));
@@ -58,7 +54,7 @@ Deno.test('renders add-objective affordance', () => {
 
 Deno.test('empty state when no objectives', () => {
     const p = new OrganizationObjectivesPresenter(
-        [], [], new Map(), new Map(),
+        [], [], new Map(),
     );
     const html = p.buildBox().toString();
     assert(html.toLowerCase().includes('no objectives'));

@@ -114,7 +114,7 @@ export async function init(
             '[data-retry-btn]', root,
         ).addEventListener(
             'click',
-            () => init(),
+            () => init(params),
         );
         return;
     }
@@ -136,7 +136,7 @@ export async function init(
             '[data-retry-btn]', root,
         ).addEventListener(
             'click',
-            () => init(),
+            () => init(params),
         );
         return;
     }

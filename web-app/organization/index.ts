@@ -150,7 +150,6 @@ interface ObjectivesData {
             typeof getCurrentObjectiveDefinitions
         >
     >;
-    archivedAt: Map<string, string>;
 }
 
 async function fetchObjectivesData(
@@ -171,7 +170,6 @@ async function fetchObjectivesData(
         active,
         archived,
         defs,
-        archivedAt: new Map<string, string>(),
     };
 }
 
@@ -221,7 +219,6 @@ function paintObjectives(
             data.active,
             data.archived,
             data.defs,
-            data.archivedAt,
         );
     const box = $('#objectives-box', document);
     if (!box) return;
