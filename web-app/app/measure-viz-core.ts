@@ -888,3 +888,64 @@ export function trendAxisMax(
     if (max <= 0) return 1;
     return max;
 }
+
+// Legend and stacked bar shared by both phase
+// renderers. The dashboard embeds this body.
+export function phaseBar(
+    buckets: MeanPhaseBuckets,
+): string {
+    const total = buckets.boot + buckets.fetch
+        + buckets.render + buckets.other;
+    const seg = (
+        ms: number,
+        color: string,
+    ): string => {
+        if (ms <= 0 || total <= 0) return '';
+        const pct = (ms / total) * 100;
+        return '<div class="bar-seg" style="width:'
+            + pct + '%;background:' + color
+            + '"></div>';
+    };
+    const names: Array<keyof MeanPhaseBuckets> = [
+        'boot',
+        'fetch',
+        'render',
+        'other',
+    ];
+    let legend = '<div class="legend">';
+    let stack = '<div class="bar-stack">';
+    for (const name of names) {
+        const ms = buckets[name];
+        legend += '<span><span class="swatch" style="'
+            + 'background:var(--' + name
+            + ')"></span>' + name + ' '
+            + formatDurationPerf(ms)
+            + '</span>';
+        stack += seg(ms, 'var(--' + name + ')');
+    }
+    return legend + '</div>' + stack + '</div>';
+}
+
+// Source embedded in the dashboard script. Deno's
+// function toString is the type-stripped body the
+// runtime already runs, so the page cannot drift.
+// formatDurationPerf and formatAxisTick read MINUS,
+// which the script declares before these functions.
+const browserHelpers = [
+    trimNum,
+    formatDurationPerf,
+    pickAxisUnit,
+    formatAxisTick,
+    deltaReadyMs,
+    budgetRatio,
+    cmpNumDescNullLast,
+    pageKeysUnion,
+    rankPages,
+    phaseBar,
+];
+
+export function browserHelpersSource(): string {
+    return browserHelpers
+        .map((fn) => fn.toString())
+        .join('\n');
+}
