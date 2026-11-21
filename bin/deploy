@@ -188,7 +188,6 @@ if [ -n "$LOCAL_PORT" ]; then
 fi
 
 export RENDER_API_KEY="$RENDER_TOKEN"
-unset TOKEN
 # shellcheck disable=SC1091
 . "$BIN/postgres-lib"
 assert_render_cli
