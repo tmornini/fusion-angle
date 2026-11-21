@@ -21,7 +21,7 @@ import {
 import { html, type SafeHtml } from
     '../web-app/app/safe-html.ts';
 
-// Neither adapters/identities.ts nor
+// Neither client/identities.ts nor
 // presenters/identity-detail.ts reads localStorage
 // (checked against the full product tree); window/
 // document are stubbed because IdentityDetailPresenter

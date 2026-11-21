@@ -33,13 +33,11 @@ export interface RecordAttribute {
 }
 
 // Nested attribute wire (Task 7 / Task 21): parentage is
-// record_type_id on the echo. Flat alias still stamps
-// record_id; accept either so a residual flat read maps.
+// record_type_id on the echo.
 interface AttributeWire {
     readonly id: string;
     readonly organization_id: string;
-    readonly record_type_id?: string;
-    readonly record_id?: string;
+    readonly record_type_id: string;
     readonly name: string;
     readonly attribute_type: AttributeType;
     readonly sort_order: number;
@@ -52,18 +50,10 @@ interface AttributeWire {
 function toRecordAttribute(
     entity: AttributeWire,
 ): RecordAttribute {
-    const recordId =
-        entity.record_type_id ?? entity.record_id;
-    if (recordId === undefined) {
-        throw new Error(
-            'attribute wire missing parent type id: '
-            + entity.id,
-        );
-    }
     return {
         id: entity.id,
         organizationId: entity.organization_id,
-        recordId,
+        recordId: entity.record_type_id,
         name: entity.name,
         attributeType: entity.attribute_type,
         sortOrder: entity.sort_order,

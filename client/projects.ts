@@ -75,7 +75,7 @@ export async function getProjectEntity(
 // The wire document PUT /projects/:id now takes today's
 // entity fields plus state, camelCase on this side of the
 // adapter seam — the IdeaDocumentFields precedent
-// (adapters/ideas.ts). organization_id is EXCLUDED too — the
+// (client/ideas.ts). organization_id is EXCLUDED too — the
 // client never supplies it (the org fence stamps it
 // downstream).
 export type ProjectDocumentFields =

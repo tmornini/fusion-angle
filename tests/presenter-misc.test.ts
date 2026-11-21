@@ -83,7 +83,7 @@ function makeGauge(
 }
 
 // Mirrors the production display rule
-// (adapters/dashboard.ts impactDisplay): absent
+// (web-app/app/dashboard.ts impactDisplay): absent
 // renders DISPLAY_ABSENT, present renders signed.
 function impactDisplay(
     v: number | undefined,

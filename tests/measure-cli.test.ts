@@ -241,7 +241,7 @@ Deno.test(
     );
 });
 
-Deno.test('bare ceremony needs a local Node server', () => {
+Deno.test('bare ceremony needs a local measure server', () => {
     const result = finalizeMeasureCli(baseFlags());
     assertStrictEquals(result.kind, 'ok');
     if (result.kind !== 'ok') return;
@@ -252,7 +252,7 @@ Deno.test('bare ceremony needs a local Node server', () => {
     );
 });
 
-Deno.test('--base-url skips the local Node spawn', () => {
+Deno.test('--base-url skips the local serve spawn', () => {
     const cli = baseFlags({
         baseUrl: 'http://127.0.0.1:8080',
         password: 'secret',

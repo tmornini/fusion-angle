@@ -4,7 +4,7 @@ import {
 } from '../shared/access-token-decode.ts';
 
 // Per-client bearer holder. No mint — the test composition
-// root (`adapters/init.ts`) seeds an anonymous token; the
+// root (`tests/client-init.ts`) seeds an anonymous token; the
 // server entry installs a login token.
 
 export interface SessionTokenHolder {

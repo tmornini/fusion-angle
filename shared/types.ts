@@ -50,7 +50,7 @@ export type Constraint =
 // Hidden is encoded by absence from the array, so
 // hidden + isRequired is structurally impossible.
 // Storage spells the id key attribute_id; the seam maps
-// it (validators.ts asNodeAttribute in, storedGraph out).
+// it (shared/flow-graph-body.ts asNodeAttribute in, storedGraph out).
 export interface NodeAttribute {
     attributeId: RecordAttributeId;
     mode: 'editable' | 'readonly';

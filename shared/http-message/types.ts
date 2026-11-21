@@ -44,6 +44,6 @@ export interface MessageModel {
 
 // A rejection at the parse gate is an EXPECTED failure: profane
 // wire/JSON stopped before it can enter the model. Mirrors
-// api/types.ts ValidationError. An impossible internal state is
+// shared/types.ts ValidationError. An impossible internal state is
 // a bug and crashes instead.
 export class HttpMessageError extends Error {}
