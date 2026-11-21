@@ -14,7 +14,7 @@ import {
     loadInto,
 } from '../app/loading-states.ts';
 import { extractErrorMessage } from
-    '../app/error-helpers.ts';
+    '../../shared/error-helpers.ts';
 import {
     ICON_SIZE,
     iconPlus,

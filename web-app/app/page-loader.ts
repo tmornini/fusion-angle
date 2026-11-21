@@ -6,9 +6,8 @@ import { setHtml } from './safe-html.ts';
 import {
     buildErrorState,
 } from './loading-states.ts';
-import {
-    extractErrorMessage,
-} from './error-helpers.ts';
+import { extractErrorMessage } from
+    '../../shared/error-helpers.ts';
 import { redirectToLogin } from './auth-redirect.ts';
 import { navigateTo } from './navigation.ts';
 import {
