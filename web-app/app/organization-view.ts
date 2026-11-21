@@ -48,22 +48,6 @@ export class Organization {
         };
     }
 
-    seatsUsage(): {
-        used: number;
-        total: number;
-        percent: number;
-    } {
-        const used = this.#derived.usedSeats;
-        const total = this.#entity.seats;
-        const percent = total > 0
-            ? Math.min(
-                100,
-                (used / total) * 100,
-            )
-            : 0;
-        return { used, total, percent };
-    }
-
     usedSeats(): number {
         return this.#derived.usedSeats;
     }

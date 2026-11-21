@@ -13,12 +13,6 @@ export interface NodeMoveUpdate {
     y: number;
 }
 
-export interface NodePosition {
-    x: number;
-    y: number;
-    isDraggable: boolean;
-}
-
 export interface NodeWithPos {
     id: string;
     x: number;
