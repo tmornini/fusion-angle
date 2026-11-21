@@ -21,8 +21,8 @@ import {
 import {
     canonicalPath,
 } from '../api/message-pair.ts';
-import { deriveFlowStateHistory } from
-    '../api/derive-flows.ts';
+import { selectVersionsAt } from '../api/head-reads.ts';
+import { servedBodyOf } from '../api/served-response.ts';
 import {
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,
@@ -151,8 +151,8 @@ Deno.test.afterEach(() => {
 
 // An invitation's history, derived from the message plane —
 // the local oracle for the invitation drift legs. Work-order
-// legs read getWorkOrderEvents and flow legs read
-// deriveFlowStateHistory directly.
+// legs read getWorkOrderEvents and flow legs read the
+// stored version list.
 async function invitationHistory(
     db: DbAdapter, entityId: Id,
 ): Promise<StateEntity[]> {
@@ -386,7 +386,7 @@ const CASE_2_FAMILY_ENTITY_IDS: readonly {
     },
 ];
 
-Deno.test('case 2: flow parts match deriveFlowStateHistory;'
+Deno.test('case 2: flow parts match stored versions;'
 + ' work-order events are the seed trace in chain order',
 async () => {
     const db = await seededDb();
@@ -452,9 +452,18 @@ async () => {
             state: string;
             state_at: string;
         }>(res);
-        const history = await deriveFlowStateHistory(
-            db, STARK_ORGANIZATION, id,
+        const versions = await selectVersionsAt(
+            db,
+            canonicalPath(STARK_ORGANIZATION, '/flows/'),
+            id,
+            'state',
+            'flows',
+            { sees: 'whole' },
+            () => Promise.reject(new Error(
+                'missing flow ' + id,
+            )),
         );
+        assert(versions.kind === 'versions');
         assertEquals(
             parts.map((part) => {
                 const body = part.body().toValue();
@@ -464,11 +473,16 @@ async () => {
                     state_at: body.state_at,
                 };
             }),
-            history.map((row) => ({
-                state_event_id: row.id,
-                state: row.state,
-                state_at: row.at,
-            })),
+            versions.pairs.map((pair) => {
+                const body = servedBodyOf(
+                    pair, { sees: 'whole' },
+                );
+                return {
+                    state_event_id: body['state_event_id'],
+                    state: body['state'],
+                    state_at: body['state_at'],
+                };
+            }),
             family,
         );
     }

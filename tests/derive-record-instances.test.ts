@@ -13,10 +13,13 @@ import {
     mergeInstanceValues,
     deriveInstanceHead,
     deriveInstanceCollection,
-    deriveInstanceRevisions,
     instancesUriPrefix,
     type InstanceValue,
 } from '../api/derive-record-instances.ts';
+import {
+    selectVersionsAt,
+} from '../api/head-reads.ts';
+import { servedBodyOf } from '../api/served-response.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
@@ -372,7 +375,7 @@ Deno.test(
 );
 
 Deno.test(
-    'deriveInstanceRevisions: genesis + 2 patches'
+    'instance versions: genesis + 2 patches'
     + ' → 3 full-state ASC; last == head',
     async () => {
         const db = await emptyDb();
@@ -403,75 +406,46 @@ Deno.test(
             },
             '2026-01-01T00:00:02.000000Z',
         );
-        const revisions = await deriveInstanceRevisions(
-            db, ORGANIZATION, TYPE_ID, INST_A,
+        const versions = await selectVersionsAt(
+            db,
+            instancesUriPrefix(ORGANIZATION, TYPE_ID),
+            INST_A,
+            'stateless',
+            'record_instances',
+            { sees: 'whole' },
+            () => Promise.reject(new Error('missing instance')),
         );
-        assertStrictEquals(revisions.length, 3);
-        assertStrictEquals(revisions[0]!.messagePairId, g0);
-        assertEquals(revisions[0]!.values, [
+        assert(versions.kind === 'versions');
+        const pairs = versions.pairs;
+        const valuesOf = (index: number) => revisionValuesOf(
+            servedBodyOf(pairs[index]!, { sees: 'whole' }),
+        );
+        assertStrictEquals(pairs.length, 3);
+        assertStrictEquals(pairs[0]!.id, g0);
+        assertEquals(valuesOf(0), [
             val('a', 'AjdvjuECVZEgZoFajaIEkg'),
             val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
         ]);
-        assertStrictEquals(
-            revisions[1]!.messagePairId, r1,
-        );
-        assertEquals(revisions[1]!.values, [
+        assertStrictEquals(pairs[1]!.id, r1);
+        assertEquals(valuesOf(1), [
             val('a', '3'),
             val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
         ]);
-        assertStrictEquals(revisions[2]!.messagePairId, r2);
-        assertEquals(revisions[2]!.values, [
-            val('a', '3'),
-        ]);
-        // ASC by (at, id); index last matches live head.
+        assertStrictEquals(pairs[2]!.id, r2);
+        assertEquals(valuesOf(2), [val('a', '3')]);
         const head = await deriveInstanceHead(
             db, ORGANIZATION, TYPE_ID, INST_A,
         );
         assert(head !== undefined);
         assertStrictEquals(
-            revisions[revisions.length - 1]!.messagePairId,
+            pairs[pairs.length - 1]!.id,
             head!.messagePairId,
         );
-        assertEquals(
-            revisions[revisions.length - 1]!.values,
-            head!.values,
-        );
-        // Strict ASC timestamps.
+        assertEquals(valuesOf(2), head!.values);
         assert(
-            revisions[0]!.at <= revisions[1]!.at
-            && revisions[1]!.at <= revisions[2]!.at,
+            pairs[0]!.response_at <= pairs[1]!.response_at
+            && pairs[1]!.response_at
+                <= pairs[2]!.response_at,
         );
-    },
-);
-
-Deno.test(
-    'deriveInstanceRevisions empty when tombstoned',
-    async () => {
-        const db = await emptyDb();
-        await appendInstancePair(
-            db, INST_A, 'PUT',
-            { set: [val('a', 'AjdvjuECVZEgZoFajaIEkg')] },
-            '2026-01-01T00:00:00.000000Z',
-        );
-        await appendInstancePair(
-            db, INST_A, 'DELETE',
-            {},
-            '2026-01-01T00:00:01.000000Z',
-        );
-        const revisions = await deriveInstanceRevisions(
-            db, ORGANIZATION, TYPE_ID, INST_A,
-        );
-        assertEquals(revisions, []);
-    },
-);
-
-Deno.test(
-    'deriveInstanceRevisions empty when absent',
-    async () => {
-        const db = await emptyDb();
-        const revisions = await deriveInstanceRevisions(
-            db, ORGANIZATION, TYPE_ID, 'no-such',
-        );
-        assertEquals(revisions, []);
     },
 );

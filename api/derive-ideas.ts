@@ -1,4 +1,3 @@
-import type { DbAdapter } from './db.ts';
 import type {
     Id,
     IdeaEntity,
@@ -10,18 +9,12 @@ import {
 } from './validators.ts';
 import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
-import {
-    deriveDocumentsAt,
-    byIdAscending,
-    type DerivedDocument,
-} from './derive-documents.ts';
+import { type DerivedDocument } from './derive-documents.ts';
 
-// Ideas' own reshaping of the generic message-plane reduction
-// (derive-documents.ts) for idea submissions — a bespoke
-// derivation, not a DocumentFamilyWiring family (a nested
-// document carries no lifecycle state of its own). GET
-// ideas/:id/submissions/ serves the stored heads at this
-// prefix (spec §1 B).
+// Idea submissions nest at this prefix. A nested document
+// carries no lifecycle of its own, and it is not a
+// DocumentFamilyWiring family. GET ideas/:id/submissions/
+// serves the stored heads (spec §1 B).
 
 export function submissionsUriPrefix(
     organization: Id,
@@ -68,22 +61,4 @@ export function ideaSubmissionEntityOf(
             withoutId(document.body),
         ),
     };
-}
-
-export async function deriveIdeaSubmissions(
-    db: DbAdapter,
-    organization: Id,
-    ideaId: Id,
-): Promise<IdeaSubmissionEntity[]> {
-    const prefix = submissionsUriPrefix(organization, ideaId);
-    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
-    );
-    const documents = deriveDocumentsAt(
-        messagePairs, prefix,
-    );
-    const submissions: IdeaSubmissionEntity[] = [];
-    for (const document of documents.values()) {
-        submissions.push(ideaSubmissionEntityOf(document));
-    }
-    return submissions.sort(byIdAscending);
 }

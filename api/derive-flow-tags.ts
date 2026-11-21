@@ -1,13 +1,8 @@
-import type { DbAdapter } from './db.ts';
 import type { Id, FlowTagEntity } from '../shared/types.ts';
 import { validateFlowTagEntity } from './validators.ts';
 import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
-import {
-    deriveDocumentsAt,
-    type DerivedDocument,
-} from './derive-documents.ts';
-import { missedReadError } from './derive-states.ts';
+import { type DerivedDocument } from './derive-documents.ts';
 
 // Flow tags: the codebase's FIRST message-plane-ONLY document
 // family (Phase 14 Task 9) — no backing table, derived entirely
@@ -19,8 +14,7 @@ import { missedReadError } from './derive-states.ts';
 // No collection GET exists (no route, no derivation) — Step 0
 // scoped this task to the single PUT/GET/DELETE leaf only
 // (Unbidden Helper Code: no speculative tag-listing surface).
-
-const FLOW_TAGS_TABLE = 'flow_tags';
+// GET flows/:id/tags/:name serves the stored head.
 
 export function flowTagsUriPrefix(
     organization: Id,
@@ -42,36 +36,4 @@ export function flowTagEntityOf(
         flow_id: flowId,
         ...validateFlowTagEntity(withoutId(document.body)),
     };
-}
-
-// The head document body (the pinned response id) plus the
-// tag's own name/flow_id; absent or a DELETE head throws
-// EntityNotFoundError(FLOW_TAGS_TABLE, name) — deriveDocumentsAt's
-// own DELETE-head exclusion already collapses both cases into
-// "no document at this name", exactly like every sibling nested
-// family (deriveFlowRecord, deriveIdentityPii).
-export async function deriveFlowTag(
-    db: DbAdapter,
-    organization: Id,
-    flowId: Id,
-    name: Id,
-): Promise<FlowTagEntity> {
-    const prefix = flowTagsUriPrefix(organization, flowId);
-    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
-    );
-    const document = deriveDocumentsAt(
-        messagePairs, prefix,
-    ).get(name);
-    if (document === undefined) {
-        // Probe the parent flow in the bound organization's
-        // own collection: a foreign flow is absent there,
-        // so its tag 404s, as does a miss on an own flow.
-        throw await missedReadError(
-            db, name, organization, FLOW_TAGS_TABLE, flowId,
-        );
-    }
-    // The stored response is the tag's wire; the path owns
-    // its flow_id.
-    const { flow_id: _flow, ...body } = document.body;
-    return flowTagEntityOf(flowId, { ...document, body });
 }

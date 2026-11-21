@@ -21,9 +21,13 @@ import type {
 } from '../shared/types.ts';
 import { canonicalPath } from '../api/message-pair.ts';
 import {
-    byIdAscending,
     documentMessagePairsAt,
 } from '../api/derive-documents.ts';
+import {
+    isDeletedHead,
+    selectHeadsAtPath,
+} from '../api/head-reads.ts';
+import { servedBodyOf } from '../api/served-response.ts';
 import {
     documentGetHandler,
     documentCollectionGetHandler,
@@ -36,13 +40,10 @@ import {
     validateObjectiveDocumentBody,
 } from '../api/validators.ts';
 import { postObjectiveDocumentOp } from '../api/routes.ts';
-import {
-    deriveObjectiveRevisions,
-} from '../api/derive-objective-revisions.ts';
-import {
-    deriveBaselineScores,
-    deriveActualScores,
-} from '../api/derive-project-scores.ts';
+import { objectiveRevisionsUriPrefix } from
+    '../api/derive-objective-revisions.ts';
+import { scoresUriPrefix } from
+    '../api/derive-project-scores.ts';
 import { OBJECTIVE_SEEDS } from '../api/mock-data/objectives.ts';
 import {
     ORGANIZATION_TWO_OBJECTIVE,
@@ -71,6 +72,19 @@ const OBJ_DRIFT_METHOD_FILTER_1 = generateIdentifier();
 const OBJ_DRIFT_Z = generateIdentifier();
 const OBJ_DRIFT_A = generateIdentifier();
 const OBJ_DRIFT_M = generateIdentifier();
+
+async function headBodies<T>(
+    db: MemoryDbAdapter,
+    prefix: string,
+): Promise<T[]> {
+    const listed = await selectHeadsAtPath(
+        db, prefix, 'stateless',
+    );
+    const bodies = listed.heads
+        .filter((head) => !isDeletedHead(head, 'stateless'))
+        .map((head) => servedBodyOf(head, { sees: 'whole' }));
+    return bodies as T[];
+}
 
 // Phase Final Task 2: objectives(+objective_revisions)
 // dual-write stripped. This file no longer compares derive
@@ -365,14 +379,15 @@ async () => {
             db, req('GET', path, token),
         );
         assertStrictEquals(res.status, 200);
-        const derived = await deriveObjectiveRevisions(
-            db, organization, id,
+        const derived = await headBodies<
+            ObjectiveRevisionEntity
+        >(
+            db, objectiveRevisionsUriPrefix(organization, id),
         );
         const parts = await partsOf<{ id: string }>(res);
         await assertPartsAreHeads(db, parts, { sees: 'whole' });
         assertEquals(
-            parts.map((part) => part.body().toValue())
-                .toSorted(byIdAscending),
+            parts.map((part) => part.body().toValue()),
             derived,
         );
         assertStrictEquals(derived.length, 1);
@@ -391,8 +406,10 @@ async () => {
     assertStrictEquals(foreignRes.status, 204);
     assertStrictEquals(await foreignRes.text(), '');
     assertEquals(
-        await deriveObjectiveRevisions(
-            db, ORGANIZATION_TWO, foreignId,
+        await headBodies(
+            db, objectiveRevisionsUriPrefix(
+                ORGANIZATION_TWO, foreignId,
+            ),
         ),
         [],
     );
@@ -428,14 +445,16 @@ Deno.test('score collection wire equals derive per project: an'
         db, req('GET', fullBasePath, tokenStark),
     );
     assertStrictEquals(fullBaseRes.status, 200);
-    const derivedFullBaselines = await deriveBaselineScores(
-        db, STARK_ORGANIZATION, fullCoverageProjectId,
+    const derivedFullBaselines = await headBodies(
+        db, scoresUriPrefix(
+            STARK_ORGANIZATION, fullCoverageProjectId,
+            'objective-baseline-scores',
+        ),
     );
     const fullBaseParts = await partsOf<{ id: string }>(fullBaseRes);
     await assertPartsAreHeads(db, fullBaseParts, { sees: 'whole' });
     assertEquals(
-        fullBaseParts.map((part) => part.body().toValue())
-            .toSorted(byIdAscending),
+        fullBaseParts.map((part) => part.body().toValue()),
         derivedFullBaselines,
     );
     assertStrictEquals(derivedFullBaselines.length, 4);
@@ -444,14 +463,16 @@ Deno.test('score collection wire equals derive per project: an'
         db, req('GET', fullActPath, tokenStark),
     );
     assertStrictEquals(fullActRes.status, 200);
-    const derivedFullActuals = await deriveActualScores(
-        db, STARK_ORGANIZATION, fullCoverageProjectId,
+    const derivedFullActuals = await headBodies(
+        db, scoresUriPrefix(
+            STARK_ORGANIZATION, fullCoverageProjectId,
+            'objective-actual-scores',
+        ),
     );
     const fullActParts = await partsOf<{ id: string }>(fullActRes);
     await assertPartsAreHeads(db, fullActParts, { sees: 'whole' });
     assertEquals(
-        fullActParts.map((part) => part.body().toValue())
-            .toSorted(byIdAscending),
+        fullActParts.map((part) => part.body().toValue()),
         derivedFullActuals,
     );
     assertStrictEquals(derivedFullActuals.length, 64);
@@ -464,34 +485,45 @@ Deno.test('score collection wire equals derive per project: an'
         tokenStark,
     ));
     assertStrictEquals(partialBaseRes.status, 200);
-    const derivedPartialBaselines = await deriveBaselineScores(
-        db, STARK_ORGANIZATION, partialProjectId,
+    const derivedPartialBaselines = await headBodies(
+        db, scoresUriPrefix(
+            STARK_ORGANIZATION, partialProjectId,
+            'objective-baseline-scores',
+        ),
     );
     const partialBaseParts = await partsOf<{ id: string }>(partialBaseRes);
     await assertPartsAreHeads(db, partialBaseParts, { sees: 'whole' });
     assertEquals(
-        partialBaseParts.map((part) => part.body().toValue())
-            .toSorted(byIdAscending),
+        partialBaseParts.map((part) => part.body().toValue()),
         derivedPartialBaselines,
     );
     assertStrictEquals(derivedPartialBaselines.length, 2);
     assertEquals(
-        await deriveActualScores(
-            db, STARK_ORGANIZATION, partialProjectId,
+        await headBodies(
+            db, scoresUriPrefix(
+                STARK_ORGANIZATION, partialProjectId,
+                'objective-actual-scores',
+            ),
         ),
         [],
     );
 
     const submittedProjectId = 'PIfhHMLQQxTxKFDdabXbOw';
     assertEquals(
-        await deriveBaselineScores(
-            db, STARK_ORGANIZATION, submittedProjectId,
+        await headBodies(
+            db, scoresUriPrefix(
+                STARK_ORGANIZATION, submittedProjectId,
+                'objective-baseline-scores',
+            ),
         ),
         [],
     );
     assertEquals(
-        await deriveActualScores(
-            db, STARK_ORGANIZATION, submittedProjectId,
+        await headBodies(
+            db, scoresUriPrefix(
+                STARK_ORGANIZATION, submittedProjectId,
+                'objective-actual-scores',
+            ),
         ),
         [],
     );
@@ -500,14 +532,20 @@ Deno.test('score collection wire equals derive per project: an'
         'seed-project-org2',
     );
     assertEquals(
-        await deriveBaselineScores(
-            db, ORGANIZATION_TWO, org2ProjectId,
+        await headBodies(
+            db, scoresUriPrefix(
+                ORGANIZATION_TWO, org2ProjectId,
+                'objective-baseline-scores',
+            ),
         ),
         [],
     );
     assertEquals(
-        await deriveActualScores(
-            db, ORGANIZATION_TWO, org2ProjectId,
+        await headBodies(
+            db, scoresUriPrefix(
+                ORGANIZATION_TWO, org2ProjectId,
+                'objective-actual-scores',
+            ),
         ),
         [],
     );
@@ -518,13 +556,19 @@ Deno.test('score collection wire equals derive per project: an'
     const derivedActualTotal: { id: string }[] = [];
     for (const projectId of starkProjectIds) {
         derivedBaselineTotal.push(
-            ...(await deriveBaselineScores(
-                db, STARK_ORGANIZATION, projectId,
+            ...(await headBodies<{ id: string }>(
+                db, scoresUriPrefix(
+                    STARK_ORGANIZATION, projectId,
+                    'objective-baseline-scores',
+                ),
             )),
         );
         derivedActualTotal.push(
-            ...(await deriveActualScores(
-                db, STARK_ORGANIZATION, projectId,
+            ...(await headBodies<{ id: string }>(
+                db, scoresUriPrefix(
+                    STARK_ORGANIZATION, projectId,
+                    'objective-actual-scores',
+                ),
             )),
         );
     }
@@ -541,8 +585,11 @@ Deno.test('score collection wire equals derive per project: an'
     assertStrictEquals(foreignRes.status, 204);
     assertStrictEquals(await foreignRes.text(), '');
     assertEquals(
-        await deriveBaselineScores(
-            db, ORGANIZATION_TWO, fullCoverageProjectId,
+        await headBodies(
+            db, scoresUriPrefix(
+                ORGANIZATION_TWO, fullCoverageProjectId,
+                'objective-baseline-scores',
+            ),
         ),
         [],
     );
@@ -597,14 +644,17 @@ Deno.test('live-write chain: create, reposition, revision edit,'
                 + objectiveId + '/revisions/',
             token,
         ));
-        const revs = await deriveObjectiveRevisions(
-            db, STARK_ORGANIZATION, objectiveId,
+        const revs = await headBodies<
+            ObjectiveRevisionEntity
+        >(
+            db, objectiveRevisionsUriPrefix(
+                STARK_ORGANIZATION, objectiveId,
+            ),
         );
         const revParts = await partsOf<{ id: string }>(revRes);
         await assertPartsAreHeads(db, revParts, { sees: 'whole' });
         assertEquals(
-            revParts.map((part) => part.body().toValue())
-                .toSorted(byIdAscending),
+            revParts.map((part) => part.body().toValue()),
             revs,
         );
         assertStrictEquals(revs.length, 1);
@@ -667,8 +717,12 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     ));
     assertStrictEquals(revEdit.status, 201);
     {
-        const revs = await deriveObjectiveRevisions(
-            db, STARK_ORGANIZATION, objectiveId,
+        const revs = await headBodies<
+            ObjectiveRevisionEntity
+        >(
+            db, objectiveRevisionsUriPrefix(
+                STARK_ORGANIZATION, objectiveId,
+            ),
         );
         assertStrictEquals(revs.length, 2);
         const latestByAt = [...revs].sort((a, b) =>
@@ -815,14 +869,16 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     );
     assertStrictEquals(baseRes.status, 200);
     const derivedBaselinesAfterConversion =
-        await deriveBaselineScores(
-            db, STARK_ORGANIZATION, projectId,
+        await headBodies(
+            db, scoresUriPrefix(
+                STARK_ORGANIZATION, projectId,
+                'objective-baseline-scores',
+            ),
         );
     const baseParts = await partsOf<{ id: string }>(baseRes);
     await assertPartsAreHeads(db, baseParts, { sees: 'whole' });
     assertEquals(
-        baseParts.map((part) => part.body().toValue())
-            .toSorted(byIdAscending),
+        baseParts.map((part) => part.body().toValue()),
         derivedBaselinesAfterConversion,
     );
     assertStrictEquals(derivedBaselinesAfterConversion.length, 2);
@@ -855,14 +911,16 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     const baseFinalRes = await handleRequest(
         db, req('GET', basePath, token),
     );
-    const derivedBaselinesFinal = await deriveBaselineScores(
-        db, STARK_ORGANIZATION, projectId,
+    const derivedBaselinesFinal = await headBodies(
+        db, scoresUriPrefix(
+            STARK_ORGANIZATION, projectId,
+            'objective-baseline-scores',
+        ),
     );
     const baseFinalParts = await partsOf<{ id: string }>(baseFinalRes);
     await assertPartsAreHeads(db, baseFinalParts, { sees: 'whole' });
     assertEquals(
-        baseFinalParts.map((part) => part.body().toValue())
-            .toSorted(byIdAscending),
+        baseFinalParts.map((part) => part.body().toValue()),
         derivedBaselinesFinal,
     );
     assertStrictEquals(derivedBaselinesFinal.length, 3);
@@ -873,14 +931,16 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     const actFinalRes = await handleRequest(
         db, req('GET', actPath, token),
     );
-    const derivedActualsFinal = await deriveActualScores(
-        db, STARK_ORGANIZATION, projectId,
+    const derivedActualsFinal = await headBodies(
+        db, scoresUriPrefix(
+            STARK_ORGANIZATION, projectId,
+            'objective-actual-scores',
+        ),
     );
     const actFinalParts = await partsOf<{ id: string }>(actFinalRes);
     await assertPartsAreHeads(db, actFinalParts, { sees: 'whole' });
     assertEquals(
-        actFinalParts.map((part) => part.body().toValue())
-            .toSorted(byIdAscending),
+        actFinalParts.map((part) => part.body().toValue()),
         derivedActualsFinal,
     );
     assertStrictEquals(derivedActualsFinal.length, 1);
@@ -1221,8 +1281,10 @@ async () => {
         ...body,
     };
     assertEquals(await putRes.json(), expected);
-    const revs = await deriveObjectiveRevisions(
-        db, STARK_ORGANIZATION, objectiveId,
+    const revs = await headBodies<ObjectiveRevisionEntity>(
+        db, objectiveRevisionsUriPrefix(
+            STARK_ORGANIZATION, objectiveId,
+        ),
     );
     assert(revs.some((r) => r.id === revisionId));
     const found = revs.find((r) => r.id === revisionId)!;

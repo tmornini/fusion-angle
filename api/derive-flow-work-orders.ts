@@ -11,7 +11,7 @@ import {
 
 // The flow<->work-order join's own reshaping of the generic
 // message-plane reduction (derive-documents.ts) — the
-// deriveProjectFlows structural mirror (api/derive-project-
+// project-flow join's structural mirror (api/derive-project-
 // flows.ts), re-nested one level deeper: one prefix scan per
 // flow, at the join document the live PUT flows/:id/work-
 // orders/:woid route, Phase 5 Task 3's create, and Phase 5 Task
@@ -24,7 +24,7 @@ import {
 // DELETE-head exclusion mirrors the old plane's physical
 // splice; parity, not a new mechanism — no DELETE route exists
 // for this join today, so the exclusion is defense-in-depth,
-// the deriveProjectFlows mechanics verbatim). GET
+// the project-flow join's mechanics verbatim). GET
 // flows/:id/work-orders/ serves the joins' stored heads
 // (spec §1 B).
 

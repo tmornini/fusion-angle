@@ -23,19 +23,20 @@ import {
     validateWorkOrderVersion,
     validateFlowWorkOrderEntity,
     validateStateFieldValueEntity,
-    validateStateEntity,
     validateBaselineScoreEntity,
     validateActualScoreEntity,
 } from '../api/validators.ts';
-import {
-    deriveIdeaSubmissions,
-} from '../api/derive-ideas.ts';
-import { deriveProjectFlows } from
+import { submissionsUriPrefix } from
+    '../api/derive-ideas.ts';
+import { projectFlowsUriPrefix } from
     '../api/derive-project-flows.ts';
+import { scoresUriPrefix } from
+    '../api/derive-project-scores.ts';
 import {
-    deriveBaselineScores,
-    deriveActualScores,
-} from '../api/derive-project-scores.ts';
+    isDeletedHead,
+    selectHeadsAtPath,
+} from '../api/head-reads.ts';
+import { servedBodyOf } from '../api/served-response.ts';
 import {
     deriveFlows,
 } from '../api/derive-flows.ts';
@@ -56,9 +57,6 @@ import { postWorkOrderDocumentOp } from
     '../api/routes.ts';
 import { deriveFlowWorkOrders } from
     '../api/derive-flow-work-orders.ts';
-import {
-    deriveInvitationStates,
-} from '../api/derive-states.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
 import {
     assignOrganization,
@@ -93,6 +91,19 @@ function withoutId(
 }
 
 type Validator = (b: Record<string, unknown>) => unknown;
+
+async function headBodies(
+    db: MemoryDbAdapter,
+    prefix: string,
+): Promise<{ id: string; at: string }[]> {
+    const listed = await selectHeadsAtPath(
+        db, prefix, 'stateless',
+    );
+    const bodies = listed.heads
+        .filter((head) => !isDeletedHead(head, 'stateless'))
+        .map((head) => servedBodyOf(head, { sees: 'whole' }));
+    return bodies as { id: string; at: string }[];
+}
 
 async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();
@@ -192,29 +203,6 @@ const WORK_ORDERS_WIRING: DocumentFamilyWiring = {
     }),
 };
 
-// Phase Final Task 2 / C3: bulk deriveStates retired — the
-// idea/project/objective/record-type legs rode the retired
-// walk (deriveIdeaStateHistory et al., now read through GET
-// above); the work-order rows are the versions read's events,
-// each carrying the id the read named, and the
-// invitation-state rows come from the surviving derive; both
-// still owe validateStateEntity a caller.
-Deno.test(
-    'work-order and invitation state rows validate as'
-    + ' StateEntity',
-    async () => {
-        const db = await seededDb();
-        const rows = [
-            ...await seededWorkOrderLifecycle(db),
-            ...await deriveInvitationStates(db),
-        ];
-        assert(rows.length > 0, 'state rows empty');
-        for (const row of rows) {
-            validateStateEntity(withoutId(row));
-        }
-    },
-);
-
 for (const [name, getAll, validate] of TABLES) {
     Deno.test(
         `mock-data seeds non-empty ${name}`,
@@ -283,8 +271,8 @@ async () => {
     }));
     let total = 0;
     for (const { id, organization } of seeds) {
-        const subs = await deriveIdeaSubmissions(
-            db, organization, id,
+        const subs = await headBodies(
+            db, submissionsUriPrefix(organization, id),
         );
         total += subs.length;
         for (const sub of subs) {
@@ -342,8 +330,10 @@ async () => {
             db, 'projects', organization,
         );
         for (const project of projects) {
-            const joins = await deriveProjectFlows(
-                db, organization, project.id,
+            const joins = await headBodies(
+                db, projectFlowsUriPrefix(
+                    organization, project.id,
+                ),
             );
             total += joins.length;
             for (const join of joins) {
@@ -365,15 +355,21 @@ Deno.test('mock-data derived baseline/actual scores pass'
             db, 'projects', organization,
         );
         for (const project of projects) {
-            const baselines = await deriveBaselineScores(
-                db, organization, project.id,
+            const baselines = await headBodies(
+                db, scoresUriPrefix(
+                    organization, project.id,
+                    'objective-baseline-scores',
+                ),
             );
             baselineTotal += baselines.length;
             for (const row of baselines) {
                 validateBaselineScoreEntity(withoutId(row));
             }
-            const actuals = await deriveActualScores(
-                db, organization, project.id,
+            const actuals = await headBodies(
+                db, scoresUriPrefix(
+                    organization, project.id,
+                    'objective-actual-scores',
+                ),
             );
             actualTotal += actuals.length;
             for (const row of actuals) {
@@ -423,11 +419,17 @@ async () => {
         );
         for (const project of projects) {
             for (const row of [
-                ...await deriveBaselineScores(
-                    db, organization, project.id,
+                ...await headBodies(
+                    db, scoresUriPrefix(
+                        organization, project.id,
+                        'objective-baseline-scores',
+                    ),
                 ),
-                ...await deriveActualScores(
-                    db, organization, project.id,
+                ...await headBodies(
+                    db, scoresUriPrefix(
+                        organization, project.id,
+                        'objective-actual-scores',
+                    ),
                 ),
             ]) {
                 assertMatch(

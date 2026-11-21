@@ -1,25 +1,15 @@
-import type { DbAdapter } from './db.ts';
 import type { Id, ProjectFlowEntity } from '../shared/types.ts';
 import { validateProjectFlowEntity } from './validators.ts';
 import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
-import {
-    deriveDocumentsAt,
-    byIdAscending,
-    type DerivedDocument,
-} from './derive-documents.ts';
+import { type DerivedDocument } from './derive-documents.ts';
 
-// The project<->flow join's own reshaping of the generic
-// message-plane reduction (derive-documents.ts): one prefix
-// scan per project, at the join document the live route and the
+// The project<->flow join document the live route and the
 // Phase 4 Task 5 create/seed writes both share — verified by
 // content against a stored :pfid pair (tests/api-flow-
 // document.test.ts's joinPrefix): /organizations/{org}/
 // projects/{projectId}/flows/. A join row carries no lifecycle
-// trio of its own — a DELETE tombstones it outright
-// (deriveDocumentsAt's own DELETE-head exclusion mirrors the
-// old plane's physical splice; parity, not a new mechanism).
-// GET projects/:id/flows/ serves the joins' stored heads
+// of its own. GET projects/:id/flows/ serves the stored heads
 // (spec §1 B).
 
 export function projectFlowsUriPrefix(
@@ -41,24 +31,4 @@ export function projectFlowEntityOf(
         id: document.name,
         ...validateProjectFlowEntity(withoutId(document.body)),
     };
-}
-
-// id-lex ordered (byIdAscending — the derivation's own
-// order, never the backend's); a DELETE head
-// excludes the row exactly as the old plane's physical splice
-// does (parity, not a new mechanism).
-export async function deriveProjectFlows(
-    db: DbAdapter,
-    organization: Id,
-    projectId: Id,
-): Promise<ProjectFlowEntity[]> {
-    const prefix = projectFlowsUriPrefix(organization, projectId);
-    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
-    );
-    const documents = deriveDocumentsAt(messagePairs, prefix);
-    const rows: ProjectFlowEntity[] = [];
-    for (const document of documents.values()) {
-        rows.push(projectFlowEntityOf(document));
-    }
-    return rows.sort(byIdAscending);
 }

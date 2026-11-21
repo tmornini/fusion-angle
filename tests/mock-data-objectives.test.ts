@@ -14,17 +14,24 @@ import {
 } from '../client/objectives.ts';
 import { getProjectEntities } from
     '../client/projects.ts';
-import type { Id, ProjectState } from
-    '../shared/types.ts';
+import type {
+    Id,
+    ObjectiveRevisionEntity,
+    ProjectState,
+} from '../shared/types.ts';
 import type { RequestContext } from
     '../client/request-context.ts';
 import {
     getBaselineScoresForProject,
     getActualScoresForProject,
 } from '../client/project-scoring.ts';
+import { objectiveRevisionsUriPrefix } from
+    '../api/derive-objective-revisions.ts';
 import {
-    deriveObjectiveRevisions,
-} from '../api/derive-objective-revisions.ts';
+    isDeletedHead,
+    selectHeadsAtPath,
+} from '../api/head-reads.ts';
+import { servedBodyOf } from '../api/served-response.ts';
 import {
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,
@@ -66,6 +73,22 @@ async function getCollection(
     return rows as { id: Id; state: string }[];
 }
 
+async function revisionHeads(
+    db: MemoryDbAdapter,
+    organization: Id,
+    objectiveId: Id,
+): Promise<ObjectiveRevisionEntity[]> {
+    const listed = await selectHeadsAtPath(
+        db,
+        objectiveRevisionsUriPrefix(organization, objectiveId),
+        'stateless',
+    );
+    const bodies = listed.heads
+        .filter((head) => !isDeletedHead(head, 'stateless'))
+        .map((head) => servedBodyOf(head, { sees: 'whole' }));
+    return bodies as unknown as ObjectiveRevisionEntity[];
+}
+
 async function projectIdsByState(
     ctx: RequestContext,
     wanted: ProjectState,
@@ -103,7 +126,7 @@ async () => {
         validateObjectiveEntity(body);
     }
     // Org-2 objective via derive from the other plane.
-    const org2Revs = await deriveObjectiveRevisions(
+    const org2Revs = await revisionHeads(
         db, ORGANIZATION_TWO, ORGANIZATION_TWO_OBJECTIVE.id,
     );
     assertStrictEquals(org2Revs.length, 1);
@@ -116,7 +139,7 @@ Deno.test('postMockDataLoad seeds one revision per objective',
         // Stark revisions (4) + org-2 revision (1).
         let total = 0;
         for (const seed of OBJECTIVE_SEEDS) {
-            const revs = await deriveObjectiveRevisions(
+            const revs = await revisionHeads(
                 db, STARK_ORGANIZATION, seed.id,
             );
             assertStrictEquals(revs.length, 1);
@@ -124,7 +147,7 @@ Deno.test('postMockDataLoad seeds one revision per objective',
             validateObjectiveRevisionEntity(body);
             total += 1;
         }
-        const org2Revs = await deriveObjectiveRevisions(
+        const org2Revs = await revisionHeads(
             db, ORGANIZATION_TWO,
             ORGANIZATION_TWO_OBJECTIVE.id,
         );

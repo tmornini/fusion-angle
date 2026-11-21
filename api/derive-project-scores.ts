@@ -1,46 +1,21 @@
-import type { DbAdapter } from './db.ts';
-import type {
-    Id,
-    ProjectObjectiveBaselineScoreEntity,
-    ProjectObjectiveActualScoreEntity,
-} from '../shared/types.ts';
+import type { Id } from '../shared/types.ts';
 import { pickString, pickNumber } from './validators.ts';
 import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
-import {
-    deriveDocumentsAt,
-    byIdAscending,
-    type DerivedDocument,
-} from './derive-documents.ts';
+import { type DerivedDocument } from './derive-documents.ts';
 
-// The project<->objective-score nest's own reshaping of the
-// generic message-plane reduction (derive-documents.ts) — the
-// deriveFlowRecords structural mirror (api/derive-flow-
-// records.ts), for TWO byte-twin nested collections that share
-// one module because they are the SAME shape at two sibling
-// documents: /projects/{id}/objective-baseline-scores/ and
-// /projects/{id}/objective-actual-scores/, written by a live
-// standalone PUT at either leaf AND by the idea-conversion
-// bundle's per-baseline synthesized pairs (routes.ts's
-// route('ideas/:id/conversion', ...)). Both collection GETs
-// serve the stored heads at their prefix through
-// selectHeadsAtPath (api/head-reads.ts); the two derivations
-// stay for their test callers (Interpretation V), and
-// routes.ts still calls the prefix and entity-of helpers for
-// the writes.
-//
-// Neither leaf carries a lifecycle, a DELETE, or a by-id GET
-// route (only the bare collection GET is live at each document;
-// the leaf is PUT-only) — so, like deriveObjectiveRevisions, this
-// module exports the two collection derivations alone, no by-id
-// sibling.
-//
-// H7: explicit id-lex sort — load-bearing, because the
-// backend's row order is not a contract and no caller may
-// inherit it. The archived-list raw-order surface and the
-// org-page next-position computation are the named
-// pre-existing H7-class surfaces; these two derivations
-// join them.
+// Baseline and actual scores are the same five-field
+// shape at two sibling documents:
+// /projects/{id}/objective-baseline-scores/ and
+// /projects/{id}/objective-actual-scores/. A live
+// standalone PUT writes either leaf, and the
+// idea-conversion bundle writes the per-baseline pairs
+// (routes.ts's route('ideas/:id/conversion', ...)).
+// Both collection GETs serve the stored heads through
+// selectHeadsAtPath (api/head-reads.ts). routes.ts
+// calls the prefix and entity-of helpers for the writes.
+// Neither leaf carries a lifecycle, a DELETE, or a
+// by-id GET (the leaf is PUT-only).
 
 export function scoresUriPrefix(
     organization: Id,
@@ -71,55 +46,4 @@ export function scoreEntityOf(document: DerivedDocument): {
         member_id: pickString(body, 'member_id'),
         at: pickString(body, 'at'),
     };
-}
-
-async function fetchScoreDocuments(
-    db: DbAdapter,
-    organization: Id,
-    projectId: Id,
-    segment: string,
-): Promise<Map<string, DerivedDocument>> {
-    const prefix = scoresUriPrefix(organization, projectId, segment);
-    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
-    );
-    return deriveDocumentsAt(messagePairs, prefix);
-}
-
-// id-lex ordered (byIdAscending — the derivation's own
-// order, never the backend's). The route no longer calls
-// this: GET projects/:id/objective-baseline-scores/ serves
-// the stored heads at this prefix through selectHeadsAtPath,
-// and this derivation stays for its test callers
-// (Interpretation V). The parent scope is still the prefix
-// alone.
-export async function deriveBaselineScores(
-    db: DbAdapter,
-    organization: Id,
-    projectId: Id,
-): Promise<ProjectObjectiveBaselineScoreEntity[]> {
-    const documents = await fetchScoreDocuments(
-        db, organization, projectId, 'objective-baseline-scores',
-    );
-    const rows: ProjectObjectiveBaselineScoreEntity[] = [];
-    for (const document of documents.values()) {
-        rows.push(scoreEntityOf(document));
-    }
-    return rows.sort(byIdAscending);
-}
-
-// The actuals byte-twin of deriveBaselineScores above — same
-// prefix shape, same reduction, the sibling document.
-export async function deriveActualScores(
-    db: DbAdapter,
-    organization: Id,
-    projectId: Id,
-): Promise<ProjectObjectiveActualScoreEntity[]> {
-    const documents = await fetchScoreDocuments(
-        db, organization, projectId, 'objective-actual-scores',
-    );
-    const rows: ProjectObjectiveActualScoreEntity[] = [];
-    for (const document of documents.values()) {
-        rows.push(scoreEntityOf(document));
-    }
-    return rows.sort(byIdAscending);
 }

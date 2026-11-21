@@ -46,7 +46,6 @@ import type {
     ProjectObjectiveBaselineScoreEntity,
     ProjectObjectiveActualScoreEntity,
     MessagePairEntity,
-    StateEntity,
     TransitionFieldValueEntity,
     WorkOrderEventEntity,
 } from '../shared/types.ts';
@@ -2466,35 +2465,6 @@ export function validateMessagePairEntity(
             body, 'response_secrets_hash',
         ),
         pair_hash: pickDigest(body, 'pair_hash'),
-    };
-}
-
-// etag is optional because versions-index rows carry
-// the pair id and other StateEntity rows omit it.
-const STATE_ENTITY_KEYS: readonly string[] = [
-    'entity_id', 'state', 'member_id', 'at',
-];
-
-export function validateStateEntity(
-    body: Record<string, unknown>,
-): Omit<StateEntity, 'id'> {
-    assertOnlyKeys(
-        body, STATE_ENTITY_KEYS, 'StateEntity',
-        ['etag'],
-    );
-    const etag = body['etag'];
-    return {
-        entity_id: pickString(
-            body, 'entity_id',
-        ),
-        state: pickString(body, 'state'),
-        member_id: pickIdentifier(body, 'member_id'),
-        at: validateTimestampField(
-            body, 'at', 'StateEntity',
-        ),
-        ...(typeof etag === 'string'
-            ? { etag }
-            : {}),
     };
 }
 

@@ -6,7 +6,6 @@ import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import {
     deriveFlow,
     deriveFlows,
-    deriveFlowStateHistory,
 } from '../api/derive-flows.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
@@ -187,36 +186,6 @@ Deno.test(
         );
         assertStrictEquals(
             flows.some((flow) => flow.id === id), true,
-        );
-
-        const history = await deriveFlowStateHistory(
-            db, STARK_ORGANIZATION, id,
-        );
-        // Order- AND content-sensitive: (state_at, id)
-        // ascending — the SAME order store-state.ts's
-        // getAllForIn returns. The later-ARRIVED but earlier-
-        // STAMPED 'deleted' event sorts FIRST; genesis SECOND.
-        assertEquals(
-            history.map((entry) => ({
-                id: entry.id,
-                entity_id: entry.entity_id,
-                state: entry.state,
-                at: entry.at,
-            })),
-            [
-                {
-                    id: laterEventId,
-                    entity_id: id,
-                    state: 'deleted',
-                    at: '2020-01-01T00:00:00.000000Z',
-                },
-                {
-                    id: genesisEventId,
-                    entity_id: id,
-                    state: 'active',
-                    at: '2026-06-01T00:00:00.000000Z',
-                },
-            ],
         );
     },
 );

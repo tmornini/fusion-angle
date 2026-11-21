@@ -20,10 +20,13 @@ import { buildIdeas } from '../api/mock-data/ideas.ts';
 import { assignOrganization } from
     '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
+import { submissionsUriPrefix } from
+    '../api/derive-ideas.ts';
 import {
-    deriveIdeaSubmissions,
-} from '../api/derive-ideas.ts';
-import { byIdAscending } from '../api/derive-documents.ts';
+    isDeletedHead,
+    selectHeadsAtPath,
+} from '../api/head-reads.ts';
+import { servedBodyOf } from '../api/served-response.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
@@ -36,6 +39,22 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 
 const READER: Id = 'XXZruirZyAOoRpNxaDnpSA';
+
+async function submissionHeads(
+    db: MemoryDbAdapter,
+    organization: string,
+    ideaId: string,
+): Promise<{ id: string }[]> {
+    const listed = await selectHeadsAtPath(
+        db,
+        submissionsUriPrefix(organization, ideaId),
+        'stateless',
+    );
+    const bodies = listed.heads
+        .filter((head) => !isDeletedHead(head, 'stateless'))
+        .map((head) => servedBodyOf(head, { sees: 'whole' }));
+    return bodies as { id: string }[];
+}
 
 function wiringOf(family: string): DocumentFamilyWiring {
     const wiring = documentFamilyWiring(family);
@@ -337,21 +356,23 @@ async () => {
         parts.map((part) => part.body().toValue()),
         [expectedSub],
     );
-    const derived = await deriveIdeaSubmissions(
-        db, 'AjdvjuECVZEgZoFajaIEkg', ideaId,
+    assertEquals(
+        await submissionHeads(
+            db, 'AjdvjuECVZEgZoFajaIEkg', ideaId,
+        ),
+        [expectedSub],
     );
-    assertEquals(derived, [expectedSub]);
 });
 
-Deno.test('seeded idea submissions: derive non-empty for every'
+Deno.test('seeded idea submissions: a head for every'
 + ' seeded idea, per org', async () => {
     const db = await seededDb();
     for (const { id, organization } of SEEDED_IDEAS) {
-        const derived = await deriveIdeaSubmissions(
+        const heads = await submissionHeads(
             db, organization, id,
         );
         assert(
-            derived.length > 0,
+            heads.length > 0,
             'seeded submission missing for ' + id,
         );
         const token = await organizationToken(
@@ -364,14 +385,11 @@ Deno.test('seeded idea submissions: derive non-empty for every'
             token,
         ));
         assertStrictEquals(res.status, 200);
-        // The parts come in write order (response_at, id); the
-        // derive sorts by id, so the bodies compare as one set.
         const parts = await partsOf<{ id: string }>(res);
         await assertPartsAreHeads(db, parts, { sees: 'whole' });
         assertEquals(
-            parts.map((part) => part.body().toValue())
-                .toSorted(byIdAscending),
-            derived,
+            parts.map((part) => part.body().toValue()),
+            heads,
         );
     }
 });

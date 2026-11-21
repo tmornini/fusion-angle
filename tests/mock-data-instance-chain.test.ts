@@ -20,10 +20,12 @@ import {
     mockStateFieldValues,
 } from '../api/mock-data/seed-message-pairs.ts';
 import {
-    deriveInstanceRevisions,
     deriveInstanceHead,
     instancesUriPrefix,
+    revisionValuesOf,
 } from '../api/derive-record-instances.ts';
+import { selectVersionsAt } from '../api/head-reads.ts';
+import { servedBodyOf } from '../api/served-response.ts';
 import {
     workOrderHeadFor,
 } from '../api/derive-states.ts';
@@ -67,14 +69,27 @@ const LEGACY_UNION = new Map(
 Deno.test('A1 chain: instance history {} → 6 → 7; head = union',
 async () => {
     const db = await seededDb();
-    const revisions = await deriveInstanceRevisions(
-        db, STARK_ORGANIZATION, SEED_RECORD_TYPE_ID,
+    const versions = await selectVersionsAt(
+        db,
+        instancesUriPrefix(
+            STARK_ORGANIZATION, SEED_RECORD_TYPE_ID,
+        ),
         SEED_INSTANCE_ID,
+        'stateless',
+        'record_instances',
+        { sees: 'whole' },
+        () => Promise.reject(new Error('missing instance')),
+    );
+    assert(versions.kind === 'versions');
+    const revisions = versions.pairs.map((pair) =>
+        revisionValuesOf(
+            servedBodyOf(pair, { sees: 'whole' }),
+        ),
     );
     assertStrictEquals(revisions.length, 3);
-    assertStrictEquals(revisions[0]!.values.length, 0);
-    assertStrictEquals(revisions[1]!.values.length, 6);
-    assertStrictEquals(revisions[2]!.values.length, 7);
+    assertStrictEquals(revisions[0]!.length, 0);
+    assertStrictEquals(revisions[1]!.length, 6);
+    assertStrictEquals(revisions[2]!.length, 7);
 
     const head = await deriveInstanceHead(
         db, STARK_ORGANIZATION, SEED_RECORD_TYPE_ID,

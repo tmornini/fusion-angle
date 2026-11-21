@@ -1,17 +1,16 @@
-import { assertStrictEquals } from '@std/assert';
-import { deriveFlowStateHistory } from
-    '../api/derive-flows.ts';
+import { assert, assertStrictEquals } from '@std/assert';
 import { GET, GETCollection, POST } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
+import type { DbAdapter } from '../api/db.ts';
+import { canonicalPath } from '../api/message-pair.ts';
+import { selectVersionsAt } from '../api/head-reads.ts';
+import { servedBodyOf } from '../api/served-response.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
-} from '../shared/types.ts';
-import type {
-    StateEntity,
 } from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -23,6 +22,27 @@ async function freshDb() {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     return db;
+}
+
+async function flowVersions(
+    db: DbAdapter,
+    flowId: string,
+) {
+    const versions = await selectVersionsAt(
+        db,
+        canonicalPath(
+            'AjdvjuECVZEgZoFajaIEkg', '/flows/',
+        ),
+        flowId,
+        'state',
+        'flows',
+        { sees: 'whole' },
+        () => Promise.reject(new Error(
+            'missing flow ' + flowId,
+        )),
+    );
+    assert(versions.kind === 'versions');
+    return versions;
 }
 
 // The flow body OMITS organization_id — the org fence stamps it
@@ -123,16 +143,23 @@ Deno.test(
         assertStrictEquals(links[0]!.project_id, 'pnXmXrxOWayANgDLdCjuBw');
         assertStrictEquals(links[0]!.flow_id, 'aEsGMmBEFaVdWihhHXwCbw');
 
-        const events = await deriveFlowStateHistory(db
-            , 'AjdvjuECVZEgZoFajaIEkg', 'aEsGMmBEFaVdWihhHXwCbw');
+        const versions = await flowVersions(
+            db, 'aEsGMmBEFaVdWihhHXwCbw',
+        );
         // Phase Final Stage B: states table retired.
-        assertStrictEquals(events.length, 1);
-        const ev = events[0]! as StateEntity;
-        assertStrictEquals(ev.id, body.initialStateEventId);
-        assertStrictEquals(ev.state, 'active');
+        assertStrictEquals(versions.pairs.length, 1);
+        const pair = versions.pairs[0]!;
+        const ev = servedBodyOf(pair, { sees: 'whole' });
+        assertStrictEquals(
+            ev['state_event_id'], body.initialStateEventId,
+        );
+        assertStrictEquals(ev['state'], 'active');
         // The event is authored by the verified caller, never
         // the body.
-        assertStrictEquals(ev.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+        assertStrictEquals(
+            pair.requester_identity_id,
+            'XXZruirZyAOoRpNxaDnpSA',
+        );
     },
 );
 
@@ -154,11 +181,16 @@ Deno.test(
                 + 'aEsGMmBEFaVdWihhHXwCbw', DEV_TOKEN,
                 operationIdHeader())).body().toValue();
         assertStrictEquals(flow.id, 'aEsGMmBEFaVdWihhHXwCbw');
-        const flowEvents = await deriveFlowStateHistory(
-            db, 'AjdvjuECVZEgZoFajaIEkg', 'aEsGMmBEFaVdWihhHXwCbw',
+        const flowEvents = await flowVersions(
+            db, 'aEsGMmBEFaVdWihhHXwCbw',
         );
-        assertStrictEquals(flowEvents.length, 1);
-        assertStrictEquals(flowEvents[0]!.state, 'active');
+        assertStrictEquals(flowEvents.pairs.length, 1);
+        assertStrictEquals(
+            servedBodyOf(
+                flowEvents.pairs[0]!, { sees: 'whole' },
+            )['state'],
+            'active',
+        );
     },
 );
 

@@ -6,13 +6,15 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
+import { submissionsUriPrefix } from
+    '../api/derive-ideas.ts';
+import { scoresUriPrefix } from
+    '../api/derive-project-scores.ts';
 import {
-    deriveIdeaSubmissions,
-} from '../api/derive-ideas.ts';
-import {
-    deriveBaselineScores,
-    deriveActualScores,
-} from '../api/derive-project-scores.ts';
+    isDeletedHead,
+    selectHeadsAtPath,
+} from '../api/head-reads.ts';
+import { servedBodyOf } from '../api/served-response.ts';
 import { deriveFlows } from '../api/derive-flows.ts';
 import {
     deriveFlowRecords,
@@ -184,6 +186,27 @@ async function getCollection(
         wiringOf(family),
     )(db, [organization], READER, organization, []);
     return rows as { id: string; state: string }[];
+}
+
+async function headBodies(
+    db: MemoryDbAdapter,
+    prefix: string,
+): Promise<{
+    id: string;
+    member_id: string;
+    project_id: string;
+}[]> {
+    const listed = await selectHeadsAtPath(
+        db, prefix, 'stateless',
+    );
+    const bodies = listed.heads
+        .filter((head) => !isDeletedHead(head, 'stateless'))
+        .map((head) => servedBodyOf(head, { sees: 'whole' }));
+    return bodies as {
+        id: string;
+        member_id: string;
+        project_id: string;
+    }[];
 }
 
 async function seed() {
@@ -467,8 +490,8 @@ Deno.test('every idea submission names a submitter in its'
     const memberOrganizations = await membershipsByIdentity(db);
     const violations: string[] = [];
     for (const [ideaId, organization] of ideaOrganization) {
-        const subs = await deriveIdeaSubmissions(
-            db, organization, ideaId,
+        const subs = await headBodies(
+            db, submissionsUriPrefix(organization, ideaId),
         );
         for (const s of subs) {
             const organizations =
@@ -506,11 +529,17 @@ Deno.test('every project score names an author in its'
         for (const p of projects) {
             projectOrganization.set(p.id, organization);
             scores.push(
-                ...await deriveBaselineScores(
-                    db, organization, p.id,
+                ...await headBodies(
+                    db, scoresUriPrefix(
+                        organization, p.id,
+                        'objective-baseline-scores',
+                    ),
                 ),
-                ...await deriveActualScores(
-                    db, organization, p.id,
+                ...await headBodies(
+                    db, scoresUriPrefix(
+                        organization, p.id,
+                        'objective-actual-scores',
+                    ),
                 ),
             );
         }

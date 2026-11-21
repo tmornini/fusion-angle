@@ -1,7 +1,7 @@
 import type { DbAdapter } from './db.ts';
 import { missedReadError } from './derive-states.ts';
 import type {
-    Id, FlowWithGraph, StateEntity,
+    Id, FlowWithGraph,
     FlowNodeAttributeEntity, FlowNodeMemberEntity,
 } from '../shared/types.ts';
 import {
@@ -346,26 +346,6 @@ export async function resolveFlowUndoTarget(
     const target = targetPointer >= 0
         ? stack[targetPointer] : undefined;
     return { current, target };
-}
-
-// One row per pair whose state_event_id is NEW — the document
-// sequence IS the history, (state_at, id) ascending. Matches
-// states.getAllFor(flowId): node-level 'deleted'/'restored'
-// events carry NODE entity_ids, never the flow's own, so they
-// never appear in a flow's own document message pairs either — absent
-// from BOTH sides. NOT routed — drift-proof only.
-export async function deriveFlowStateHistory(
-    db: DbAdapter,
-    organization: Id,
-    flowId: Id,
-): Promise<StateEntity[]> {
-    const prefix = flowsUriPrefix(organization);
-    const { messagePairs } =
-        await fetchFlowDocumentMessagePairs(db, prefix, flowId);
-    return stateHistoryFrom(
-        documentLifecycleEvents(messagePairs),
-        flowId,
-    );
 }
 
 // ---- flowGraphBindingsFromMessagePairs — RESTRICT

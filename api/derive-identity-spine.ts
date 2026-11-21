@@ -211,7 +211,7 @@ export async function deriveIdentityPiiOf(
 }
 
 // ---- identity_credentials — a per-identity nested collection, --
-// ---- the deriveBaselineScores/deriveActualScores precedent -----
+// ---- the project-score collection precedent -----------------
 // ---- (api/derive-project-scores.ts) ------------------------------
 
 export function credentialsPrefixFor(identityId: Id): string {

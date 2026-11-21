@@ -2,9 +2,7 @@ import type { DbAdapter } from './db.ts';
 import type { Id } from '../shared/types.ts';
 import {
     deriveDocumentsAt,
-    documentMessagePairsAt,
     byIdAscending,
-    type DocumentMessagePair,
 } from './derive-documents.ts';
 
 // Instance derive surface — full-state heads (R5 / Task 14).
@@ -14,18 +12,9 @@ import {
 // PUT|DELETE — revision storage is PUT with full state, not
 // a PATCH method pair. Do not edit derive-documents.ts.
 
-const DELETE_METHOD = 'DELETE';
-const PUT_METHOD = 'PUT';
-
 export interface InstanceValue {
     readonly attribute_id: string;
     readonly value: string;
-}
-
-export interface InstanceRevision {
-    readonly at: string;
-    readonly messagePairId: string;
-    readonly values: readonly InstanceValue[];
 }
 
 export interface InstanceHead {
@@ -113,21 +102,6 @@ export function mergeInstanceValues(
         }));
 }
 
-async function fetchInstanceMessagePairs(
-    db: DbAdapter,
-    organization: Id,
-    recordTypeId: Id,
-    instanceId: Id,
-): Promise<readonly DocumentMessagePair[]> {
-    const prefix = instancesUriPrefix(
-        organization, recordTypeId,
-    );
-    const history = await db.messagePairs.getDocumentHistory(
-        prefix, instanceId,
-    );
-    return documentMessagePairsAt(history, prefix);
-}
-
 // undefined when absent OR tombstoned (DELETE is the last
 // document message pair) — tombstone = absent for every read path.
 // Head body: revisionValuesOf(head body) — ONE head pair via
@@ -178,30 +152,4 @@ export async function deriveInstanceCollection(
         });
     }
     return rows.sort(byIdAscending);
-}
-
-// ASC; empty when absent or tombstoned; each entry carries
-// FULL state (the stored body — no fold of prior pairs).
-export async function deriveInstanceRevisions(
-    db: DbAdapter,
-    organization: Id,
-    recordTypeId: Id,
-    instanceId: Id,
-): Promise<InstanceRevision[]> {
-    const messagePairs = await fetchInstanceMessagePairs(
-        db, organization, recordTypeId, instanceId,
-    );
-    if (messagePairs.length === 0) return [];
-    const last = messagePairs[messagePairs.length - 1]!;
-    if (last.method === DELETE_METHOD) return [];
-    const revisions: InstanceRevision[] = [];
-    for (const messagePair of messagePairs) {
-        if (messagePair.method !== PUT_METHOD) continue;
-        revisions.push({
-            at: messagePair.at,
-            messagePairId: messagePair.id,
-            values: revisionValuesOf(messagePair.body),
-        });
-    }
-    return revisions;
 }

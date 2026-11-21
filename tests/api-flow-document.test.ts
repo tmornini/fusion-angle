@@ -8,10 +8,10 @@ import {
     generateIdentifier,
     NIL_IDENTIFIER,
 } from '../shared/identifier.ts';
-import {
-    deriveFlowStateHistory,
-    flowStoredEntityOf,
-} from '../api/derive-flows.ts';
+import { flowStoredEntityOf } from
+    '../api/derive-flows.ts';
+import { selectVersionsAt } from '../api/head-reads.ts';
+import { servedBodyOf } from '../api/served-response.ts';
 import {
     documentMessagePairsAt,
 } from '../api/derive-documents.ts';
@@ -52,6 +52,29 @@ import {
 // families in tests/document-family.test.ts).
 
 const AT = '2026-01-01T00:00:00.000000Z';
+
+async function flowVersionBodies(
+    db: MemoryDbAdapter,
+    flowId: string,
+): Promise<Record<string, unknown>[]> {
+    const versions = await selectVersionsAt(
+        db,
+        canonicalPath(
+            'AjdvjuECVZEgZoFajaIEkg', '/flows/',
+        ),
+        flowId,
+        'state',
+        'flows',
+        { sees: 'whole' },
+        () => Promise.reject(new Error(
+            'missing flow ' + flowId,
+        )),
+    );
+    assert(versions.kind === 'versions');
+    return versions.pairs.map((pair) =>
+        servedBodyOf(pair, { sees: 'whole' }),
+    );
+}
 
 function req(
     method: string,
@@ -257,10 +280,11 @@ Deno.test('postFlowDocumentOp returns the entity, exactly one'
     assertStrictEquals(update.status, 200);
     const wire = await update.json() as { name: string };
     assertStrictEquals(wire.name, 'Renamed');
-    const events = await deriveFlowStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
-        , 'bgwNLywXomEwlIMSFlkukQ');
+    const events = await flowVersionBodies(
+        db, 'bgwNLywXomEwlIMSFlkukQ',
+    );
     assertEquals(
-        events.map(e => e.state), ['active', 'updated'],
+        events.map((e) => e['state']), ['active', 'updated'],
     );
     // Phase Final Stage B: flow_nodes + flow_versions tables
     // retired — message-plane state events are the residual pin.
@@ -509,8 +533,9 @@ Deno.test('e2e: a byte-identical resend converges (one event, one'
     assertStrictEquals(first.status, 200);
     const firstId = pairIdOf(first);
     const eventsAfterFirst =
-        await deriveFlowStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
-            , 'bZXXOWeDHCowVkWMhrZGgg');
+        await flowVersionBodies(
+            db, 'bZXXOWeDHCowVkWMhrZGgg',
+        );
     const requestsAfterFirst = await db.messagePairs.getAll();
 
     // Same response body with the current latch is 200
@@ -530,8 +555,9 @@ Deno.test('e2e: a byte-identical resend converges (one event, one'
     assert(stored !== undefined);
     assertStrictEquals(pairIdOf(second), stored.id);
     const eventsAfterSecond =
-        await deriveFlowStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
-            , 'bZXXOWeDHCowVkWMhrZGgg');
+        await flowVersionBodies(
+            db, 'bZXXOWeDHCowVkWMhrZGgg',
+        );
     assertStrictEquals(
         eventsAfterSecond.length, eventsAfterFirst.length,
     );
@@ -675,9 +701,8 @@ async () => {
 
     const requestsBefore = await db.messagePairs.getAll();
     const responsesBefore = await db.messagePairs.getAll();
-    const eventsBefore = await deriveFlowStateHistory(db
-        , 'AjdvjuECVZEgZoFajaIEkg',
-        'cnRwmsMXKOgLWsMVIjtubQ',
+    const eventsBefore = await flowVersionBodies(
+        db, 'cnRwmsMXKOgLWsMVIjtubQ',
     );
 
     const res = await handleRequest(db, req(
@@ -698,9 +723,8 @@ async () => {
 
     const requestsAfter = await db.messagePairs.getAll();
     const responsesAfter = await db.messagePairs.getAll();
-    const eventsAfter = await deriveFlowStateHistory(db
-        , 'AjdvjuECVZEgZoFajaIEkg',
-        'cnRwmsMXKOgLWsMVIjtubQ',
+    const eventsAfter = await flowVersionBodies(
+        db, 'cnRwmsMXKOgLWsMVIjtubQ',
     );
     assertStrictEquals(requestsAfter.length, requestsBefore.length);
     assertStrictEquals(responsesAfter.length, responsesBefore.length);
@@ -1208,11 +1232,12 @@ async () => {
         assertStrictEquals(flow.name, 'Saved');
         assertStrictEquals(save.status, 200);
         assertStrictEquals(undo.status, 412);
-        const events = await deriveFlowStateHistory(db
-            , 'AjdvjuECVZEgZoFajaIEkg', 'biakjMJqdIlFhfVZBGhpKw');
+        const events = await flowVersionBodies(
+            db, 'biakjMJqdIlFhfVZBGhpKw',
+        );
         assert(
             !events.some(
-                e => e.id === undoEventId,
+                (e) => e['state_event_id'] === undoEventId,
             ),
             'the losing undo must not have posted its event',
         );

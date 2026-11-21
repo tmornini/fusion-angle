@@ -33,11 +33,16 @@ import { organizationToken } from './token-fixtures.ts';
 import {
     deriveFlow,
     deriveFlows,
-    deriveFlowStateHistory,
     flowEntityOf,
 } from '../api/derive-flows.ts';
-import { deriveProjectFlows } from
+import { projectFlowsUriPrefix } from
     '../api/derive-project-flows.ts';
+import {
+    isDeletedHead,
+    selectHeadsAtPath,
+    selectVersionsAt,
+} from '../api/head-reads.ts';
+import { servedBodyOf } from '../api/served-response.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
@@ -116,11 +121,39 @@ function req(
     });
 }
 
-function sortById<T extends { id: string }>(
-    rows: readonly T[],
-): T[] {
-    return [...rows].sort((a, b) =>
-        a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+async function headBodies<T>(
+    db: MemoryDbAdapter,
+    prefix: string,
+): Promise<T[]> {
+    const listed = await selectHeadsAtPath(
+        db, prefix, 'stateless',
+    );
+    const bodies = listed.heads
+        .filter((head) => !isDeletedHead(head, 'stateless'))
+        .map((head) => servedBodyOf(head, { sees: 'whole' }));
+    return bodies as T[];
+}
+
+async function flowVersionBodies(
+    db: MemoryDbAdapter,
+    organization: string,
+    flowId: string,
+): Promise<Record<string, unknown>[]> {
+    const versions = await selectVersionsAt(
+        db,
+        canonicalPath(organization, '/flows/'),
+        flowId,
+        'state',
+        'flows',
+        { sees: 'whole' },
+        () => Promise.reject(new Error(
+            'missing flow ' + flowId,
+        )),
+    );
+    assert(versions.kind === 'versions');
+    return versions.pairs.map((pair) =>
+        servedBodyOf(pair, { sees: 'whole' }),
+    );
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {
@@ -511,11 +544,22 @@ Deno.test('state-history parity across every seeded flow',
 async () => {
     const db = await seededDb();
     for (const { id, organization } of SEEDED_FLOWS) {
-        const derived = await deriveFlowStateHistory(
-            db, organization, id,
+        const versions = await selectVersionsAt(
+            db,
+            canonicalPath(organization, '/flows/'),
+            id,
+            'state',
+            'flows',
+            { sees: 'whole' },
+            () => Promise.reject(new Error(
+                'missing flow ' + id,
+            )),
         );
-        // Family history is the sole live oracle (C2).
-        assert(Array.isArray(derived));
+        assert(versions.kind === 'versions');
+        assert(
+            versions.pairs.length > 0,
+            'seeded flow has no versions: ' + id,
+        );
     }
 });
 
@@ -535,16 +579,16 @@ Deno.test('project-flows wire equals derive across every'
                 '/flows/', token,
         ));
         assertStrictEquals(res.status, 200);
-        // The parts come in write order (response_at, id); the
-        // derive sorts by id, so the bodies compare as one set.
         const parts = await partsOf<{ id: string }>(res);
         await assertPartsAreHeads(db, parts, { sees: 'whole' });
-        const derived = await deriveProjectFlows(
-            db, STARK_ORGANIZATION, projectId,
+        const derived = await headBodies<{ id: string }>(
+            db, projectFlowsUriPrefix(
+                STARK_ORGANIZATION, projectId,
+            ),
         );
         assertEquals(
-            sortById(parts.map((part) => part.body().toValue())),
-            sortById(derived),
+            parts.map((part) => part.body().toValue()),
+            derived,
         );
     }
 });
@@ -565,13 +609,15 @@ Deno.test('the two-flows project serves both join rows'
     // assertPartsAreHeads pins the write order.
     const parts = await partsOf<{ id: string }>(res);
     await assertPartsAreHeads(db, parts, { sees: 'whole' });
-    const derived = await deriveProjectFlows(
-        db, STARK_ORGANIZATION, TWO_FLOWS_PROJECT_ID,
+    const derived = await headBodies<{ id: string }>(
+        db, projectFlowsUriPrefix(
+            STARK_ORGANIZATION, TWO_FLOWS_PROJECT_ID,
+        ),
     );
     assertStrictEquals(derived.length, 2);
     assertEquals(
-        sortById(parts.map((part) => part.body().toValue())),
-        sortById(derived),
+        parts.map((part) => part.body().toValue()),
+        derived,
     );
 });
 
@@ -793,10 +839,6 @@ Deno.test('live-write chain: create, save, node delete, undo, '
         listBodies.some((body) => body.id === flowId), false,
     );
 
-    const derivedHistory = await deriveFlowStateHistory(
-        db, STARK_ORGANIZATION, flowId,
-    );
-    assert(derivedHistory.length >= 0);
 });
 
 // -- 7. live join-row chain: PUT appears, DELETE vanishes ------
@@ -829,11 +871,13 @@ Deno.test('live join-row chain: PUT appears on wire/derive, '
     await assertPartsAreHeads(db, partsAfterPut, { sees: 'whole' });
     const wireAfterPut = partsAfterPut.map((part) =>
         part.body().toValue());
-    const derivedAfterPut = await deriveProjectFlows(
-        db, STARK_ORGANIZATION, projectId,
+    const derivedAfterPut = await headBodies<{ id: string }>(
+        db, projectFlowsUriPrefix(
+            STARK_ORGANIZATION, projectId,
+        ),
     );
     assert(wireAfterPut.some((row) => row.id === pfid));
-    assertEquals(sortById(wireAfterPut), sortById(derivedAfterPut));
+    assertEquals(wireAfterPut, derivedAfterPut);
 
     const delRes = await handleRequest(db, req(
         'DELETE',
@@ -850,8 +894,10 @@ Deno.test('live join-row chain: PUT appears on wire/derive, '
     await assertPartsAreHeads(db, partsAfterDelete, { sees: 'whole' });
     const wireAfterDelete = partsAfterDelete.map((part) =>
         part.body().toValue());
-    const derivedAfterDelete = await deriveProjectFlows(
-        db, STARK_ORGANIZATION, projectId,
+    const derivedAfterDelete = await headBodies<{ id: string }>(
+        db, projectFlowsUriPrefix(
+            STARK_ORGANIZATION, projectId,
+        ),
     );
     assertStrictEquals(
         wireAfterDelete.some((row) => row.id === pfid), false,
@@ -860,7 +906,7 @@ Deno.test('live join-row chain: PUT appears on wire/derive, '
         derivedAfterDelete.some((row) => row.id === pfid), false,
     );
     assertEquals(
-        sortById(wireAfterDelete), sortById(derivedAfterDelete),
+        wireAfterDelete, derivedAfterDelete,
     );
 });
 
@@ -903,7 +949,7 @@ async () => {
         db, STARK_ORGANIZATION, flowId, wireText,
     );
 
-    const derivedHistory = await deriveFlowStateHistory(
+    const derivedHistory = await flowVersionBodies(
         db, STARK_ORGANIZATION, flowId,
     );
     assertStrictEquals(derivedHistory.length, 1);
@@ -916,14 +962,14 @@ async () => {
     await assertPartsAreHeads(db, joinParts, { sees: 'whole' });
     const wireJoins = joinParts.map((part) => part.body().toValue())
         .filter((row) => row.id === pfidA || row.id === pfidB);
-    const derivedJoins = (await deriveProjectFlows(
-        db, STARK_ORGANIZATION, projectId,
+    const derivedJoins = (await headBodies<{ id: string }>(
+        db, projectFlowsUriPrefix(
+            STARK_ORGANIZATION, projectId,
+        ),
     )).filter((row) => row.id === pfidA || row.id === pfidB);
     assertStrictEquals(wireJoins.length, 1);
     assertStrictEquals(derivedJoins.length, 1);
-    assertEquals(
-        sortById(wireJoins), sortById(derivedJoins),
-    );
+    assertEquals(wireJoins, derivedJoins);
 });
 
 Deno.test('duplicate-create with an unchanged document'
@@ -961,7 +1007,7 @@ Deno.test('duplicate-create with an unchanged document'
         );
     assertStrictEquals(documents.length, 1);
     assertStrictEquals(
-        (await deriveFlowStateHistory(
+        (await flowVersionBodies(
             db, STARK_ORGANIZATION, flowId,
         )).length,
         1,
@@ -975,8 +1021,10 @@ Deno.test('duplicate-create with an unchanged document'
     await assertPartsAreHeads(db, joinParts, { sees: 'whole' });
     const wireJoins = joinParts.map((part) => part.body().toValue())
         .filter((row) => row.id === pfidA || row.id === pfidB);
-    const derivedJoins = (await deriveProjectFlows(
-        db, STARK_ORGANIZATION, projectId,
+    const derivedJoins = (await headBodies<{ id: string }>(
+        db, projectFlowsUriPrefix(
+            STARK_ORGANIZATION, projectId,
+        ),
     )).filter((row) => row.id === pfidA || row.id === pfidB);
     assertStrictEquals(wireJoins.length, 1);
     assertStrictEquals(derivedJoins.length, 1);
@@ -1013,11 +1061,11 @@ async () => {
     // initialStateEventId) or double-count the genesis event.
     // ONE lifecycle event proves the FILTER, not merely the
     // envelope ordering, decided this.
-    const history = await deriveFlowStateHistory(
+    const history = await flowVersionBodies(
         db, STARK_ORGANIZATION, flowId,
     );
     assertStrictEquals(history.length, 1);
-    assertStrictEquals(history[0]!.state, 'active');
+    assertStrictEquals(history[0]!['state'], 'active');
 
     const wireText = await wireFlowText(
         db, STARK_ORGANIZATION, flowId,
