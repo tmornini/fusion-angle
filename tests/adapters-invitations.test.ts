@@ -144,19 +144,6 @@ function freshStorage(): Partial<Storage> {
 // notification, so seedWithNotify's counting spy stays clean.
 // Every id/field value stays IDENTICAL to the raw puts these
 // replace — only the write mechanism changes.
-async function seedMembershipPair(
-    db: DbAdapter,
-    _id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    await seedSeat(
-        db,
-        String(body.organization_id),
-        String(body.identity_id),
-        body.type as 'admin' | 'member',
-        String(body.at),
-    );
-}
 
 // Two orgs (Stark 'AjdvjuECVZEgZoFajaIEkg', Wayne 'BBjWJsjYIDkTRKIIPrzWRw').
 // Tony ('XXZruirZyAOoRpNxaDnpSA') is admin
@@ -179,21 +166,16 @@ async function seedRows(
     await seedOrganizationDocument(db, 'BBjWJsjYIDkTRKIIPrzWRw', 'Wayne');
     for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
         , 'BBjWJsjYIDkTRKIIPrzWRw']) {
-        await seedMembershipPair(db, generateIdentifier(), {
-            organization_id: organization
-                , identity_id: 'XXZruirZyAOoRpNxaDnpSA',
-        type: 'admin',
-            at: AT,
-        });
+        await seedSeat(
+            db, organization, 'XXZruirZyAOoRpNxaDnpSA', 'admin', AT,
+        );
     }
     await seedPerson(db, 'XXZruirZyAOoRpNxaDnpSA', 'Tony'
         , 'demo@example.com');
     await seedPerson(db, 'toccYYkLEABmlbpHJalgtQ', 'Sarah', 'sarah@x.com');
-    await seedMembershipPair(db, generateIdentifier(), {
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg'
-            , identity_id: 'toccYYkLEABmlbpHJalgtQ',
-        type: 'member', at: AT,
-    });
+    await seedSeat(
+        db, 'AjdvjuECVZEgZoFajaIEkg', 'toccYYkLEABmlbpHJalgtQ', 'member', AT,
+    );
     const daveId = generateIdentifier();
     await seedPerson(db, daveId, 'Dave', 'dave@x.com');
     return { daveId };

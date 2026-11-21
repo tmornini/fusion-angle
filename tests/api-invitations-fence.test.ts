@@ -81,19 +81,6 @@ const EXPIRES_AT = '2099-12-31T00:00:00.000000Z';
 // once role_grants/memberships flip, so a raw row here would go
 // derivation-invisible. Every id/field value stays IDENTICAL to
 // the raw puts these replace — only the write mechanism changes.
-async function seedMembershipPair(
-    db: MemoryDbAdapter,
-    _id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    await seedSeat(
-        db,
-        String(body.organization_id),
-        String(body.identity_id),
-        body.type as 'admin' | 'member',
-        String(body.at),
-    );
-}
 
 function req(
     method: string,
@@ -164,20 +151,15 @@ async function seed(): Promise<MemoryDbAdapter> {
     await seedOrganizationDocument(db, 'BBjWJsjYIDkTRKIIPrzWRw', 'Wayne');
     for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
         , 'BBjWJsjYIDkTRKIIPrzWRw']) {
-        await seedMembershipPair(db, generateIdentifier(), {
-            organization_id: organization
-                , identity_id: 'XXZruirZyAOoRpNxaDnpSA',
-        type: 'admin',
-            at: AT,
-        });
+        await seedSeat(
+            db, organization, 'XXZruirZyAOoRpNxaDnpSA', 'admin', AT,
+        );
     }
     await person(db, 'XXZruirZyAOoRpNxaDnpSA', 'Tony', 'demo@example.com');
     await person(db, 'toccYYkLEABmlbpHJalgtQ', 'Sarah', 'sarah@x.com');
-    await seedMembershipPair(db, generateIdentifier(), {
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg'
-            , identity_id: 'toccYYkLEABmlbpHJalgtQ',
-        type: 'member', at: AT,
-    });
+    await seedSeat(
+        db, 'AjdvjuECVZEgZoFajaIEkg', 'toccYYkLEABmlbpHJalgtQ', 'member', AT,
+    );
     return db;
 }
 

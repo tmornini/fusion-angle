@@ -85,19 +85,6 @@ async function person(
 // would go derivation-invisible. Every id/field value stays
 // IDENTICAL to the raw puts these replace — only the write
 // mechanism changes.
-async function seedMembershipMessagePair(
-    db: MemoryDbAdapter,
-    _id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    await seedSeat(
-        db,
-        String(body.organization_id),
-        String(body.identity_id),
-        body.type as 'admin' | 'member',
-        String(body.at),
-    );
-}
 
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
@@ -108,11 +95,9 @@ async function freshDb(): Promise<MemoryDbAdapter> {
         './root-admin-fixture.ts'
     );
     await seedOrganizationDocument(db, 'AjdvjuECVZEgZoFajaIEkg', 'Stark');
-    await seedMembershipMessagePair(db, generateIdentifier(), {
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg'
-            , identity_id: 'XXZruirZyAOoRpNxaDnpSA',
-        type: 'admin', at: AT,
-    });
+    await seedSeat(
+        db, 'AjdvjuECVZEgZoFajaIEkg', 'XXZruirZyAOoRpNxaDnpSA', 'admin', AT,
+    );
     await person(db, 'XXZruirZyAOoRpNxaDnpSA', 'Tony', 'demo@example.com');
     await person(db, 'toccYYkLEABmlbpHJalgtQ', 'Sarah', 'sarah@x.com');
     return db;

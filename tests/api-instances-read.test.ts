@@ -85,20 +85,6 @@ function req(
     });
 }
 
-async function seedMembershipMessagePair(
-    db: MemoryDbAdapter,
-    _id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    await seedSeat(
-        db,
-        String(body['organization_id'] ?? body.organization_id),
-        String(body['identity_id'] ?? body.identity_id),
-        (body['type'] ?? body.type) as 'admin' | 'member',
-        String(body['at'] ?? body.at),
-    );
-}
-
 async function adminDb(): Promise<{
     db: MemoryDbAdapter;
     adminToken: string;
@@ -106,12 +92,9 @@ async function adminDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedMembershipMessagePair(db, generateIdentifier(), {
-        organization_id: ORGANIZATION,
-        identity_id: 'nkgaOHZISTQrILTfPThWCA',
-        type: 'member',
-        at: AT,
-    });
+    await seedSeat(
+        db, ORGANIZATION, 'nkgaOHZISTQrILTfPThWCA', 'member', AT,
+    );
     return {
         db,
         adminToken: await organizationToken(

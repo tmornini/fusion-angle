@@ -533,31 +533,16 @@ Deno.test('a token-exchange grant stores its own pair with live'
 // raw row here would go derivation-invisible. Every id/field
 // value stays IDENTICAL to the raw puts these replace — only the
 // write mechanism changes.
-async function seedMembershipMessagePair(
-    db: DbAdapter,
-    _id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    await seedSeat(
-        db,
-        String(body.organization_id),
-        String(body.identity_id),
-        body.type as 'admin' | 'member',
-        String(body.at),
-    );
-}
 
 
 Deno.test('a client_credentials grant stores its own pair with live'
 + ' secrets', async () => {
     const db = await dbWithPasswordUser();
     await seedServiceIdentity(db, 'uYaHKbNeVUcsFjuooOjMew');
-    await seedMembershipMessagePair(db, 'm-svc', {
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-        identity_id: 'uYaHKbNeVUcsFjuooOjMew',
-        type: 'member',
-        at: '2020-01-01T00:00:00.000000Z',
-    });
+    await seedSeat(
+        db, 'AjdvjuECVZEgZoFajaIEkg', 'uYaHKbNeVUcsFjuooOjMew',
+        'member', '2020-01-01T00:00:00.000000Z',
+    );
     const signer = await makeAssertionSigner('ES256');
     const now = Math.floor(Date.now() / 1000);
     const assertion = await signer.sign({

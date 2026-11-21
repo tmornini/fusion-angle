@@ -1,11 +1,7 @@
 import { assertStrictEquals } from '@std/assert';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';
@@ -44,12 +40,6 @@ function req(
 // An operation names a head; none was ever read here, so any
 // well-formed tag reaches the handler.
 const ANY_TAG = { 'If-Match': '"' + generateIdentifier() + '"' };
-
-async function freshDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
-}
 
 Deno.test('PUT work-orders 405s (no put handler wired)',
 async () => {

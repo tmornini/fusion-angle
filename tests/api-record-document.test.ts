@@ -5,7 +5,6 @@ import {
     assertThrows,
 } from '@std/assert';
 import {
-    memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
@@ -17,7 +16,7 @@ import {
     RECORD_TYPE_DETAIL_PATTERN,
 } from '../api/family-registry.ts';
 import { organizationToken } from './token-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import {
     apiRequest,
     partsOf,
@@ -67,12 +66,6 @@ function recordDocument(name: string, state: string) {
         ...recordFields(name),
         state,
     };
-}
-
-async function freshDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
 }
 
 async function versionsOf(

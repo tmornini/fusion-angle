@@ -5,15 +5,11 @@ import {
 } from '@std/assert';
 import { stub } from '@std/testing/mock';
 import { FakeTime } from '@std/testing/time';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
 import { GET, PUT } from './in-page-facade.ts';
 import { jitteredBackoff } from
     '../client/request-context.ts';
 import { organizationToken } from './token-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import {
     generateIdentifier,
     isIdentifier,
@@ -26,12 +22,6 @@ import { operationIdHeader } from
 // echo (client/flow-mutations.ts). Ideas/:id is
 // simple-class (If-Match is inert there); the pin is that PUT
 // hoists the header into the stored request message.
-
-async function freshDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
-}
 
 function ideaFields(title: string) {
     return {

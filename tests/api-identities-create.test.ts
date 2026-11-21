@@ -11,7 +11,7 @@ import {
 } from '../api/db-memory.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import {
-    seedAdminSchema,
+    freshDb,
 } from './test-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import {
@@ -30,12 +30,6 @@ import { operationIdHeader } from
 
 
 const MEMBER = generateIdentifier();
-
-async function freshDb() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
-}
 
 // The PII facet — the contact fields the identity_pii store
 // re-validates after the composing POST puts it.

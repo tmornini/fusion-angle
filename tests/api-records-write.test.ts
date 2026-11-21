@@ -4,25 +4,18 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import { GET, GETCollection, POST } from './in-page-facade.ts';
-import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     seedCurrentMember,
 } from './member-fixtures.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
-    seedAdminSchema,
+    freshDb,
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
 
-
-async function freshDb() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
-}
 
 // ── Create variant ──────
 

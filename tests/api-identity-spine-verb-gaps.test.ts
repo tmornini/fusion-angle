@@ -3,13 +3,9 @@ import {
     assertEquals,
     assertStrictEquals,
 } from '@std/assert';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken, devToken } from './token-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import {
     apiRequest,
@@ -107,12 +103,6 @@ function req(
         token,
         body,
     });
-}
-
-async function freshDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
 }
 
 const OUTSIDER = 'fndCYAsXazdzMUlEGMNIZw';

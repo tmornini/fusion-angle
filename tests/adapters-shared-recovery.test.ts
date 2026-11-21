@@ -16,7 +16,6 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import {
-    memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest, UnauthorizedError } from '../api/api.ts';
@@ -29,7 +28,9 @@ import {
 } from './fixtures/local-storage.ts';
 import { STORAGE_KEY_AUTHORIZATION } from '../client/session-storage-keys.ts';
 import {
-    ideaBody, organizationRow, seedAdminSchema,
+    ideaBody,
+    organizationRow,
+    freshDb,
     seedOrganizationDocument as seedOrganizationDocumentMessagePair,
 } from './test-fixtures.ts';
 import {
@@ -121,12 +122,6 @@ function freshStorage(): Partial<Storage> {
     };
 }
 
-async function freshDb() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
-}
-
 async function issuePair(db: MemoryDbAdapter): Promise<{
     access_token: string; refresh_token: string;
 }> {
@@ -162,19 +157,6 @@ async function issuePair(db: MemoryDbAdapter): Promise<{
 // so a raw row here would go derivation-invisible. Every
 // id/field value stays IDENTICAL to the raw puts these replace —
 // only the write mechanism changes.
-async function seedMembershipMessagePair(
-    db: MemoryDbAdapter,
-    _id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    await seedSeat(
-        db,
-        String(body['organization_id'] ?? body.organization_id),
-        String(body['identity_id'] ?? body.identity_id),
-        (body['type'] ?? body.type) as 'admin' | 'member',
-        String(body['at'] ?? body.at),
-    );
-}
 
 // Authorize `current` as admin of `org` and stamp the
 // membership the gate fences on — the per-org grant the
@@ -192,11 +174,10 @@ async function seedOrganizationAdmin(
     // resolve.
     await seedOrganizationDocumentMessagePair(
         db, organization, organization);
-    await seedMembershipMessagePair(db, generateIdentifier(), {
-        organization_id: organization, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
-        type: 'admin',
-        at: '2026-06-04T00:00:00.000000Z',
-    });
+    await seedSeat(
+        db, organization, 'XXZruirZyAOoRpNxaDnpSA',
+        'admin', '2026-06-04T00:00:00.000000Z',
+    );
 }
 
 // The message-plane counterpart of seedOrganizationAdmin's row-

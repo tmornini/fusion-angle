@@ -18,7 +18,6 @@ import {
     buildResponseModel,
     storedWire,
 } from '../api/message-form.ts';
-import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     generateIdentifier,
 } from '../shared/identifier.ts';
@@ -32,7 +31,7 @@ import {
 } from '../shared/types.ts';
 import { landMembership } from
     './membership-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 
 const O = 'AjdvjuECVZEgZoFajaIEkg';
 const I = 'XXZruirZyAOoRpNxaDnpSA';
@@ -94,12 +93,6 @@ function expectRefused(
         error: 'no transition from ' + from
             + ' to ' + to + ' for the ' + actor,
     };
-}
-
-async function freshDb() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
 }
 
 Deno.test('an admin grant lands pending from nothing,'
