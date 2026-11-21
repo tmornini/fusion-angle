@@ -30,6 +30,7 @@ import {
 } from '../shared/types.ts';
 import {
     apiRequest,
+    req,
     assertPartsAreHeads,
     partsOf,
 } from './http-fixtures.ts';
@@ -69,20 +70,6 @@ const INSTANCES = TYPE_DETAIL + '/instances/';
 
 function detailPath(instanceId: string): string {
     return INSTANCES + instanceId;
-}
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
 }
 
 async function seedMembershipMessagePair(

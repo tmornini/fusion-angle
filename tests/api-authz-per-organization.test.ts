@@ -10,7 +10,7 @@ import {
 } from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { seedIdentityDocument } from './identity-fixtures.ts';
@@ -18,20 +18,6 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
-
-function req(
-    method: string, path: string, token: string,
-    body?: unknown,
-    headers?: Readonly<Record<string, string>>,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(headers !== undefined ? { headers } : {}),
-    });
-}
 
 // Membership type is privilege; claim roles bake at mint /
 // exchange. Seed type:"admin" in A and type:"member" in B.

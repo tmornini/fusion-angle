@@ -12,6 +12,7 @@ import {
 } from './test-fixtures.ts';
 import {
     apiRequest,
+    req,
     framedRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
@@ -23,18 +24,6 @@ import { generateIdentifier } from
 // and 404s. Pins keep nested org stamp + flat retirement.
 
 const BASE = 'http://localhost';
-
-function req(
-    method: string, path: string,
-    token: string, body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 function editBody(organization: string) {
     return {

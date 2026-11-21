@@ -7,7 +7,7 @@ import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
     pairIdOf,
     framedRequest,
 } from './http-fixtures.ts';
@@ -40,25 +40,6 @@ function tagDocument(): Record<string, unknown> {
     return {
         flow_response_id: TAG_FLOW,
     };
-}
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    headers?: Readonly<Record<string, string>>,
-    operationId?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(headers !== undefined
-            ? { headers } : {}),
-        ...(operationId !== undefined ? { operationId } : {}),
-    });
 }
 
 async function freshDb(): Promise<MemoryDbAdapter> {

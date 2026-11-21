@@ -10,7 +10,7 @@ import {
     seedOrganizationDocument,
 } from './test-fixtures.ts';
 import {
-    apiRequest,
+    req,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
@@ -22,20 +22,6 @@ import { generateIdentifier } from
 // 404.
 
 const ORGANIZATION_A = 'AjdvjuECVZEgZoFajaIEkg';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 function ideaDocument(title: string) {
     return {

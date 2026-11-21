@@ -34,6 +34,7 @@ import { mintAccessToken, TOKEN_AUDIENCE } from
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    req,
     assertPartsAreHeads,
     partsOf,
     storedPutBodyText,
@@ -51,20 +52,6 @@ import { WRITE_RESPONSE_SPECS } from '../api/routes.ts';
 // identity's live seats on GET
 // /identities/:id/organizations/, or the pre-dispatch
 // membership guard in handleRequest (the :id read).
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 function sortById<T extends { id: string }>(
     rows: readonly T[],

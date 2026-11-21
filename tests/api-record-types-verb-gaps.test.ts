@@ -7,7 +7,7 @@ import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest,
+    req,
 } from './http-fixtures.ts';
 
 // Pins deliberate verb gaps on nested record-types so Task 9's
@@ -17,20 +17,6 @@ import {
 const COLLECTION = '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/';
 const DETAIL = COLLECTION + 'sjWcXwYGlgxxJOHxzMoUow';
 const HISTORY = DETAIL + '/versions/';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();

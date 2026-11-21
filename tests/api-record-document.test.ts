@@ -19,7 +19,7 @@ import {
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest,
+    reqWithOperationId as req,
     partsOf,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
@@ -37,22 +37,6 @@ import { generateIdentifier } from
 // that the fold commit has landed.
 
 const AT = '2026-01-01T00:00:00.000000Z';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    operationId?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(operationId !== undefined ? { operationId } : {}),
-    });
-}
 
 function recordFields(name: string) {
     return {

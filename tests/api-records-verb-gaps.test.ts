@@ -7,27 +7,13 @@ import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest,
+    req,
 } from './http-fixtures.ts';
 
 // Task 23: flat records + record-attributes routes are gone
 // (404, not 405). organizations/:id/flows/:id/records join family verb gaps
 // stay. Nested type verb gaps live in
 // api-record-types-verb-gaps.test.ts.
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();

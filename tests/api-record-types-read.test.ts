@@ -19,7 +19,7 @@ import {
     RECORD_TYPE_DETAIL_PATTERN,
 } from '../api/family-registry.ts';
 import {
-    apiRequest,
+    req,
     partBodiesOf,
     partsOf,
 } from './http-fixtures.ts';
@@ -42,20 +42,6 @@ interface RecordTypeWireRow {
     description: string;
     position: number;
     state: string;
-}
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
 }
 
 async function seedMembershipPair(

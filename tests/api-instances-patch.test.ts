@@ -46,7 +46,7 @@ import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from '../shared/types.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
     pairIdOf,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
@@ -82,25 +82,6 @@ const WELL_FORMED_TAG = generateIdentifier();
 const HEX64_TAG =
     'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
     + 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    extraHeaders?: Record<string, string>,
-    operationId?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(extraHeaders !== undefined
-            ? { headers: extraHeaders } : {}),
-        ...(operationId !== undefined ? { operationId } : {}),
-    });
-}
 
 async function seedMembershipMessagePair(
     db: MemoryDbAdapter,

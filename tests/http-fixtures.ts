@@ -218,6 +218,62 @@ export function apiRequest(input: {
     });
 }
 
+// The fifth argument differs, so these stay separate
+// functions. A sixth argument may carry the other
+// field: headers then an operation id, or an operation
+// id then headers.
+export function req(
+    method: string,
+    path: string,
+    token?: string,
+    body?: unknown,
+): Request {
+    return apiRequest({
+        method,
+        path,
+        ...(token !== undefined ? { token } : {}),
+        body,
+    });
+}
+
+export function reqWithHeaders(
+    method: string,
+    path: string,
+    token?: string,
+    body?: unknown,
+    headers?: Readonly<Record<string, string>>,
+    operationId?: string,
+): Request {
+    return apiRequest({
+        method,
+        path,
+        ...(token !== undefined ? { token } : {}),
+        body,
+        ...(headers !== undefined ? { headers } : {}),
+        ...(operationId !== undefined
+            ? { operationId } : {}),
+    });
+}
+
+export function reqWithOperationId(
+    method: string,
+    path: string,
+    token?: string,
+    body?: unknown,
+    operationId?: string,
+    headers?: Readonly<Record<string, string>>,
+): Request {
+    return apiRequest({
+        method,
+        path,
+        ...(token !== undefined ? { token } : {}),
+        body,
+        ...(operationId !== undefined
+            ? { operationId } : {}),
+        ...(headers !== undefined ? { headers } : {}),
+    });
+}
+
 // An accept, decline, or revoke names the invitation head it
 // changes; the invitation id ends the request's path.
 export async function invitationLatched(

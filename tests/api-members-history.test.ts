@@ -5,22 +5,8 @@ import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedHumanMember } from './member-fixtures.ts';
 import {
-    apiRequest,
+    req,
 } from './http-fixtures.ts';
-
-function req(
-    method: string,
-    path: string,
-    token?: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        ...(token !== undefined ? { token } : {}),
-        body,
-    });
-}
 
 Deno.test(
     'GET members/:id/versions is retired 404',

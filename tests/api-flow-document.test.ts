@@ -35,7 +35,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import {
-    apiRequest, pairIdOf, storedPutBodyText,
+    reqWithHeaders as req, pairIdOf, storedPutBodyText,
 } from './http-fixtures.ts';
 import { messageStore } from '../api/message-store.ts';
 import {
@@ -52,24 +52,6 @@ import {
 // families in tests/document-family.test.ts).
 
 const AT = '2026-01-01T00:00:00.000000Z';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    headers?: Record<string, string>,
-    operationId?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(headers !== undefined ? { headers } : {}),
-        ...(operationId !== undefined ? { operationId } : {}),
-    });
-}
 
 function flowFields(name: string) {
     return {

@@ -8,7 +8,7 @@ import {
 import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
-    apiRequest,
+    req,
     invitationLatched,
     partsOf,
 } from './http-fixtures.ts';
@@ -25,20 +25,6 @@ import { membershipNameOf } from
 const SARAH = 'MQFcPtrZPIGjMCRAXtZUnA';
 const JESSICA = 'zyGBRshxOnKHUfcyFRqowg';
 const EMILY = 'CJrglMsNBxOWWfbihHQSeg';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();

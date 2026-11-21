@@ -57,7 +57,7 @@ import {
 import { identityByEmail } from '../api/authentication.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
-    apiRequest,
+    req,
     assertPartsAreHeads,
     messageOfResponse,
     partsOf,
@@ -110,20 +110,6 @@ function outside(method: string, path: string): string {
     return 'forbidden: ' + method + ' ' + path
         + ' names an identity outside this'
         + ' organization';
-}
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
 }
 
 function sortById<T extends { id: string }>(

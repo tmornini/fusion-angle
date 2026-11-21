@@ -7,7 +7,7 @@ import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest,
+    req,
 } from './http-fixtures.ts';
 
 // Task 55: the old roster families are gone. Authenticated
@@ -27,20 +27,6 @@ const RETIRED_PATHS: readonly string[] = [
     '/memberships/x1',
     '/XeNICvLNKhXddnTKnszfpQ',
 ];
-
-function req(
-    method: string,
-    path: string,
-    token?: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        ...(token !== undefined ? { token } : {}),
-        body,
-    });
-}
 
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();

@@ -9,7 +9,7 @@ import { seedOrganizationMember } from './root-admin-fixture.ts';
 import { seedIdentityDocument } from './identity-fixtures.ts';
 import { ideaBody, seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest,
+    req,
 } from './http-fixtures.ts';
 import { landMembership } from
     './membership-fixtures.ts';
@@ -17,18 +17,6 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 
 const MEMBER = generateIdentifier();
-
-function req(
-    method: string, path: string, token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 async function memberDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();

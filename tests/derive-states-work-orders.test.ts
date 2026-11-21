@@ -13,7 +13,7 @@ import {
 import { getWorkOrderEvents } from
     './fixtures/work-order-events.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { seedCreatedWorkOrder } from
@@ -51,22 +51,6 @@ const AT = '2026-01-01T00:00:00.000000Z';
 function workOrderPath(id: string, rest = ''): string {
     return '/organizations/' + ORGANIZATION_A
         + '/work-orders/' + id + rest;
-}
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    headers?: Readonly<Record<string, string>>,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(headers !== undefined ? { headers } : {}),
-    });
 }
 
 // The seeded work order's own events: its three births

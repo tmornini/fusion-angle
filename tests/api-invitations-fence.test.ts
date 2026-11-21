@@ -23,7 +23,7 @@ import {
     organizationMembershipHeads,
 } from '../api/memberships.ts';
 import {
-    apiRequest,
+    reqWithOperationId as req,
     invitationLatched,
     partBodiesOf,
     partsOf,
@@ -93,22 +93,6 @@ async function seedMembershipPair(
         body.type as 'admin' | 'member',
         String(body.at),
     );
-}
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    operationId?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(operationId !== undefined ? { operationId } : {}),
-    });
 }
 
 // A Wayne invitation's versions as Tony, its admin, reads

@@ -27,6 +27,7 @@ import { byIdAscending } from '../api/derive-documents.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    req,
     assertPartsAreHeads,
     partBodiesOf,
     partsOf,
@@ -68,20 +69,6 @@ const EV_DRIFT_CONVERSION_PROJECT = generateIdentifier();
 // re-homes to wire-byte handleRequest assertions and
 // non-lexical live fixtures (oldest live head (at, id)
 // first; insertion diverges from id-lex).
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 function ideaDocument(title: string, state: string, position = 1) {
     return {

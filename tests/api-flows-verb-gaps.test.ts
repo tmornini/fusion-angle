@@ -8,7 +8,7 @@ import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest,
+    req,
 } from './http-fixtures.ts';
 
 // Pins the CURRENT status of every deliberate flows-family
@@ -21,20 +21,6 @@ import {
 // shift these. A future change to any of these five
 // statuses must re-derive the covenant deliberately,
 // not by accident of refactoring.
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();

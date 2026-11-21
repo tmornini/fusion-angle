@@ -18,7 +18,7 @@ import {
 import { firstProviderModel } from './member-fixtures.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
     assertPartsAreHeads,
     membershipJoinReader,
     invitationLatched,
@@ -54,20 +54,6 @@ function itemPath(
 ): string {
     return '/' + nest + '/' + owner + '/invitations/'
         + name;
-}
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    headers?: Readonly<Record<string, string>>,
-): Request {
-    return apiRequest({
-        method, path, token,
-        ...(body !== undefined ? { body } : {}),
-        ...(headers !== undefined ? { headers } : {}),
-    });
 }
 
 async function basis(): Promise<{

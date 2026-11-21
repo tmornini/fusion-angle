@@ -12,7 +12,7 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
-    apiRequest, pairIdOf, storedPutBodyText,
+    reqWithOperationId as req, pairIdOf, storedPutBodyText,
     framedRequest,
 } from './http-fixtures.ts';
 import { basicAuthorization } from
@@ -42,22 +42,6 @@ const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 // The caller's own slot. The fence admits self.
 const SELF = 'XXZruirZyAOoRpNxaDnpSA';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    operationId?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(operationId !== undefined ? { operationId } : {}),
-    });
-}
 
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();

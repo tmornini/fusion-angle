@@ -3,7 +3,7 @@ import { handleRequest } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
-    apiRequest,
+    reqWithOperationId as req,
     pairIdOf,
     partsOf,
 } from './http-fixtures.ts';
@@ -19,22 +19,6 @@ import { generateIdentifier } from
 // genesis is head-presence-defined, "the first document
 // version." The composed POST /ideas retired; it now 405s like
 // any other method-absent route (self-review requirement).
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    operationId?: string,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(operationId !== undefined ? { operationId } : {}),
-    });
-}
 
 async function freshDb() {
     const db = memoryDbAdapter();
