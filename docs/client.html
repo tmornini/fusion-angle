@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HTML client — Fusion Angle explained</title><link rel="stylesheet" href="style.css"></head>
+<body><nav><span class="brand">Fusion Angle · single table vs per-entity</span><a href="index.html">Overview</a><a href="http.html">HTTP compliance</a><a href="features.html">Features</a><a href="performance.html">Performance</a><a href="lifecycle.html">Lifecycle</a><a href="client.html" aria-current="page">Client reference</a><a href="backend.html">Backend reference</a></nav><main>
+<h1>The HTML client</h1>
+<p>The browser side has two directories. <code>web-app/</code> holds the pages, presenters, CSS, and app logic. <code>client/</code> is the API client: "the transport, the request context, the session, the bell, and the per-noun verbs" (ARCHITECTURE.md).</p>
+<h2>Build-time HTML composition</h2>
+<p>The README lists "Build-time HTML composition (shared layout + per-page content)". <code>web-app/app/compose.ts</code> reads <code>PAGE_REGISTRY</code> (<code>web-app/app/page-registry.ts</code>) and splits pages by layout:</p>
+<pre><code>const sidebarPages = Object.entries(PAGE_REGISTRY)
+    .filter(([, entry]) =&gt; entry.layout === 'sidebar')</code></pre>
+<p>Each registry entry names its source, its CSS bundles, palette keywords, and a lazy loader:</p>
+<pre><code>ideas: {
+    title: 'Ideas',
+    layout: 'sidebar',
+    inSidebarNav: true,
+    sourceDir: 'ideas',
+    sourceFile: 'index',
+    icon: iconLightbulb,
+    keywords: 'ideas list innovation',
+    cssBundles: ['pages-ideas'],
+    loader: () =&gt; import('../ideas/index.ts'),</code></pre>
+<p><code>web-app/</code> holds 34 app page templates (29 page files plus the 5 shared shell fragments) and 143 generated API-documentation pages under <code>web-app/api-documentation/</code>. The shared shell is a set of fragments in <code>web-app/app/</code>: <code>components-layout.html</code>, <code>component-sidebar.html</code>, <code>component-top-bar.html</code>, <code>component-mobile-header.html</code>, and <code>component-mobile-sidebar.html</code>. The page directories include <code>ideas/</code>, <code>flows/</code>, <code>projects/</code>, <code>records/</code>, <code>workbox/</code>, <code>members/</code>, <code>identities/</code>, <code>organization/</code>, <code>billing/</code>, <code>design-system/</code>, <code>api-documentation/</code>, <code>auth/</code>, <code>landing/</code>, and <code>not-found/</code>.</p>
+<h2>Pages and presenters</h2>
+<blockquote>Every <code>PAGE_REGISTRY</code> page module exports <code>init()</code>. Presenters take data and return <code>SafeHtml</code>; they never touch the DOM, never fetch, never mutate. Editable views split a read presenter from an <code>*Edit</code> presenter; the page owns a <code>PageState</code> discriminated union (<code>{kind: 'reading'} | {kind: 'editing', draft}</code>).</blockquote>
+<p class="src">ARCHITECTURE.md § Conventions. Presenters live in <code>web-app/app/presenters/</code>, for example <code>state-display.ts</code> and <code>detail-field.ts</code>.</p>
+<h2>Design system</h2>
+<p>"Colors are <code>hsl(var(--token))</code> — never hex." Palette HSL lives in <code>palette.css</code> under one <code>:root</code>. Values live in <code>web-app/app/styles/tokens.css</code> and render at <code>/design-system/</code>. Variants ride <code>data-tone</code> (<code>primary</code>, <code>success</code>, <code>warning</code>, <code>error</code>, <code>info</code>, <code>muted</code>) and <code>data-level</code> (<code>normal</code>, <code>warning</code>, <code>danger</code>). Dialogs are native <code>&lt;dialog&gt;</code> elements driven by <code>openDialog(id)</code> and <code>closeDialog(id)</code> from <code>dialog.ts</code>. CSS file rules: "78-char max; no hex; no <code>style="..."</code> except dynamic custom properties" (DESIGN-SYSTEM.md).</p>
+<p>This site uses those tokens: <code>--background: var(--gray-900)</code> (<code>217 20% 15%</code>), <code>--card: var(--gray-800)</code>, <code>--primary: 217 45% 60%</code>, <code>--accent-text: 48 80% 65%</code>, and the font stacks <code>--font-sans</code>, <code>--font-display</code>, and <code>--font-mono: 'IBM Plex Mono', 'Fira Code', monospace</code>. The repo self-hosts Inter, IBM Plex Sans, and IBM Plex Mono as woff2 files in <code>web-app/assets/</code>. This site falls back to system fonts instead.</p>
+<h2>Command palette (Cmd+K)</h2>
+<p><code>web-app/app/command-palette.ts</code> opens on the keystroke below. It searches ideas, projects, and members through the client (<code>getIdeas</code>, <code>getProjects</code>, <code>getHumanMembers</code>) and subscribes to their change feeds (<code>subscribeIdeaChanges</code> …):</p>
+<pre><code>return (e.metaKey || e.ctrlKey)
+    &amp;&amp; e.key === 'k';</code></pre>
+<h2>The transport: <code>client/http-facade.ts</code></h2>
+<pre><code>return send(origin + '/api/' + resource, {
+    method,
+    credentials: 'same-origin',
+    headers: requestHeaders(token, payload !== undefined, extra),
+    ...</code></pre>
+<p>The facade binds <code>fetch</code> to a local because a property call "hands Chrome's <code>fetch</code> a receiver and throws 'Illegal invocation'". A collection GET is split with <code>splitParts</code> (<code>shared/http-message/multipart.ts</code>). "The client keeps each response whole, and pages and presenters read from the unit they were given."</p>
+<h2>Session and auth</h2>
+<ul>
+<li><b>Two credential modes</b> (<code>client/session-credentials.ts</code>). Cookie-session mode is off by default: <code>let cookieSession = false;</code> ("Default is the localStorage pair for tests. server-core.ts enables this."). The shipped app turns it on with <code>client.setCookieSession(true)</code>. The access token then lives in memory only and the refresh token in an HttpOnly cookie, "never localStorage". The <code>'fusion-angle:authorization'</code> localStorage pair (<code>client/session-storage-keys.ts</code>) applies only to the default mode used by tests. Separately, <code>'fusion-angle:active-organization-id'</code> persists the active org ("Boot re-exchanges a fresh org-scoped token from this id"), in line with "localStorage holds UI preferences only".</li>
+<li><code>client/request-context.ts</code>: "All concurrent 401s share ONE recovery". <code>withAuthRecovery</code> wraps a verb call with single-shot 401 recovery: one refresh and re-scope, and a second 401 clears the session.</li>
+<li><code>client/session-refresh-mutex.ts</code>: "One in-flight refresh POST. Concurrent 401s join this promise… Across tabs, navigator.locks serializes and a BroadcastChannel carries the winner's access token". The lock is <code>'fusion-refresh'</code> and the channel is <code>'fusion-angle:refresh'</code>.</li>
+<li>Tenancy: "The org rides the VERIFIED token claim, never the path." Revocation bites at the next mint or refresh, or at <code>ACCESS_TTL_SECONDS</code> (15 min).</li>
+</ul>
+<h2>Broadcast channel (the bell)</h2>
+<p><code>client/broadcast-channel.ts</code> is "The ONLY place BroadcastChannel is named". It uses <code>CHANNEL_NAME = 'fusion-angle:data'</code>, and handlers "fan out from ONE native listener on the singleton channel". Because Deno ships its own BroadcastChannel, the module "key[s] on <code>window</code>", so it stays inert under <code>deno test</code>. A second browser "stays stale until navigation" (AGENTS.md).</p>
+<p class="src">License: <code>tmornini/fusion-angle</code> is dedicated to the public domain under <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0 Universal</a>.</p></main><footer>Every claim is drawn from <code>tmornini/fusion-angle</code> (README.md, ARCHITECTURE.md, SCHEMA.md, API.md, DESIGN-SYSTEM.md, AGENTS.md, and the cited source files).</footer></body></html>
