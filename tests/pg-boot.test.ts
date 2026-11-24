@@ -26,7 +26,7 @@ import { connectPostgres } from
 import type { SqlClient } from
     '../api/postgres-client.ts';
 // Unit pins stay Postgres-free. Live SHOW runs only
-// when POSTGRES_URL is set (./test-postgres).
+// when POSTGRES_URL is set (./bin/test postgres).
 
 const POSTGRES_URL = Deno.env.get('POSTGRES_URL');
 

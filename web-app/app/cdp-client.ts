@@ -1,5 +1,5 @@
 // CDP transport, Chrome launcher, and waits, shared by
-// ./measure and ./test-browser. killProcessTree takes a
+// ./bin/measure and ./bin/test browser. killProcessTree takes a
 // structural KillableChild, not Deno.ChildProcess, so it
 // stays indifferent to which runtime spawned the child.
 

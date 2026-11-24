@@ -1,7 +1,7 @@
 import { assertEquals } from '@std/assert';
 import { RUN_SEED_ENV, startOrigin } from './fixtures.ts';
 
-// ./test-browser names the run's one seed; a file run
+// ./bin/test browser names the run's one seed; a file run
 // alone with deno test has none and seeds its own.
 const RUN_SEED = Deno.env.get(RUN_SEED_ENV);
 

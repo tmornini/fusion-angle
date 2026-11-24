@@ -1,5 +1,5 @@
 // Deno-only CDP page-load benchmark harness.
-// Run via ./measure from the repo root (see that wrapper).
+// Run via ./bin/measure from the repo root (see that wrapper).
 // Uses Deno APIs + global WebSocket; never runs in a browser.
 //
 // Flow: optional bare --visualize (disk only) → clean-tree
@@ -94,13 +94,13 @@ const DETAIL_FROM_LIST: Record<string, string> = {
 
 function usageText(): string {
     return [
-        'Usage: ./measure [options]',
+        'Usage: ./bin/measure [options]',
         '',
         'Page-load benchmark via headless Chrome + CDP.',
         'Stats drop the top and bottom 10% of samples',
         '(ceil(n×0.10) per tail; n=25 drops three each).',
         '',
-        'Bare ./measure is the full ceremony: --record',
+        'Bare ./bin/measure is the full ceremony: --record',
         '--write-budgets --runs 25 --visualize over the',
         'full PAGE_REGISTRY (clean tree required).',
         '',
@@ -146,19 +146,19 @@ function usageText(): string {
         '  --help, -h           Show this help',
         '',
         'Examples:',
-        '  ./measure',
+        '  ./bin/measure',
         '    (= --record --write-budgets --runs 25',
         '     --visualize; full registry)',
-        '  ./measure --runs 5',
+        '  ./bin/measure --runs 5',
         '    (measure + report only; no history write)',
-        '  ./measure --pages dashboard,ideas --runs 1',
+        '  ./bin/measure --pages dashboard,ideas --runs 1',
         '    (subset smoke; no --record)',
-        '  ./measure --check',
-        '  ./measure --write-budgets --runs 30',
-        '  ./measure --visualize',
-        '  ./measure --profile',
-        '  ./measure --profile --pages ideas,dashboard',
-        '  ./measure --record --write-budgets',
+        '  ./bin/measure --check',
+        '  ./bin/measure --write-budgets --runs 30',
+        '  ./bin/measure --visualize',
+        '  ./bin/measure --profile',
+        '  ./bin/measure --profile --pages ideas,dashboard',
+        '  ./bin/measure --record --write-budgets',
         '    --base-url http://127.0.0.1:8080',
         '    --password "$MEASURE_PASSWORD"',
         '',
@@ -461,8 +461,6 @@ async function main(): Promise<void> {
         );
     }
 
-    // makeTempDirSync honours TMPDIR itself, so the
-    // fallback chain the Node harness carried is gone.
     const useOrigin = cli.baseUrl !== null;
     const buildDir = useOrigin
         ? null

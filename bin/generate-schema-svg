@@ -8,6 +8,6 @@ cd "$ROOT"
 # Regenerate SCHEMA.svg from the schema of record
 # (api/db.ts, shared/types.ts, api/schema-postgres.ts).
 # Pass --check to fail instead of write when the SVG
-# is stale; ./validate uses that to gate drift.
+# is stale; ./bin/test schema uses that to gate drift.
 deno run --frozen --allow-read --allow-write=SCHEMA.svg \
     web-app/app/generate-schema-svg.ts "$@"

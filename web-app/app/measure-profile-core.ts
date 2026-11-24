@@ -1,4 +1,4 @@
-// Pure request-profile aggregation for ./measure --profile.
+// Pure request-profile aggregation for ./bin/measure --profile.
 // No I/O — unit-tested only.
 
 import {

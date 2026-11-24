@@ -1,4 +1,4 @@
-// Pure statistics and budget gate for ./measure.
+// Pure statistics and budget gate for ./bin/measure.
 // No I/O, no Chrome, no side effects — unit-tested only.
 
 export type PageRun = {

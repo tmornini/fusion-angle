@@ -219,7 +219,7 @@ async () => {
         0,
         stderr.trim() || stdout.trim(),
     );
-    assertMatch(stdout, /Usage: \.\/measure/);
+    assertMatch(stdout, /Usage: \.\/bin\/measure/);
     assertNotMatch(stderr, /Requires env access/);
 });
 

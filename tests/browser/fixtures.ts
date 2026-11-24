@@ -1,7 +1,7 @@
 // Tier 2 fixtures: an in-process origin on the memory
 // backend, one mock seed per run, one Chrome per file,
 // one browser context per test, compositor input,
-// condition waits. Runs only under ./test-browser
+// condition waits. Runs only under ./bin/test browser
 // (FUSION_ANGLE_STATIC_ROOT).
 
 import { MemoryStorageBackend } from
@@ -69,7 +69,7 @@ type FileSeed = {
     readonly credentials: SeededCredentials;
 };
 
-// ./test-browser lands one mock seed for the run before
+// ./bin/test browser lands one mock seed for the run before
 // any file starts and names its file here. A file run
 // alone with deno test has none named and seeds its own.
 export const RUN_SEED_ENV = 'FUSION_ANGLE_BROWSER_SEED';
@@ -237,7 +237,7 @@ export async function startOrigin(
     if (staticRoot === undefined || staticRoot === '') {
         throw new Error(
             'FUSION_ANGLE_STATIC_ROOT is required'
-            + ' (run ./test-browser)',
+            + ' (run ./bin/test browser)',
         );
     }
     const seed = await seededOnce();
@@ -771,7 +771,7 @@ export async function signIn(
 
 // A dead CDP socket strands every in-flight send —
 // CdpClient never rejects its pending map on close.
-// ./test-browser gates ./crank, where a hang is
+// ./bin/deploy --local runs ./bin/test browser, where a hang is
 // strictly worse than a failure: a failure names the
 // test, a hang names nothing and takes the whole
 // checkpoint with it. 120s clears the largest single

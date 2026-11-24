@@ -10,7 +10,7 @@ import { ledgerFields } from './ledger-row.ts';
 
 // Live pin: a standalone store read issues one SELECT
 // with no BEGIN. Skip when POSTGRES_URL is unset so
-// ./validate stays Postgres-free. Private schema per
+// ./bin/test validate stays Postgres-free. Private schema per
 // file; do not share schemas across files.
 
 const POSTGRES_URL = Deno.env.get('POSTGRES_URL');

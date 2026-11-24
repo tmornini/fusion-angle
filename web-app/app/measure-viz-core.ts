@@ -1,4 +1,4 @@
-// Pure view-model logic for ./measure --visualize.
+// Pure view-model logic for ./bin/measure --visualize.
 // No I/O, no DOM — unit-tested only. Reuses HistoryLine
 // and Budgets from measure-core; does not duplicate them.
 

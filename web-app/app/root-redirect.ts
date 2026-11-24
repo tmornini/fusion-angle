@@ -3,8 +3,8 @@
 // (unsigned). No schema branch. Extracted from the
 // inline body script in web-app/index.html so a
 // strict Content-Security-Policy (script-src 'self')
-// can forbid inline scripts. esbuild bundles this
-// into a self-contained IIFE per ./build.
+// can forbid inline scripts. `deno bundle` folds this
+// into a self-contained IIFE per ./bin/build.
 
 import { putLocation } from './adapters/location.ts';
 import { createHttpFacade } from

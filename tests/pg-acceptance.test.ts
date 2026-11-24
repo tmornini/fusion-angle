@@ -8,7 +8,7 @@ import { defineStoreAcceptance } from
     './store-acceptance.ts';
 
 // Live Postgres runner for defineStoreAcceptance.
-// ./validate stays Postgres-free: skip when POSTGRES_URL
+// ./bin/test validate stays Postgres-free: skip when POSTGRES_URL
 // is unset. One schema per file; open() wipes + ensures
 // tables before seedAdminSchema. Do not share schemas
 // across files.

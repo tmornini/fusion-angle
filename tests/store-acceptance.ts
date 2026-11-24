@@ -39,9 +39,9 @@ import {
     createArchiveGraph,
 } from './fixtures/create-archive-graph.ts';
 
-// Parameterized store acceptance. ./test-postgres will
-// invoke this factory; the memory runner keeps ./validate
-// covering the cases without Postgres.
+// Parameterized store acceptance. ./bin/test postgres will
+// invoke this factory; the memory runner keeps
+// ./bin/test validate covering the cases without Postgres.
 
 const AT = '2026-01-01T00:00:00.000000Z';
 const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';

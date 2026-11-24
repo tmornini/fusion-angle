@@ -27,7 +27,7 @@ import {
 } from '../shared/identifier.ts';
 import { ledgerFields } from './ledger-row.ts';
 
-// Live EXPLAIN pins for schema indexes. ./validate stays
+// Live EXPLAIN pins for schema indexes. ./bin/test validate stays
 // Postgres-free: skip when POSTGRES_URL is unset. Private
 // schema per file; do not share schemas across files.
 

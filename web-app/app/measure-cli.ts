@@ -1,5 +1,5 @@
-// Pure CLI defaults and gates for ./measure.
-// Consumed by measure.ts (Node harness) and unit tests.
+// Pure CLI defaults and gates for ./bin/measure.
+// Consumed by measure.ts and unit tests.
 
 import { DEFAULT_PROFILE_PAGES } from
     './measure-profile-core.ts';

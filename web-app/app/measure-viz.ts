@@ -1,4 +1,4 @@
-// Generator for ./measure --visualize.
+// Generator for ./bin/measure --visualize.
 // Reads history + budgets from disk; embeds a versioned
 // payload in self-contained dashboard + page HTML.
 // Synchronous Deno file calls have no browser

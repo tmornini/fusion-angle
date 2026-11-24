@@ -20,7 +20,7 @@ import { ledgerFields } from './ledger-row.ts';
 
 // Live pin: uuid ORDER BY matches compareIdentifiers,
 // not ASCII. Skip when POSTGRES_URL is unset so
-// ./validate stays Postgres-free.
+// ./bin/test validate stays Postgres-free.
 
 const POSTGRES_URL = Deno.env.get('POSTGRES_URL');
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;

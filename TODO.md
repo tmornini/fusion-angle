@@ -3469,16 +3469,12 @@ Off the critical path; each with its oracle.
   takes.
 - Stale-history comment cleanup as one pass — comments
   still describe a past state as present. Sampled:
-  `web-app/app/measure-cli.ts` names a Node harness;
-  `web-app/app/page-request-profile.ts` says "No-op in
-  Node"; `tests/drift-states.test.ts` says derive-states
-  is unread in production while `api/routes.ts` imports
+  `tests/drift-states.test.ts` says derive-states is
+  unread in production while `api/routes.ts` imports
   it; `api/routes.ts` claims a revival dual-write, though
-  no states row half exists; `states.postEvent`,
+  no states row half exists; and `states.postEvent`,
   defined nowhere, is named at `api/routes.ts:354`,
-  `:1066`, `:1102`, `:1143` and `api/mock-data.ts:872`;
-  and `web-app/app/root-redirect.ts:6-7` says esbuild and
-  `./build` where `deno bundle` and `./bin/build` run.
+  `:1066`, `:1102`, `:1143` and `api/mock-data.ts:872`.
   The pass derives its list by reading. The
   "remove the comment … when done" and "revise both
   comments when done" pointers other entries carry are

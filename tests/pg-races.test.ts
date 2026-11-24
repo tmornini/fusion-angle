@@ -46,7 +46,7 @@ import { openPoolToFullWidth } from './fixtures/open-pool.ts';
 // under a seat removal, a program member created under a
 // flow write, and two flow writes that do not wait on each
 // other. Skip when POSTGRES_URL is unset so
-// ./validate stays Postgres-free.
+// ./bin/test validate stays Postgres-free.
 
 const POSTGRES_URL = Deno.env.get('POSTGRES_URL');
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
