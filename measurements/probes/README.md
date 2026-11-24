@@ -193,45 +193,6 @@ index scan of `fa_message_pairs_body`) and 15.284 ms
 as a sequential scan (`enable_bitmapscan` off and
 `enable_indexscan` off).
 
-## layer-one/ (2026-11-23)
-
-The figures in
-`docs/superpowers/specs/faster-layer-one-design.md`: where
-`./bin/test`'s seconds go, and what one mock seed costs. Deno
-2.9.8, one 16-core machine shared with three other
-suites, so every figure carries its load. Run from the
-repository root.
-
-- `seed-time.ts` — `seededMockDb()` alone, one unmeasured
-  seed and then seven timed. It takes the tree's root as
-  a `file:` URL, so it times the seed at any commit from
-  a `git archive` snapshot before a test file seeds once;
-  from that change on, `seededMockDb()` copies the file's
-  seed after its first call, and the probe times copies.
-- `seed-pair.ts` — two trees in one process, a seed from
-  each in turn, the order alternating: the median of the
-  per-round ratios, wall and CPU. A pair shares its load,
-  so the ratio holds when the machine is busy. It times
-  seeds only in trees before a test file seeds once.
-- `worker-spans.ts` — a fifth `--preload` for one run of
-  the memory suite: each worker's load span and test
-  span, one JSON line each, to `FA_PROBE_SPANS`.
-- `seed-spans.patch` — the temporary source patch beside
-  it: each `seededMockDb()`, rehearsal, and landing writes
-  its span to the same file. Apply it with `patch -p1`,
-  run, and reverse it with `patch -R -p1`; it is as it
-  applied at `c36020172`. Three tests fail under it, the
-  ones that fence permissions around a seed. Its
-  `tests/mock-seed.ts` hunk no longer applies once a test
-  file seeds once (the commit after `6981d40aa`); its
-  `api/ledger-seed.ts` hunks still do.
-- `spans.ts` — sums that file: loading against testing,
-  the seed's share, the longest workers, and the run
-  replayed on the slot count it is given, with the
-  longest worker whole and split.
-- `profile-self.ts` — self time by function and by file
-  in a `deno run --cpu-prof` profile.
-
 ## Figures whose script did not survive
 
 Stated in TODO.md as measured, or here for an item that

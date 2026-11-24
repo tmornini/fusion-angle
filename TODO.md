@@ -3706,9 +3706,7 @@ Off the critical path; each with its oracle.
   longer runs.
   Oracle: `./bin/test` measured under the suite lock
   before and after those 41 rehearsals share a seed, by
-  a probe that seeds directly (`seed-time.ts` and
-  `seed-pair.ts` time copies from the per-file change
-  on)
+  a probe that seeds directly
 - The memory backend copies its whole table for every
   bare statement (`const copy = [...this.#rows]`,
   `api/backend-memory.ts:154`), a cost every test write
