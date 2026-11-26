@@ -16,10 +16,19 @@ import {
     iconBook,
 } from './icons.ts';
 
+// The sidebar's headings, in the order they render.
+export const NAV_GROUPS = [
+    'Strategy', 'Pipeline', 'Operations',
+    'Account', 'Developer',
+] as const;
+export type NavGroup = typeof NAV_GROUPS[number];
+
 export interface PageEntry {
     title: string;
     layout: 'sidebar' | 'standalone';
     inSidebarNav?: boolean;
+    // The heading a sidebar link sits under.
+    navGroup?: NavGroup;
     sidebarKey?: string;
     sourceDir: string;
     sourceFile: string;
@@ -53,6 +62,7 @@ export const PAGE_REGISTRY: Record<
         title: 'Dashboard',
         layout: 'sidebar',
         inSidebarNav: true,
+        navGroup: 'Strategy',
         sourceDir: 'dashboard',
         sourceFile: 'index',
         icon: iconHome,
@@ -65,6 +75,7 @@ export const PAGE_REGISTRY: Record<
         title: 'Organization',
         layout: 'sidebar',
         inSidebarNav: true,
+        navGroup: 'Strategy',
         sourceDir: 'organization',
         sourceFile: 'index',
         icon: iconBuilding,
@@ -78,6 +89,7 @@ export const PAGE_REGISTRY: Record<
         title: 'Ideas',
         layout: 'sidebar',
         inSidebarNav: true,
+        navGroup: 'Pipeline',
         sourceDir: 'ideas',
         sourceFile: 'index',
         icon: iconLightbulb,
@@ -126,6 +138,7 @@ export const PAGE_REGISTRY: Record<
         title: 'Projects',
         layout: 'sidebar',
         inSidebarNav: true,
+        navGroup: 'Pipeline',
         sourceDir: 'projects',
         sourceFile: 'index',
         icon: iconFolderKanban,
@@ -146,48 +159,12 @@ export const PAGE_REGISTRY: Record<
         cssBundles: ['pages-projects'],
         loader: () => import('../projects/detail.ts'),
     },
-    records: {
-        organizationScoped: true,
-        title: 'Records',
-        layout: 'sidebar',
-        inSidebarNav: true,
-        sourceDir: 'records',
-        sourceFile: 'index',
-        icon: iconDatabase,
-        keywords:
-            'records data shape attribute',
-        cssBundles: ['pages-records'],
-        loader: () => import('../records/index.ts'),
-    },
-    'record-create': {
-        organizationScoped: true,
-        title: 'Create Record',
-        layout: 'sidebar',
-        sidebarKey: 'records',
-        sourceDir: 'records',
-        sourceFile: 'create',
-        icon: iconDatabase,
-        keywords: 'new record create',
-        cssBundles: ['pages-records'],
-        loader: () => import('../records/create.ts'),
-    },
-    'record-detail': {
-        organizationScoped: true,
-        title: 'Record',
-        layout: 'sidebar',
-        sidebarKey: 'records',
-        sourceDir: 'records',
-        sourceFile: 'detail',
-        icon: iconDatabase,
-        searchable: false,
-        cssBundles: ['pages-records'],
-        loader: () => import('../records/detail.ts'),
-    },
     flows: {
         organizationScoped: true,
         title: 'Flows',
         layout: 'sidebar',
         inSidebarNav: true,
+        navGroup: 'Operations',
         sourceDir: 'flows',
         sourceFile: 'index',
         icon: iconGitBranch,
@@ -220,11 +197,50 @@ export const PAGE_REGISTRY: Record<
         cssBundles: ['pages-flow-stats'],
         loader: () => import('../flows/stats.ts'),
     },
+    records: {
+        organizationScoped: true,
+        title: 'Records',
+        layout: 'sidebar',
+        inSidebarNav: true,
+        navGroup: 'Operations',
+        sourceDir: 'records',
+        sourceFile: 'index',
+        icon: iconDatabase,
+        keywords:
+            'records data shape attribute',
+        cssBundles: ['pages-records'],
+        loader: () => import('../records/index.ts'),
+    },
+    'record-create': {
+        organizationScoped: true,
+        title: 'Create Record',
+        layout: 'sidebar',
+        sidebarKey: 'records',
+        sourceDir: 'records',
+        sourceFile: 'create',
+        icon: iconDatabase,
+        keywords: 'new record create',
+        cssBundles: ['pages-records'],
+        loader: () => import('../records/create.ts'),
+    },
+    'record-detail': {
+        organizationScoped: true,
+        title: 'Record',
+        layout: 'sidebar',
+        sidebarKey: 'records',
+        sourceDir: 'records',
+        sourceFile: 'detail',
+        icon: iconDatabase,
+        searchable: false,
+        cssBundles: ['pages-records'],
+        loader: () => import('../records/detail.ts'),
+    },
     workbox: {
         organizationScoped: true,
         title: 'Workbox',
         layout: 'sidebar',
         inSidebarNav: true,
+        navGroup: 'Operations',
         sourceDir: 'workbox',
         sourceFile: 'index',
         icon: iconMail,
@@ -238,6 +254,7 @@ export const PAGE_REGISTRY: Record<
         title: 'Members',
         layout: 'sidebar',
         inSidebarNav: true,
+        navGroup: 'Account',
         sourceDir: 'members',
         sourceFile: 'index',
         icon: iconPeople,
@@ -274,6 +291,7 @@ export const PAGE_REGISTRY: Record<
         title: 'Identities',
         layout: 'sidebar',
         inSidebarNav: true,
+        navGroup: 'Account',
         sourceDir: 'identities',
         sourceFile: 'index',
         icon: iconShield,
@@ -326,6 +344,7 @@ export const PAGE_REGISTRY: Record<
         title: 'Billing',
         layout: 'sidebar',
         inSidebarNav: true,
+        navGroup: 'Account',
         sourceDir: 'billing',
         sourceFile: 'index',
         icon: iconCreditCard,
@@ -339,6 +358,7 @@ export const PAGE_REGISTRY: Record<
         title: 'API',
         layout: 'sidebar',
         inSidebarNav: true,
+        navGroup: 'Developer',
         sourceDir: 'api-documentation',
         sourceFile: 'index',
         icon: iconBook,
@@ -352,6 +372,7 @@ export const PAGE_REGISTRY: Record<
         title: 'Design System',
         layout: 'sidebar',
         inSidebarNav: true,
+        navGroup: 'Developer',
         sourceDir: 'design-system',
         sourceFile: 'index',
         icon: iconPalette,

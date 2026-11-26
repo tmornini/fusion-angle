@@ -1871,14 +1871,18 @@ the second organization.
        on the dashboard as the seeded admin';
        exploratory — the header and main content
        area rendering
-- [ ] **C2** Sidebar shows flat navigation
-  links in this order: Dashboard,
-  Organization, Ideas, Projects, Records,
-  Flows, Workbox, Members, Identities, Billing,
-  API, Design System. PASS: all 12 links
-  present, in order, and styled. Source of
+- [ ] **C2** Sidebar shows navigation links
+  under five headings, in this order: Strategy
+  (Dashboard, Organization), Pipeline (Ideas,
+  Projects), Operations (Flows, Records,
+  Workbox), Account (Members, Identities,
+  Billing), Developer (API, Design System).
+  PASS: all 5 headings and 12 links present, in
+  order, and styled; collapsed, the headings
+  hide and a rule separates the groups. Source of
   truth: `PAGE_REGISTRY` (entries with
-  `inSidebarNav: true`) in
+  `inSidebarNav: true`, and their `navGroup`) and
+  `NAV_GROUPS` in
   `web-app/app/page-registry.ts`.
   (Teams, People, Roles, Crews, Company,
   Activity Feed, and Profile sidebar entries
@@ -1887,8 +1891,10 @@ the second organization.
   member chip (the old header greeting that also
   linked to it has been removed); humans and AIs
   both live on the Members page.)
-  Pin: exploratory — the rendered order and
-       styling of the 12 links
+  Pin: tests/nav-items.test.ts 'sidebar links sit
+       under their headings in order';
+       exploratory — the rendered styling and the
+       collapsed state
 - [ ] **C2a** Open API from the sidebar. PASS: the
   view-as switch (Everyone chosen), the search box, the
   Start here card, and the elevation SVG in
