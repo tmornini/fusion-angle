@@ -18,7 +18,6 @@ import type { Organization } from '../organization-view.ts';
 export type GeneralInfoFieldKey =
     | 'name' | 'domain';
 
-const STAT_VALUE_2XL = 'text-2xl font-bold';
 const STAT_VALUE_LG = 'text-lg font-bold';
 
 function buildStatCell(
@@ -51,7 +50,7 @@ function buildPageHeader(
         <div class="${
             'flex items-center'
             + ' justify-between gap-4'
-            + ' mb-8 flex-wrap'
+            + ' mb-2 flex-wrap'
         }">
             <div>
                 <h1
@@ -129,41 +128,36 @@ function buildOverviewCard(
     identity: SafeHtml,
 ): SafeHtml {
     return html`
-        <div class="card card-hover p-6 mb-6">
-            <div
-                class="${
-                    'flex items-center'
-                    + ' gap-4 mb-6'
-                }"
-            >
-                <div class="icon-box-lg"
+        <div class="${
+            'card card-hover p-4'
+            + ' organization-summary'
+        }">
+            <div class="organization-identity">
+                <div class="icon-box"
                     data-tone="primary"
-                >${iconBuilding(ICON_SIZE['3xl'], '')}</div>
+                >${iconBuilding(ICON_SIZE.xl, '')}</div>
                 <div>${identity}</div>
             </div>
 
-            <div
-                class="grid grid-cols-2
-                       lg:grid-cols-4 gap-4"
-            >
+            <div class="organization-stats">
                 ${buildStatCell(
                     iconPeople(ICON_SIZE.base, ''),
                     'Active People',
                     html`${stats
                         .activePeopleCount}`,
-                    STAT_VALUE_2XL,
+                    STAT_VALUE_LG,
                 )}
                 ${buildStatCell(
                     iconFolderKanban(ICON_SIZE.base, ''),
                     'Projects',
                     html`${stats.projectsCurrent}`,
-                    STAT_VALUE_2XL,
+                    STAT_VALUE_LG,
                 )}
                 ${buildStatCell(
                     iconLightbulb(ICON_SIZE.base, ''),
                     'Ideas',
                     html`${stats.ideasCurrent}`,
-                    STAT_VALUE_2XL,
+                    STAT_VALUE_LG,
                 )}
                 ${buildStatCell(
                     iconCalendar(ICON_SIZE.base, ''),
@@ -235,7 +229,7 @@ function buildUsageCard(
     stats: OrganizationStats,
 ): SafeHtml {
     return html`
-        <div class="card card-hover p-6 mt-6">
+        <div class="card card-hover p-6">
             <h3
                 class="font-display
                        font-semibold mb-4
@@ -271,11 +265,13 @@ function buildPage(
     identity: SafeHtml,
 ): SafeHtml {
     return html`
-    <div class="overview">
+    <div class="overview organization-overview">
         ${buildPageHeader(headerActions)}
         ${buildOverviewCard(organization, stats, identity)}
         <div id="objectives-box"></div>
-        ${buildUsageCard(organization, stats)}
+        <div class="organization-usage">
+            ${buildUsageCard(organization, stats)}
+        </div>
     </div>`;
 }
 

@@ -63,3 +63,15 @@ Deno.test('empty state when no objectives', () => {
     const html = p.buildBox().toString();
     assert(html.toLowerCase().includes('no objectives'));
 });
+
+Deno.test('edit and archive are icon buttons named for their row',
+() => {
+    const html = new OrganizationObjectivesPresenter(
+        activeObjs, archivedObjs, defs, archivedAt,
+    ).buildBox().toString();
+    assert(html.includes('aria-label="Edit Increase incomes"'));
+    assert(html.includes(
+        'aria-label="Archive Lower expenses"'));
+    assert(!html.includes('aria-label="Edit Old Quarterly"'));
+});
+

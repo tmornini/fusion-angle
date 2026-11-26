@@ -6,3 +6,100 @@
 [data-page-editing] [data-action="add-objective"] {
     display: none;
 }
+
+/* One column on narrow screens. From 1024px, objectives
+   sit beside usage and sent invitations, and the two
+   columns end on the same line. */
+.organization-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
+    max-width: var(--width-overview);
+    margin: 0 auto;
+}
+
+.organization-layout #organization-content,
+.organization-layout .organization-overview {
+    display: contents;
+}
+
+.organization-layout #organization-content > *,
+.organization-layout .organization-overview > * {
+    min-width: 0;
+}
+
+.organization-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-4);
+}
+
+.organization-identity {
+    display: flex;
+    flex: 1 1 16rem;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+}
+
+.organization-stats {
+    display: grid;
+    flex: 1 1 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+}
+
+.organization-stats .stat-cell {
+    padding: var(--space-2) var(--space-4);
+}
+
+/* The narrow column wraps an invitee's line, so the
+   address and the expiry are never cut off. */
+.organization-layout #sent-invitations-box .truncate {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+@media (min-width: 768px) {
+    .organization-stats {
+        flex: 0 1 auto;
+        grid-template-columns: repeat(4, auto);
+    }
+}
+
+@media (min-width: 1024px) {
+    .organization-layout {
+        grid-template-columns:
+            minmax(0, 3fr) minmax(0, 2fr);
+        grid-template-rows: auto auto min-content 1fr;
+    }
+
+    .organization-layout #organization-content > *,
+    .organization-layout .organization-overview > * {
+        grid-column: 1 / -1;
+    }
+
+    .organization-layout
+    .organization-overview > #objectives-box {
+        grid-column: 1;
+        grid-row: 3 / span 2;
+    }
+
+    .organization-layout
+    .organization-overview > .organization-usage {
+        grid-column: 2;
+        grid-row: 3;
+    }
+
+    .organization-layout > #sent-invitations-box {
+        grid-column: 2;
+        grid-row: 4;
+    }
+
+    .organization-layout #objectives-box > .card,
+    .organization-layout #sent-invitations-box > .card {
+        height: 100%;
+    }
+}
+

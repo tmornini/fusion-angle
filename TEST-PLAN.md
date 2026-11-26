@@ -5374,11 +5374,15 @@ FSM, unlike `flows/detail`).
 - [ ] **G9** Navigate to `organization/index.html`. PASS:
   page wears the standard sidebar + top-bar layout. Shows
   the page header "Organization" with an Edit button, then
-  an Overview card holding the org identity (read-only
-  Organization Name and Domain) above a four-cell stat grid
+  an Overview strip holding the org identity (read-only
+  Organization Name and Domain) beside four stat cells
   (Active People, Projects, Ideas, Next Billing — no health
-  badge), then the Objectives box, then the Usage Overview
-  card with progress bars. There is no separate General
+  badge). At 1024px and wider the Objectives box then sits
+  in a left column beside the Usage Overview card and the
+  Sent invitations card, and the two columns end on the
+  same line; narrower, the three stack in that order.
+  Active objective rows carry Edit and Archive as icon
+  buttons. There is no separate General
   Information card — the read-only Name/Domain live in the
   Overview card and Edit lives in the page header — and no
   longer a Security & Administration card; Members and
@@ -5386,7 +5390,15 @@ FSM, unlike `flows/detail`).
   values are placeholders — verify the page renders
   without error; numeric accuracy arrives when wired to
   live tables.)
-  Pin: tests/presenter-projects-organization.test.ts
+  Pin: tests/browser/organization-layout.test.ts
+       'the Organization columns end on the same line'
+       (decides the two columns at 1280px);
+       tests/browser/organization-layout.test.ts 'the
+       Organization cards stack on a narrow screen';
+       tests/presenter-organization-objectives.test.ts
+       'edit and archive are icon buttons named for their
+       row';
+       tests/presenter-projects-organization.test.ts
        'OrganizationPresenter.buildPage renders the org
        name, domain, and an Edit action' (decides the
        Overview card's Name/Domain and the header Edit

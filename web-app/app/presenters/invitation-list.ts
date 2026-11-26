@@ -239,7 +239,7 @@ export class SentInvitationsPresenter {
             ? emptyState(emptySentMessage(this.#state))
             : html`${rows.map(buildSentRow)}`;
         return html`
-            <div class="card card-hover p-6 mt-6">
+            <div class="card card-hover p-6">
                 <div class="${
                     'flex items-center'
                     + ' justify-between mb-4'
