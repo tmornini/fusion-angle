@@ -197,6 +197,9 @@ function bindRegions(
     page.lists.addEventListener('click', (e) => {
         onRowClick(e, page.workOrderBox);
     }, { signal });
+    page.lists.addEventListener('keydown', (e) => {
+        onRowKey(e, page);
+    }, { signal });
 }
 
 function bindSearchBox(
@@ -597,14 +600,49 @@ function onRowClick(e: MouseEvent, box: WorkOrderBox): void {
     if (!(e.target instanceof Element)) return;
     const card = e.target.closest('[data-work-order-card]');
     if (!card) return;
-    if (e.target.closest('a[href]') && isModifiedClick(e)) {
+    if (e.target.closest('a[href]') && isModified(e)) {
         return;
     }
     e.preventDefault();
+    // The arrow keys walk on from the row that holds focus.
+    focusRow(card, { preventScroll: true });
     box.open(getRequiredAttribute(card, 'data-work-order-card'));
 }
 
-function isModifiedClick(e: MouseEvent): boolean {
+// Up and down walk the rows as the left box draws them,
+// stopping at either end. Each step opens its row, except
+// where opening would cost the person something: typed
+// values the box would drop, or a phone's scroll away from
+// the list. There only focus moves, and Enter opens.
+function onRowKey(e: KeyboardEvent, page: WorkboxPage): void {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    if (isModified(e)) return;
+    if (!(e.target instanceof Element)) return;
+    const card = e.target.closest('[data-work-order-card]');
+    if (!card) return;
+    e.preventDefault();
+    const cards = $$('[data-work-order-card]', page.lists);
+    const step = e.key === 'ArrowDown' ? 1 : -1;
+    const at = cards.findIndex((each) => each === card);
+    const next = cards[at + step];
+    if (next === undefined) return;
+    focusRow(next, {});
+    if (
+        matchMedia(MOBILE_MEDIA_QUERY).matches
+        || page.workOrderBox.holdsEdits()
+    ) {
+        return;
+    }
+    page.workOrderBox.open(
+        getRequiredAttribute(next, 'data-work-order-card'),
+    );
+}
+
+function focusRow(card: Element, options: FocusOptions): void {
+    card.querySelector<HTMLElement>('a[href]')?.focus(options);
+}
+
+function isModified(e: MouseEvent | KeyboardEvent): boolean {
     return e.metaKey || e.ctrlKey || e.shiftKey || e.altKey;
 }
 

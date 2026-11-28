@@ -27,7 +27,7 @@ import type { Member } from '../../../shared/types.ts';
 import type { Id } from '../../../shared/types.ts';
 import {
     ICON_SIZE,
-    iconClock,
+    iconCheck,
     iconXCircle,
 } from '../icons.ts';
 import {
@@ -173,23 +173,24 @@ function buildWorkOrderClose(): SafeHtml {
     </button>`;
 }
 
-// The design system's switch inside its label, named as
-// its label reads; aria-checked says whether I hold the
-// claim.
-function buildClaimSwitch(
-    on: boolean,
-    label: string,
-): SafeHtml {
-    return html`<label
+// The claim's button, named for what pressing it does:
+// Claim alone, or Release after the words saying who holds
+// the work order.
+function buildClaimButton(heldBy: string | null): SafeHtml {
+    const held = heldBy === null
+        ? html``
+        : html`${iconCheck(ICON_SIZE.sm, '')}${heldBy}`;
+    return html`<span
         id="work-order-claim"
-        class="flex items-center gap-2 text-sm"><button
+        class="flex items-center gap-2 text-sm">${held}<button
         type="button"
-        class="switch"
-        role="switch"
-        id="work-order-claim-switch"
-        aria-checked="${on ? 'true' : 'false'}"
-        aria-label="${label}"><span
-        class="switch-thumb"></span></button>${label}</label>`;
+        class="btn btn-sm ${
+            heldBy === null ? 'btn-primary' : 'btn-outline'
+        }"
+        id="work-order-claim-btn"
+        data-claim="${heldBy === null ? 'claim' : 'release'}">${
+            heldBy === null ? 'Claim' : 'Release'
+        }</button></span>`;
 }
 
 // Before anything is opened, and after it is closed.
@@ -396,17 +397,19 @@ export class WorkboxDetailPresenter {
             : html``;
 
         // The title row carries the claim place and the
-        // close control at its right end; the badges take
-        // their own row, so a long claim label never
-        // squeezes them. Attributes are two columns so
+        // close control at its right end, on a line below
+        // when the title has no room beside them; the
+        // badges take their own row. Attributes are two columns so
         // submit stays below them and still in view.
         return html`<div>
             <div id="work-order-header" class="mb-6">
-                <div class="flex items-center gap-3 mb-2">
+                <div class="flex flex-wrap items-center
+                    gap-3 mb-2">
                     <h2 class="${
-                        'text-xl font-bold flex-1 min-w-0'
+                        'work-order-title text-xl font-bold'
+                        + ' flex-1 min-w-0'
                     }">${this.flowNameText()}</h2>
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 ml-auto">
                         ${this.#buildClaimPlace()}
                         ${buildWorkOrderClose()}
                     </div>
@@ -447,7 +450,7 @@ export class WorkboxDetailPresenter {
                         cursor-pointer">
                     History
                 </summary>
-                <div class="card p-4">
+                <div>
                     ${!this.#hasHistory()
                         ? html`<p
                             class="text-muted">
@@ -467,22 +470,23 @@ export class WorkboxDetailPresenter {
         </div>`;
     }
 
-    // The claim's one place: a switch while the work order
-    // is unclaimed or mine, the holder's name while another
-    // member holds it, nothing once it is archived. A
-    // lapsed claim is no claim: the page passes none.
+    // The claim's one place: Claim while the work order is
+    // unclaimed, my name and Release while I hold it, the
+    // holder's name while another member does, nothing once
+    // it is archived. A lapsed claim is no claim: the page
+    // passes none.
     #buildClaimPlace(): SafeHtml {
         if (this.isArchive()) {
             return html``;
         }
         const claim = this.#activeClaim;
         if (claim === null) {
-            return buildClaimSwitch(false, 'Claim');
+            return buildClaimButton(null);
         }
         const label = 'Claimed by '
             + memberName(this.#memberMap, claim.memberId);
         if (claim.memberId === this.#currentMemberId) {
-            return buildClaimSwitch(true, label);
+            return buildClaimButton(label);
         }
         return html`<span
             id="work-order-claim"
@@ -593,7 +597,7 @@ export class WorkboxDetailPresenter {
             entry.fieldValues.length > 0;
         const valuesHtml = hasValues
             ? html`<div
-                class="mt-2 ml-6
+                class="mt-2
                     work-order-history-fields">
                 ${entry.fieldValues.map(
                     fv => html`
@@ -609,21 +613,20 @@ export class WorkboxDetailPresenter {
         return html`<div
             class="py-3 border-b">
             <div
-                class="flex items-center
+                class="flex items-start
                     gap-3"
             >
-                <span class="text-muted">
-                    ${iconClock(ICON_SIZE.sm, '')}
-                </span>
-                <span
-                    class="font-semibold"
-                >${entry.fromNodeName}
-                    &rarr;
-                    ${entry.toNodeName}</span>
-                <span
-                    class="text-muted
-                        ml-auto"
-                >${entry.memberName}</span>
+                <div class="flex-fill">
+                    <div
+                        class="font-semibold"
+                    >${entry.fromNodeName}
+                        &rarr;
+                        ${entry.toNodeName}</div>
+                    <div
+                        class="text-muted
+                            text-sm"
+                    >${entry.memberName}</div>
+                </div>
                 <span
                     class="text-muted
                         text-sm"

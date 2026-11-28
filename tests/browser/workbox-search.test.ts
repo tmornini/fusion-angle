@@ -171,7 +171,7 @@ function cardSelector(id: string): string {
 }
 
 // A long list puts most rows below the fold: scroll the row
-// into view, click it, and wait for its claim switch.
+// into view, click it, and wait for its claim button.
 async function openRow(page: Page, id: string): Promise<void> {
     const selector = JSON.stringify(cardSelector(id));
     await page.evaluate(
@@ -184,7 +184,7 @@ async function openRow(page: Page, id: string): Promise<void> {
         + `'#work-order-header .badge-neutral')`
         + `?.textContent.includes(${JSON.stringify(id)})`
         + ` && document.getElementById(`
-        + `'work-order-claim-switch') !== null`,
+        + `'work-order-claim-btn') !== null`,
         'the box holds ' + id,
     );
 }
@@ -304,7 +304,7 @@ Deno.test(
             await holdQueries(page, async (hold) => {
                 await typeInBox(page, TERM);
                 await hold.next();
-                await page.click('#work-order-claim-switch');
+                await page.click('#work-order-claim-btn');
                 await page.waitFor(
                     '#claimed-list ' + cardSelector(claimedId),
                 );
@@ -356,7 +356,7 @@ Deno.test(
     },
 );
 
-Deno.test('the switch claims while filtered', async () => {
+Deno.test('the claim button claims while filtered', async () => {
     await withAdminPage(browser.get(), async (page, origin) => {
         const ctx = await adminContext(origin);
         await openWorkbox(page, origin);
@@ -365,7 +365,7 @@ Deno.test('the switch claims while filtered', async () => {
         const [id] = await listIds(page, 'available-list');
         assert(id !== undefined);
         await openRow(page, id);
-        await page.click('#work-order-claim-switch');
+        await page.click('#work-order-claim-btn');
         await page.waitFor('#claimed-list ' + cardSelector(id));
         const fresh = await pollUntil(
             'the claim saved', WRITE_TIMEOUT_MS,

@@ -348,12 +348,12 @@ Deno.test(
             // offers Claim again.
             assert(await page.until<boolean>(
                 `document.getElementById(`
-                + `'work-order-claim-switch')`
-                + `?.getAttribute('aria-checked') === 'false'`
+                + `'work-order-claim-btn')`
+                + `?.dataset.claim === 'claim'`
                 + ` && document.getElementById(`
                 + `'work-order-claim').textContent.trim()`
                 + ` === 'Claim'`,
-                'the switch off, labelled Claim',
+                'the button offers Claim',
             ));
             assert(await page.evaluate<boolean>(boxHolds(id)));
             assertStrictEquals(await addressId(page), id);
@@ -637,7 +637,7 @@ Deno.test(
                         `[...document.querySelectorAll(`
                         + `'#work-order-box [data-edge-id],`
                         + ` #work-order-box [data-attribute-id],`
-                        + ` #work-order-claim-switch')]`
+                        + ` #work-order-claim-btn')]`
                         + `.every((c) => c.disabled)`,
                     ));
                     await hold.release(reread);
@@ -648,8 +648,8 @@ Deno.test(
                 + `'#work-order-header .badge-info')`
                 + `?.textContent.trim() === 'Data Capture'`
                 + ` && document.getElementById(`
-                + `'work-order-claim-switch')?.disabled === false`,
-                'the box at Data Capture, its switch live',
+                + `'work-order-claim-btn')?.disabled === false`,
+                'the box at Data Capture, its claim live',
             ));
         });
     },
@@ -687,7 +687,7 @@ Deno.test(
                 + `'#work-order-header .badge-info')`
                 + `?.textContent.trim() === 'Data Capture'`
                 + ` && document.getElementById(`
-                + `'work-order-claim-switch')?.disabled === false`,
+                + `'work-order-claim-btn')?.disabled === false`,
                 'Try Again recovers the box at Data Capture',
             ));
             assert(await page.evaluate<boolean>(boxHolds(id)));

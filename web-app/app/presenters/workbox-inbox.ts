@@ -30,6 +30,27 @@ function relativeTime(iso: string): string {
     return 'just now';
 }
 
+// Whole days without a transition after which a row is
+// marked, so work that has stopped moving stands out.
+export const WAIT_SOON_DAYS = 14;
+export const WAIT_LATE_DAYS = 30;
+
+export type WaitLevel = 'none' | 'soon' | 'late';
+
+export function waitLevelOf(
+    lastTransitionedAt: string | null,
+    nowMs: number,
+): WaitLevel {
+    if (lastTransitionedAt === null) return 'none';
+    const days = Math.floor(
+        (nowMs - new Date(lastTransitionedAt).getTime())
+        / DAY_MS,
+    );
+    if (days >= WAIT_LATE_DAYS) return 'late';
+    if (days >= WAIT_SOON_DAYS) return 'soon';
+    return 'none';
+}
+
 interface PlacedInboxItem {
     kind: 'placed';
     id: string;
@@ -41,6 +62,27 @@ interface PlacedInboxItem {
     completed: boolean;
     taskInstructions: string;
 }
+
+// Completed work is not waiting on anyone.
+function waitOf(item: InboxItem, nowMs: number): WaitLevel {
+    if (item.kind === 'placed' && item.completed) {
+        return 'none';
+    }
+    return waitLevelOf(item.lastTransitionedAt, nowMs);
+}
+
+// The key above the lists: what each row tint means.
+const WAIT_LEGEND: readonly {
+    readonly level: Exclude<WaitLevel, 'none'>;
+    readonly text: string;
+}[] = [
+    { level: 'late', text: `Waiting ${WAIT_LATE_DAYS}+ days` },
+    {
+        level: 'soon',
+        text: `Waiting ${WAIT_SOON_DAYS}–`
+            + `${WAIT_LATE_DAYS - 1} days`,
+    },
+];
 
 // A head whose node its flow graph no longer holds: it has
 // no state to name, no completion, and no instructions.
@@ -110,9 +152,10 @@ export interface InboxSection {
 // never opens it in the box, which could not place it.
 function buildUnplacedRow(
     item: UnplacedInboxItem,
+    wait: WaitLevel,
 ): SafeHtml {
     return html`
-        <div class="card p-4">
+        <div class="card p-4" data-wait="${wait}">
             <div class="flex-fill">
                 <div class="${
                     'flex items-center'
@@ -137,7 +180,7 @@ function buildUnplacedRow(
                     <span
                         class="badge badge-warning"
                         >State unknown</span>
-                    <span class="ml-auto"
+                    <span class="inbox-age ml-auto"
                         >${
                             item.lastTransitionedAt
                                 ? relativeTime(
@@ -154,9 +197,11 @@ function buildUnplacedRow(
 // badge and age below.
 function buildInboxRow(
     item: InboxItem,
+    nowMs: number,
 ): SafeHtml {
+    const wait = waitOf(item, nowMs);
     if (item.kind === 'unplaced')
-        return buildUnplacedRow(item);
+        return buildUnplacedRow(item, wait);
     const titleAttr = item.taskInstructions
         ? trusted(' title="'
             + escapeForHtml(
@@ -172,50 +217,34 @@ function buildInboxRow(
             class="badge badge-info"${
             titleAttr}
             >${item.stateName}</span>`;
+    const age = item.lastTransitionedAt
+        ? relativeTime(item.lastTransitionedAt)
+        : DISPLAY_ABSENT;
     return html`
     <div
-        class="card p-4 cursor-pointer"
+        class="card p-4 cursor-pointer workbox-row"
+        data-wait="${wait}"
         data-work-order-card="${item.id}">
+        <div class="flex items-start gap-3 mb-2">
+            <a href="${
+                buildPageUrl('workbox', { id: item.id })
+            }" class="flex-fill font-semibold"
+                aria-label="${item.flowName}, work order ${
+                    item.id
+                }">${
+                item.flowName
+            }</a>
+            <span class="inbox-age text-sm text-muted"
+                >${age}</span>
+        </div>
         <div class="${
-            'flex items-center gap-4'
+            'flex flex-wrap items-center'
+            + ' gap-2 text-sm text-muted'
         }">
-            <div class="flex-fill">
-                <a href="${
-                    buildPageUrl(
-                        'workbox',
-                        { id: item.id },
-                    )
-                }" class="${
-                    'flex items-center'
-                    + ' gap-2 mb-1'
-                }">
-                    <span class="${
-                        'font-semibold'
-                    }">${
-                        item.flowName
-                    }</span>
-                    <span class="${
-                        'text-xs text-muted min-w-0'
-                    }">${
-                        idLabel('Work order', item.id)
-                    }</span>
-                </a>
-                <div class="${
-                    'flex items-center'
-                    + ' gap-2 text-sm'
-                    + ' text-muted'
-                }">
-                    ${badge}
-                    <span class="ml-auto"
-                        >${
-                            item.lastTransitionedAt
-                                ? relativeTime(
-                                    item.lastTransitionedAt,
-                                )
-                                : DISPLAY_ABSENT
-                        }</span>
-                </div>
-            </div>
+            ${badge}
+            <span class="text-xs min-w-0">${
+                idLabel('Work order', item.id)
+            }</span>
         </div>
     </div>`;
 }
@@ -269,11 +298,14 @@ export function buildInboxLists(
     filter: InboxFilter,
     pressed: PressedPill,
 ): SafeHtml {
-    return html`${sections.map(
-        (section, index) => buildInboxSection(
-            section, index === 0, filter, pressed,
-        ),
-    )}`;
+    return html`<ul class="workbox-legend mb-3"
+        aria-label="Row colours">${WAIT_LEGEND.map((key) => html`<li
+        data-legend="${key.level}">${key.text}</li>`)}</ul>${
+        sections.map(
+            (section, index) => buildInboxSection(
+                section, index === 0, filter, pressed,
+            ),
+        )}`;
 }
 
 function buildInboxSection(
@@ -286,12 +318,16 @@ function buildInboxSection(
         ? html`<p class="text-muted">${
             emptyCopyOf(section.kind, filter, pressed)
         }</p>`
-        : html`${section.items.map(buildInboxRow)}`;
+        : html`${section.items.map(
+            (item) => buildInboxRow(item, Date.now()),
+        )}`;
     return html`<h2 class="${
         first
-            ? 'text-lg font-semibold mb-4'
-            : 'text-lg font-semibold mt-6 mb-4'
-    }">${LIST_TITLE[section.kind]}</h2>
+            ? 'workbox-section-title mb-3'
+            : 'workbox-section-title mt-6 mb-3'
+    }" data-section="${section.kind}">${
+        LIST_TITLE[section.kind]
+    } <span class="text-muted">${section.items.length}</span></h2>
     <div
         id="${LIST_ID[section.kind]}"
         class="flex flex-col gap-3"

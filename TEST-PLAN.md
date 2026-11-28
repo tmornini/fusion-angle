@@ -316,7 +316,7 @@ not repeat the note in every case.
   the bearer is memory-only. Witness the pair once,
   in this order: a claimed-by-me work order open in
   the box (a live create birth-claims, binds, and
-  opens it there; or turn the claim switch on first),
+  opens it there; or press Claim first),
   fill, arm the read, click `submit`. One attempt.
   Append WB16's line after WB15's, out of document
   order, holding the witnessed read until then; a
@@ -396,7 +396,7 @@ not repeat the note in every case.
 - WB11: from a claimed-by-me work order open in the
   box (a live create on Customer Onboarding
   birth-claims, binds a fresh instance, and opens it
-  there; or turn the claim switch on first), fill,
+  there; or press Claim first), fill,
   submit. Opening inspects; bind is gone. Layer 2 pin
   tests/browser/workbox-transition.test.ts
   'fill and submit moves the box to my next work
@@ -4636,8 +4636,8 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   the right box at the first post-start state ("Data
   Capture") without leaving the page: the address gains
   `?id=<id>`, the label `Work order <id>` is in the box's
-  header, and the claim switch is on, "Claimed by
-  <you>" — a create birth-claims.
+  header, and the claim place reads "Claimed by <you>"
+  beside "Release" — a create birth-claims.
   Pin: tests/adapters-work-orders.test.ts
        'postWorkOrderCreation seeds work order, flow
        link, and three state events in one call' (decides
@@ -4647,7 +4647,7 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        submit moves the box to my next work (WB11)'
        (creates through the page and finds the new work
        order in the box and the address); exploratory —
-       the switch's live label
+       the claim place's live label
 - [ ] **WB5a** Click the Data Capture → Review `submit`
   edge to select it, then click the Delete (trash)
   toolbar button — F28's own gesture. Reload Workbox and
@@ -4724,10 +4724,10 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        tests/presenter-workbox-detail.test.ts 'buildPage
        unclaimed shows disabled fields with values and
        disabled transitions'
-- [ ] **WB9** No Release button. Turning the claim switch
-  off releases (WB13).
-  Pin: tests/browser/workbox-box.test.ts 'the switch
-       claims and releases'
+- [ ] **WB9** One claim button, "Claim" or "Release".
+  Pressing "Release" releases (WB13).
+  Pin: tests/browser/workbox-box.test.ts 'the claim
+       button claims and releases'
 - [ ] **WB10** A collapsible History section shows all
   transitions with from/to state names, user name, and
   relative timestamp.
@@ -4758,13 +4758,13 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   Open an unclaimed (or lapsed) work order that has
   instance values. PASS: attribute inputs are disabled
   and still show those values; transition buttons are
-  shown and disabled; the claim switch is off, labelled
-  "Claim". To work it, turn the switch on.
+  shown and disabled; the claim button reads "Claim".
+  To work it, press it.
   Pin: tests/presenter-workbox-detail.test.ts
        'buildPage unclaimed shows disabled fields with
        values and disabled transitions';
        tests/presenter-workbox-detail.test.ts 'an
-       unclaimed work order offers the claim switch off'
+       unclaimed work order offers Claim'
 - [ ] **WB27 — Open, close, and the address.** Click an
   available row. PASS: its work order fills the right
   box, the row is outlined (`aria-current="true"`), the
@@ -4792,26 +4792,30 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        exploratory — the modified click's new tab
 - [ ] **WB28 — The claim place.** Open, in turn, an
   unclaimed work order, one I claim, one another member
-  claims, and an archived one. PASS: a switch, off,
-  labelled "Claim"; the same switch, on, labelled
-  "Claimed by <me>"; the words "Claimed by <them>" and
-  no switch; nothing. A lapsed claim reads as no claim.
+  claims, and an archived one. PASS: a "Claim" button;
+  the words "Claimed by <me>" and a "Release" button;
+  the words "Claimed by <them>" and no button; nothing.
+  A lapsed claim reads as no claim.
   Pin: tests/presenter-workbox-detail.test.ts 'an
-       unclaimed work order offers the claim switch off';
+       unclaimed work order offers Claim';
        tests/presenter-workbox-detail.test.ts 'my claim
-       shows the switch on with my name';
+       shows my name and Release';
        tests/presenter-workbox-detail.test.ts 'another
-       member's claim names them with no switch';
+       member's claim names them with no button';
        tests/presenter-workbox-detail.test.ts 'an archived
        work order has no claim place'
 - [ ] **WB29 — Phones.** At 375×800, open a row. PASS:
   the page scrolls the box into view below the mobile
   header. Close it. PASS: the page scrolls back to the
   lists. At 1280×800 with a long list, scroll the
-  lists. PASS: the open work order stays in view.
+  lists. PASS: the open work order stays in view. At
+  375×800 claim the open work order. PASS: the flow name
+  keeps its line, the claim and close controls below it.
   Pin: tests/browser/workbox-box.test.ts 'on a phone
        opening scrolls to the box and closing scrolls
-       back'; exploratory — the sticky box at desktop
+       back'; tests/browser/workbox-box.test.ts 'on a
+       phone a claim leaves the title its width';
+       exploratory — the sticky box at desktop
        width
 
 ### Workbox — Transitions
@@ -4915,31 +4919,32 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        exploratory — the live network-log read itself
 - [ ] **WB12** Click a work order row. PASS: the box
   opens it and the page does not PUT
-  `work-orders/:id/claim`; the switch stays off.
+  `work-orders/:id/claim`; the button still reads
+  "Claim".
   Pin: tests/browser/workbox-box.test.ts 'opening a row
        fills the box, marks the row, and sets the id'
        (decides the head is still unclaimed after
        opening)
-- [ ] **WB13** On a claimed-by-me work order, turn the
-  claim switch off. PASS: DELETE `work-orders/:id/claim`
-  (200); the switch is disabled while the DELETE is in
-  flight and goes off only when it answers; the row
+- [ ] **WB13** On a claimed-by-me work order, press
+  "Release". PASS: DELETE `work-orders/:id/claim`
+  (200); the button is disabled while the DELETE is in
+  flight and reads "Claim" only when it answers; the row
   moves to available-to-me; the form and the transition
   buttons disable.
-  Pin: tests/browser/workbox-box.test.ts 'the switch
-       claims and releases';
+  Pin: tests/browser/workbox-box.test.ts 'the claim
+       button claims and releases';
        tests/adapters-work-orders.test.ts
        'deleteWorkOrderClaim DELETEs claim and derives
        claim_released'
 - [ ] **WB13a — Claim → release → reclaim.** Open an
-  available row and turn the switch on (claim), off
-  (release), and on again (reclaim). PASS: the message
+  available row and press "Claim", "Release", and
+  "Claim" again. PASS: the message
   plane carries `claimed` → `claim_released` →
   `claimed`. On a seeded work order, its first claim
   records `claim_expired` for its creator's lapsed
   birth claim, then `claimed`.
-  Pin: tests/browser/workbox-box.test.ts 'the switch
-       claims and releases';
+  Pin: tests/browser/workbox-box.test.ts 'the claim
+       button claims and releases';
        tests/api-work-order-claim.test.ts 'a released
        claim allows a fresh claim';
        tests/mock-data-pairs.test.ts 'claiming a seeded
@@ -4968,7 +4973,7 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        invariant, not a single assertion)
 - [ ] **WB19a — Two-tab 412 in the box.**
   Subject: the same bound Active WO from WB11–WB13,
-  claimed by the switch (or already claimed-by-me). Drive
+  claimed by "Claim" (or already claimed-by-me). Drive
   before WB14. If the WO is already archived,
   DEFERRED on WB14 — not FAIL. Open it in the box
   in two tabs.
@@ -5080,28 +5085,28 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   box as two members in two cookie jars: Tony Stark in
   the walk's tab, and Sarah Chen in a second jar minted
   as SV6 does (Driving notes, SV6/SV7/SV10). In Tony's
-  tab, turn the switch on. Opening inspects. In
-  Sarah's, still showing the switch off, turn it on.
+  tab, press "Claim". Opening inspects. In Sarah's,
+  still offering "Claim", press it.
   PASS: Sarah's claim is refused — her box latched the
   head from before Tony's claim, so `PUT
   work-orders/:id/claim` answers 412 — a toast carries
-  "Failed to claim work order", her switch never shows
-  on, and her box re-reads to the holder's name with no
-  switch: "Claimed by Member without PII" for Sarah, who
+  "Failed to claim work order", her box never offers
+  "Release", and it re-reads to the holder's name with
+  no button: "Claimed by Member without PII" for Sarah, who
   may not read Tony's personal details (an organization
   admin's box reads "Claimed by Tony Stark"); the row is
   in neither of her lists.
   (A claim the server refuses with 409 `work order is
   already claimed` toasts "Someone else holds that work
   order"; a box that read after Tony's claim shows no
-  switch to try.) This work order's version chain
+  button to try.) This work order's version chain
   carries one live `'claimed'` event, Tony's (a stale
   prior claim is superseded by a `'claim_expired'`
   event, never overwritten in place). Inspect via
   derived `GET work-orders/:id/versions/` (oldest
   first; claim events carry `field_values: []`). Two
-  tabs of one jar are one member: the second opens the
-  holder's switch on and appends no claim (WB23's claim
+  tabs of one jar are one member: the second opens on
+  the holder's "Release" and appends no claim (WB23's claim
   half).
   Pin: tests/api-work-order-claim.test.ts 'a live claim by
        another member is a 409';
@@ -5117,7 +5122,7 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        specific live drive is unlikely to trigger an
        actual expiry);
        tests/browser/workbox-box.test.ts 'a claim another
-       member took leaves the switch off'; exploratory —
+       member took leaves no button'; exploratory —
        Sarah's live toast and lists
 
 ### Workbox — Personal inbox
@@ -5166,8 +5171,8 @@ all-see-all as the default.
        further required parameter
 - [ ] **WB23** Open the holder's work order in the box in
   two tabs of one cookie jar. PASS: the second tab shows
-  the holder's switch on and the form editable, and
-  appends no claim. Release is the switch, not
+  the holder's "Release" and the form editable, and
+  appends no claim. Release is the claim button, not
   `#unclaim-btn`.
   Pin: tests/browser/workbox-box.test.ts 'opening a row
        fills the box, marks the row, and sets the id'
@@ -5176,6 +5181,56 @@ all-see-all as the default.
        order box has no bind or unclaim chrome';
        tests/api-work-order-release.test.ts 'a release
        with no live claim answers the head'
+- [ ] **WB34 — Waiting legend.** Navigate to
+  `workbox/`. PASS: above the lists one legend shows a
+  red swatch, "Waiting 30+ days", and an amber swatch,
+  "Waiting 14–29 days", in the same tints as the waiting
+  rows; the lists have no group headings and the rows
+  keep their oldest-first order. Type in the search box.
+  PASS: the legend stays and the matches keep their
+  best-match order.
+  Pin: tests/presenter-workbox-inbox.test.ts 'one legend
+       above the lists explains the row tints';
+       tests/presenter-workbox-inbox.test.ts 'the legend
+       stays when no row is waiting';
+       tests/presenter-workbox-inbox.test.ts 'a search
+       keeps its order under the legend'; exploratory —
+       the painted swatches
+- [ ] **WB33 — Arrow keys.** Open a row, then press
+  Down and Up. PASS: focus and the open work order move
+  one row at a time through the lists as drawn, and stop
+  at either end. Type into a claimed work order's field,
+  focus its row, and press Down. PASS: focus moves, the
+  box keeps the work order and the typed value, and
+  Enter opens the focused row. At 375×800 the arrows
+  move focus only.
+  Pin: tests/browser/workbox-box.test.ts 'the arrow keys
+       walk the rows and open them';
+       tests/browser/workbox-box.test.ts 'the arrow keys
+       keep typed values'; exploratory — Enter and the
+       phone width
+- [ ] **WB32 — The queue.** At 1280×800, read the
+  lists. PASS: each list's heading starts with a dot in
+  the list's tone and ends with how many rows it draws;
+  each row has a left edge in that tone, the flow name
+  with the age at its right, and the state badge beside
+  the work order id below; the lists' column is narrower
+  than the work order box.
+  Pin: tests/presenter-workbox-inbox.test.ts 'a heading
+       counts the rows it draws'; exploratory — the
+       painted tones and column widths
+- [ ] **WB31 — Waiting rows.** Navigate to
+  `workbox/`. PASS: an open row that last moved 30 or
+  more days ago is tinted in the error tone, one that
+  last moved 14 to 29 days ago in the warning tone, and
+  a newer one is untinted; each tinted row's age is bold
+  in the same tone. Rows under "Archived by Me" are
+  never tinted.
+  Pin: tests/presenter-workbox-inbox.test.ts 'a row waits
+       from 14 days and is late from 30';
+       tests/presenter-workbox-inbox.test.ts 'a stalled
+       open row is marked and a completed one is not';
+       exploratory — the painted tints
 
 ---
 
@@ -5184,7 +5239,7 @@ all-see-all as the default.
 **Mock-data blast radius:** the mock seed adds ~38 work
 orders to "Customer Onboarding" and ~6 to a second flow,
 plus their flow-work-order join rows and transition
-chains — Workbox cases (WB1–WB30) and dashboard counts
+chains — Workbox cases (WB1–WB34) and dashboard counts
 elsewhere in the walk are lower bounds, not equalities,
 because of this.
 

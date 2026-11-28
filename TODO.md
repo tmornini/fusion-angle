@@ -771,7 +771,7 @@ code comments cite; specs and plans written before the
   Layer 1 pin: a member not in the current node's
   `memberIds` cannot claim that work order — PUT
   `work-orders/:id/claim` is refused, and the claim
-  switch that would call it does not land a claim.
+  button that would call it does not land a claim.
   Today's `postWorkOrderClaimOp`
   (`api/routes.ts:1827`) checks a live hold only
   (409 `work order is already claimed`); it does
@@ -995,7 +995,7 @@ Off the critical path; each with its oracle.
   WO01, is Archive, so R14/WB11 have no seeded bound
   Data Capture subject. Oracle: the mock seed includes
   one bound Customer Onboarding work order at Data
-  Capture that the claim switch (or a birth-claimed
+  Capture that the claim button (or a birth-claimed
   seed row) can claim; a later walk can fill Company
   Name and Contact Email and submit; the
   gate-violation work order stays unbound.

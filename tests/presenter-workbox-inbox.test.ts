@@ -7,6 +7,7 @@ import {
 import {
     buildInboxLists,
     inboxSectionsOf,
+    waitLevelOf,
     type InboxFilter,
     type InboxItem,
     type InboxListKind,
@@ -339,6 +340,22 @@ Deno.test(
     },
 );
 
+Deno.test('a heading counts the rows it draws', () => {
+    const out = listsHtml({
+        claimed: [],
+        available: [
+            placed({ id: 'a-1' }), placed({ id: 'a-2' }),
+        ],
+        archivedByMe: [],
+    }, NO_FILTER, NO_PILL);
+    assertMatch(
+        out, /Work Orders claimed by me <span[^>]*>0</,
+    );
+    assertMatch(
+        out, /Work Orders available to me <span[^>]*>2</,
+    );
+});
+
 Deno.test('a flow pill narrows both lists to its flow', () => {
     assertEquals(
         sectionsDrawn({ kind: 'flow', flowName: 'Billing' }),
@@ -412,3 +429,94 @@ Deno.test('a row carries no position', () => {
         false,
     );
 });
+
+const NOW_MS = Date.parse('2026-05-01T12:00:00.000000Z');
+
+function daysBefore(days: number): string {
+    return new Date(NOW_MS - days * 86_400_000).toISOString();
+}
+
+Deno.test('a row waits from 14 days and is late from 30',
+() => {
+    assertEquals(
+        [0, 13, 14, 29, 30, 90].map(
+            (days) => waitLevelOf(daysBefore(days), NOW_MS),
+        ),
+        ['none', 'none', 'soon', 'soon', 'late', 'late'],
+    );
+    assertEquals(waitLevelOf(null, NOW_MS), 'none');
+});
+
+Deno.test('a stalled open row is marked and a completed one'
++ ' is not', () => {
+    const old = '2026-01-01T00:00:00.000000Z';
+    const open = capture(
+        [placed({ lastTransitionedAt: old })],
+        'available', NO_FILTER,
+    );
+    assertStringIncludes(open, 'data-wait="late"');
+    const done = capture(
+        [placed({
+            lastTransitionedAt: old, completed: true,
+        })],
+        'archivedByMe', NO_FILTER,
+    );
+    assertStringIncludes(done, 'data-wait="none"');
+});
+
+function daysAgo(days: number): string {
+    return new Date(Date.now() - days * 86_400_000)
+        .toISOString();
+}
+
+function waitingLists(): InboxLists {
+    return {
+        claimed: [placed({
+            id: 'c-1', lastTransitionedAt: daysAgo(40),
+        })],
+        available: [
+            placed({ id: 'a-40', lastTransitionedAt: daysAgo(40) }),
+            placed({ id: 'a-20', lastTransitionedAt: daysAgo(20) }),
+            placed({ id: 'a-2', lastTransitionedAt: daysAgo(2) }),
+        ],
+        archivedByMe: [],
+    };
+}
+
+// The legend keys and rows in the order they are drawn.
+function drawn(out: string): string[] {
+    return [...out.matchAll(
+        /data-legend="(\w+)"|data-work-order-card="([\w-]+)"/g,
+    )].map(([, key, id]) => key ?? id!);
+}
+
+Deno.test('one legend above the lists explains the row'
++ ' tints', () => {
+    const out = listsHtml(waitingLists(), NO_FILTER, NO_PILL);
+    assertEquals(drawn(out), [
+        'late', 'soon', 'c-1', 'a-40', 'a-20', 'a-2',
+    ]);
+    assertStringIncludes(out, 'Waiting 30+ days');
+    assertStringIncludes(out, 'Waiting 14–29 days');
+    assertEquals(out.includes('Needs you'), false);
+});
+
+Deno.test('the legend stays when no row is waiting', () => {
+    const lists = waitingLists();
+    const out = listsHtml(
+        { ...lists, claimed: [], available: [lists.available[2]!] },
+        NO_FILTER, NO_PILL,
+    );
+    assertEquals(drawn(out), ['late', 'soon', 'a-2']);
+});
+
+Deno.test('a search keeps its order under the legend', () => {
+    const out = listsHtml(
+        waitingLists(),
+        { kind: 'matched', text: 'zz' }, NO_PILL,
+    );
+    assertEquals(drawn(out), [
+        'late', 'soon', 'c-1', 'a-40', 'a-20', 'a-2',
+    ]);
+});
+

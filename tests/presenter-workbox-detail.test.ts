@@ -1139,8 +1139,8 @@ Deno.test('the detail reads its node from the head', () => {
     assertStrictEquals(presenter.currentNodeId(), 'n-2');
 });
 
-// The box claims by its switch; the bind picker and the
-// unclaim button stay retired.
+// The box claims by its claim button; the bind picker and
+// the old unclaim button stay retired.
 Deno.test(
     'the work order box has no bind or unclaim chrome',
     async () => {
@@ -1211,10 +1211,11 @@ Deno.test(
     },
 );
 
-// The claim place: a switch, a holder's name, or nothing.
+// The claim place: Claim, a holder and Release, a holder,
+// or nothing.
 function claimPlaceOf(out: string): string | null {
     const place = out.match(
-        /<(label|span)\s+id="work-order-claim"[\s\S]*?<\/\1>/,
+        /<span\s+id="work-order-claim"[\s\S]*?<\/span>/,
     );
     return place === null ? null : place[0];
 }
@@ -1228,21 +1229,20 @@ Deno.test('the box has a close control and no back button', () => {
 });
 
 Deno.test(
-    'an unclaimed work order offers the claim switch off',
+    'an unclaimed work order offers Claim',
     () => {
         const place = claimPlaceOf(
             makePresenter({ activeClaim: null })
                 .buildPage().toString(),
         );
         assert(place !== null);
-        assertStringIncludes(place, 'role="switch"');
-        assertStringIncludes(place, 'aria-checked="false"');
-        assertStringIncludes(place, 'aria-label="Claim"');
-        assertMatch(place, /<\/button>Claim<\/label>/);
+        assertStringIncludes(place, 'data-claim="claim"');
+        assertMatch(place, />Claim<\/button>/);
+        assert(!place.includes('Claimed by'));
     },
 );
 
-Deno.test('my claim shows the switch on with my name', () => {
+Deno.test('my claim shows my name and Release', () => {
     const place = claimPlaceOf(makePresenter({
         activeClaim: {
             memberId: 'pjQzgITAPDQVyvCVpzpIfQ',
@@ -1251,15 +1251,13 @@ Deno.test('my claim shows the switch on with my name', () => {
         currentMemberId: 'pjQzgITAPDQVyvCVpzpIfQ',
     }).buildPage().toString());
     assert(place !== null);
-    assertStringIncludes(place, 'aria-checked="true"');
-    assertStringIncludes(
-        place, 'aria-label="Claimed by Ada Park"',
-    );
-    assertMatch(place, /<\/button>Claimed by Ada Park<\/label>/);
+    assertStringIncludes(place, 'Claimed by Ada Park');
+    assertStringIncludes(place, 'data-claim="release"');
+    assertMatch(place, />Release<\/button>/);
 });
 
 Deno.test(
-    'another member\'s claim names them with no switch',
+    'another member\'s claim names them with no button',
     () => {
         const place = claimPlaceOf(makePresenter({
             activeClaim: {
@@ -1270,7 +1268,7 @@ Deno.test(
         }).buildPage().toString());
         assert(place !== null);
         assertStringIncludes(place, 'Claimed by Bo Park');
-        assert(!place.includes('role="switch"'));
+        assert(!place.includes('<button'));
     },
 );
 
@@ -1288,5 +1286,5 @@ Deno.test('an archived work order has no claim place', () => {
         },
     }).buildPage().toString();
     assertStrictEquals(claimPlaceOf(out), null);
-    assert(!out.includes('work-order-claim-switch'));
+    assert(!out.includes('work-order-claim-btn'));
 });

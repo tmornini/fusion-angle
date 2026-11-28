@@ -94,7 +94,7 @@ export interface WorkOrderBoxEvents {
 }
 
 // The workbox's right box: one work order at a time, read
-// and painted in place. Its claim switch, its transitions,
+// and painted in place. Its claim button, its transitions,
 // and its 412 recovery latch the heads it read.
 export class WorkOrderBox {
     readonly #el: HTMLElement;
@@ -132,6 +132,12 @@ export class WorkOrderBox {
 
     openId(): string | null {
         return this.#openId;
+    }
+
+    // Whether the form holds something typed or picked that
+    // opening another work order would drop.
+    holdsEdits(): boolean {
+        return $$('[data-attribute-id]', this.#el).some(isEdited);
     }
 
     // Opening never claims. The row already open opens
@@ -194,11 +200,11 @@ export class WorkOrderBox {
             void this.#show(this.#requireOpenId(), 'person');
             return;
         }
-        const claimSwitch = e.target.closest(
-            '#work-order-claim-switch',
+        const claimButton = e.target.closest(
+            '#work-order-claim-btn',
         );
-        if (claimSwitch instanceof HTMLButtonElement) {
-            void this.#toggleClaim(claimSwitch);
+        if (claimButton instanceof HTMLButtonElement) {
+            void this.#toggleClaim(claimButton);
             return;
         }
         const edge = e.target.closest('[data-edge-id]');
@@ -341,22 +347,23 @@ export class WorkOrderBox {
         );
     }
 
-    // On is a PUT, off a DELETE, each latching the head the
-    // box holds. The switch is disabled while the write is
-    // in flight and moves only when it answers. A refusal
-    // leaves it where it was, and the lists and the box
-    // read again so the claim place names who holds it.
+    // Claim is a PUT, Release a DELETE, each latching the
+    // head the box holds. The button is disabled while the
+    // write is in flight, and the claim place changes only
+    // when it answers. A refusal leaves it as it was, and
+    // the lists and the box read again so the claim place
+    // names who holds it.
     async #toggleClaim(
-        switchEl: HTMLButtonElement,
+        button: HTMLButtonElement,
     ): Promise<void> {
         if (this.#writeInFlight) return;
         const read = this.#requireRead();
         const held = read.workOrder;
-        // The gesture is the one the switch shows, whatever
+        // The gesture is the one the button names, whatever
         // this clock has done to the claim since it painted.
         const releasing =
-            switchEl.getAttribute('aria-checked') === 'true';
-        switchEl.disabled = true;
+            button.getAttribute('data-claim') === 'release';
+        button.disabled = true;
         this.#writeInFlight = true;
         this.#sequence += 1;
         const sequence = this.#sequence;
@@ -372,19 +379,19 @@ export class WorkOrderBox {
                 'workbox', err,
             );
             showToast(refusalMessage(err, releasing), 'error');
-            switchEl.disabled = false;
+            button.disabled = false;
             // A focused control that turns disabled loses
             // focus to <body> (the HTML focus fixup rule).
-            // Unless the person has moved on, the switch
+            // Unless the person has moved on, the button
             // takes it back now, so a re-read that fails
             // leaves focus where they pressed.
             const active = document.activeElement;
             if (
                 active === null
                 || active === document.body
-                || active === switchEl
+                || active === button
             ) {
-                switchEl.focus();
+                button.focus();
             }
             this.#events.claimRefused();
             if (sequence === this.#sequence) {
@@ -403,12 +410,12 @@ export class WorkOrderBox {
             )
             && mayTakeFocus
         ) {
-            $('#work-order-claim-switch', this.#el)?.focus();
+            $('#work-order-claim-btn', this.#el)?.focus();
         }
     }
 
     // A write's answer takes focus only when none is held or
-    // it is still in the box: the disabled switch dropped it,
+    // it is still in the box: the disabled button dropped it,
     // or the button pressed is about to be repainted away.
     // Focus the person put elsewhere meanwhile stays there.
     #mayTakeFocus(): boolean {
@@ -419,10 +426,10 @@ export class WorkOrderBox {
     }
 
     // A refused claim's re-read names who holds the work
-    // order now. If the box held focus, the switch it
+    // order now. If the box held focus, the button it
     // repainted takes it back, or the box does when a
-    // member's name stands in its place; focus the person
-    // moved elsewhere meanwhile stays there.
+    // member's name stands alone in its place; focus the
+    // person moved elsewhere meanwhile stays there.
     async #rereadRefused(
         ctx: RequestContext,
         id: string,
@@ -433,9 +440,9 @@ export class WorkOrderBox {
         if (!this.#repaint(ctx, read, REFRESH_FAILED) || !held) {
             return;
         }
-        const switchEl = $('#work-order-claim-switch', this.#el);
-        if (switchEl) {
-            switchEl.focus();
+        const button = $('#work-order-claim-btn', this.#el);
+        if (button) {
+            button.focus();
             return;
         }
         this.#el.focus({ preventScroll: true });
@@ -563,7 +570,7 @@ export class WorkOrderBox {
         }
     }
 
-    // The switch and the transition buttons exist only on a
+    // The claim and transition buttons exist only on a
     // painted work order, so its read is on hand.
     #requireRead(): WorkOrderRead {
         if (this.#read === null) {
@@ -660,6 +667,22 @@ function refusalMessage(
     return releasing
         ? 'Failed to release work order'
         : 'Failed to claim work order';
+}
+
+// A control that no longer shows what it was painted with.
+function isEdited(el: Element): boolean {
+    if (el instanceof HTMLSelectElement) {
+        const painted = [...el.options].find(
+            (option) => option.defaultSelected,
+        );
+        return el.value !== (painted?.value ?? '');
+    }
+    if (el instanceof HTMLInputElement) {
+        return el.type === 'checkbox' || el.type === 'radio'
+            ? el.checked !== el.defaultChecked
+            : el.value !== el.defaultValue;
+    }
+    return false;
 }
 
 function collectAttributeValues(

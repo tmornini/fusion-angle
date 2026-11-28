@@ -131,11 +131,10 @@ and its `aria-label` says what its numbers mean
 `.header-stat-divider` parts the two "by Me" pills from
 the flows'. One page uses it, so its one rule stays in
 `pages-workbox.css`. The work order box's claim control
-is the existing `.switch`, `role="switch"` with
-`aria-checked`, inside its label. While its write is in
-flight it is disabled, and `.switch:disabled` dims it
-and drops its pointer, as `.btn:disabled` and
-`.input:disabled` do.
+is a `.btn.btn-sm` named for what pressing it does:
+`.btn-primary` "Claim", or "Claimed by <name>" with a
+check icon and a `.btn-outline` "Release". While its
+write is in flight it is disabled.
 
 When groups exist, use native `<optgroup label>` —
 introducing case: AI-member model picker

@@ -173,6 +173,129 @@
     outline-offset: -2px;
 }
 
+/* The queue's column beside the wider work order box. */
+@media (min-width: 768px) {
+    #workbox-inbox {
+        grid-template-columns:
+            minmax(0, min(27.5rem, 40%)) minmax(0, 1fr);
+    }
+}
+
+/* A list's heading: a dot in the list's tone, then its
+    name and how many rows it draws. */
+.workbox-section-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    font-weight: var(--font-weight-semibold);
+}
+
+.workbox-section-title::before {
+    content: "";
+    width: 0.5rem;
+    height: 0.5rem;
+    flex-shrink: 0;
+    border-radius: var(--radius-full);
+    background: hsl(var(--muted-foreground));
+}
+
+.workbox-section-title[data-section="claimed"]::before {
+    background: hsl(var(--primary));
+}
+
+.workbox-section-title[data-section="archivedByMe"]::before {
+    background: hsl(var(--success));
+}
+
+/* The key above the lists: a swatch in each waiting tint,
+    then the days that earn it. */
+.workbox-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-4);
+    font-size: var(--text-xs);
+    color: hsl(var(--muted-foreground));
+}
+
+.workbox-legend li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.workbox-legend li::before {
+    content: "";
+    width: 1rem;
+    height: 0.75rem;
+    border-radius: calc(var(--radius-sm) / 2);
+    border: 1px solid;
+    border-left-width: 3px;
+}
+
+.workbox-legend [data-legend="soon"]::before {
+    background: hsl(var(--warning-soft));
+    border-color: hsl(var(--warning-border));
+    border-left-color: hsl(var(--warning));
+}
+
+.workbox-legend [data-legend="late"]::before {
+    background: hsl(var(--error-soft));
+    border-color: hsl(var(--error-border));
+    border-left-color: hsl(var(--error));
+}
+
+/* A row wears its list's tone down its left edge. */
+[data-inbox-list] > [data-wait] {
+    border-left: 3px solid hsl(var(--muted-foreground));
+}
+
+[data-inbox-list="claimed"] > [data-wait] {
+    border-left-color: hsl(var(--primary));
+}
+
+[data-inbox-list="archivedByMe"] > [data-wait] {
+    border-left-color: hsl(var(--success));
+}
+
+/* Waiting rows: the tint repeats what the age says, so
+   colour is never the only signal. */
+[data-inbox-list] > [data-wait="soon"] {
+    background: hsl(var(--warning-soft));
+    border-color: hsl(var(--warning-border));
+    border-left-color: hsl(var(--warning));
+}
+
+[data-inbox-list] > [data-wait="late"] {
+    background: hsl(var(--error-soft));
+    border-color: hsl(var(--error-border));
+    border-left-color: hsl(var(--error));
+}
+
+[data-wait="soon"] .inbox-age,
+[data-wait="late"] .inbox-age {
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-full);
+}
+
+[data-wait="soon"] .inbox-age {
+    color: hsl(var(--warning-text));
+    background: hsl(var(--warning) / 0.18);
+    font-weight: var(--font-weight-semibold);
+}
+
+[data-wait="late"] .inbox-age {
+    color: hsl(var(--error-text));
+    background: hsl(var(--error) / 0.18);
+    font-weight: var(--font-weight-semibold);
+}
+
+/* Narrower than this, the title takes the whole line and
+    the claim and close controls wrap below it. */
+#work-order-header .work-order-title {
+    flex-basis: 12rem;
+}
+
 /* Before anything is opened: the box's one muted line. */
 .workbox-work-order-empty {
     display: flex;

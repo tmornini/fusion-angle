@@ -164,9 +164,9 @@ async function openRow(page: Page, id: string): Promise<void> {
     await untilBoxHolds(page, id);
 }
 
-function switchChecked(value: 'true' | 'false'): string {
-    return `document.getElementById('work-order-claim-switch')`
-        + `?.getAttribute('aria-checked') === '${value}'`;
+function claimOffers(action: 'claim' | 'release'): string {
+    return `document.getElementById('work-order-claim-btn')`
+        + `?.dataset.claim === '${action}'`;
 }
 
 function submitDisabled(disabled: boolean): string {
@@ -205,7 +205,7 @@ Deno.test(
                 + `.endsWith('/workbox/index.html')`,
             ));
             assert(await page.evaluate<boolean>(
-                switchChecked('false'),
+                claimOffers('claim'),
             ));
             // Opening inspects: it never claims.
             const opened = await workOrderOf(ctx, DATA_CAPTURE);
@@ -263,7 +263,7 @@ Deno.test(
     },
 );
 
-Deno.test('the switch claims and releases', async () => {
+Deno.test('the claim button claims and releases', async () => {
     await withAdminPage(browser.get(), async (page, origin) => {
         const ctx = await adminContext(origin);
         const admin = memberOf(ADMIN_EMAIL);
@@ -272,17 +272,17 @@ Deno.test('the switch claims and releases', async () => {
         assert(await page.evaluate<boolean>(
             submitDisabled(true),
         ));
-        await page.click('#work-order-claim-switch');
+        await page.click('#work-order-claim-btn');
         await page.waitFor(
             '#claimed-list ' + cardSelector(DATA_CAPTURE),
         );
         assert(await page.until<boolean>(
-            switchChecked('true')
+            claimOffers('release')
             + ` && document.getElementById('work-order-claim')`
             + `.textContent.includes(${
                 JSON.stringify('Claimed by ' + admin.name)
             })`,
-            'the switch on, named for the admin',
+            'Release, named for the admin',
         ));
         assert(await page.until<boolean>(
             submitDisabled(false), 'the transition enabled',
@@ -292,14 +292,14 @@ Deno.test('the switch claims and releases', async () => {
             isClaimedAndUnlapsed(claimed.claim)
             && claimed.claim.memberId === admin.id,
         );
-        await page.click('#work-order-claim-switch');
+        await page.click('#work-order-claim-btn');
         await page.waitFor(
             '#available-list ' + cardSelector(DATA_CAPTURE),
         );
         assert(await page.until<boolean>(
-            switchChecked('false') + ' && '
+            claimOffers('claim') + ' && '
             + submitDisabled(true),
-            'the switch off, the transition disabled',
+            'Claim, the transition disabled',
         ));
         const released = await workOrderOf(ctx, DATA_CAPTURE);
         assert(!isClaimedAndUnlapsed(released.claim));
@@ -307,7 +307,7 @@ Deno.test('the switch claims and releases', async () => {
 });
 
 Deno.test(
-    'a claim another member took leaves the switch off',
+    'a claim another member took leaves no button',
     async () => {
         await withAdminPage(browser.get(), async (page, origin) => {
             const sarah = memberOf(SECOND_EMAIL);
@@ -325,7 +325,7 @@ Deno.test(
                 sarahCtx,
                 await workOrderOf(sarahCtx, DATA_CAPTURE),
             );
-            await page.click('#work-order-claim-switch');
+            await page.click('#work-order-claim-btn');
             assert(await page.until<boolean>(
                 `[...document.querySelectorAll('.toast')]`
                 + `.some(t => t.textContent.includes(`
@@ -338,8 +338,8 @@ Deno.test(
                     JSON.stringify('Claimed by ' + sarah.name)
                 }) === true`
                 + ` && document.getElementById(`
-                + `'work-order-claim-switch') === null`,
-                'the holder named, no switch',
+                + `'work-order-claim-btn') === null`,
+                'the holder named, no button',
             ));
             await page.until(
                 `document.querySelector(${
@@ -421,7 +421,7 @@ Deno.test(
 const LAPSE_MS = 30 * 24 * 60 * 60 * 1000;
 
 Deno.test(
-    'the switch releases a claim that lapsed on this clock',
+    'Release releases a claim that lapsed on this clock',
     async () => {
         await withAdminPage(browser.get(), async (page, origin) => {
             const ctx = await adminContext(origin);
@@ -437,7 +437,7 @@ Deno.test(
                 '#claimed-list ' + cardSelector(DATA_CAPTURE),
             );
             assert(await page.until<boolean>(
-                switchChecked('true'), 'the switch on',
+                claimOffers('release'), 'Release offered',
             ));
             // Painted while the claim was live; the page's
             // clock now runs past its expiry, the server's
@@ -446,7 +446,7 @@ Deno.test(
                 const now = Date.now;
                 Date.now = () => now.call(Date) + ${LAPSE_MS};
             })()`);
-            await page.click('#work-order-claim-switch');
+            await page.click('#work-order-claim-btn');
             await page.waitFor(
                 '#available-list ' + cardSelector(DATA_CAPTURE),
             );
@@ -504,7 +504,7 @@ Deno.test('closing the box hands focus to the box', async () => {
 });
 
 Deno.test(
-    'a refused claim hands focus back to the switch',
+    'a refused claim hands focus back to the button',
     async () => {
         await withAdminPage(browser.get(), async (page, origin) => {
             const sarah = memberOf(SECOND_EMAIL);
@@ -519,7 +519,7 @@ Deno.test(
             // Sarah claims and releases after the box read:
             // the head it latches is stale, so its PUT
             // answers 412, and the re-read offers the
-            // switch again.
+            // button again.
             const held = await putWorkOrderClaim(
                 sarahCtx,
                 await workOrderOf(sarahCtx, DATA_CAPTURE),
@@ -527,10 +527,10 @@ Deno.test(
             await deleteWorkOrderClaim(sarahCtx, held);
             await page.evaluate(
                 `document.getElementById(`
-                + `'work-order-claim-switch')`
+                + `'work-order-claim-btn')`
                 + `.dataset.painted = 'before'`,
             );
-            await page.click('#work-order-claim-switch');
+            await page.click('#work-order-claim-btn');
             assert(await page.until<boolean>(
                 `[...document.querySelectorAll('.toast')]`
                 + `.some(t => t.textContent.includes(`
@@ -540,12 +540,12 @@ Deno.test(
             assert(await page.until<boolean>(
                 `(() => {
                     const s = document.getElementById(
-                        'work-order-claim-switch');
+                        'work-order-claim-btn');
                     return s !== null
                         && s.dataset.painted === undefined
                         && document.activeElement === s;
                 })()`,
-                'the re-read switch focused',
+                'the re-read button focused',
             ));
         });
     },
@@ -707,14 +707,14 @@ function holdBoxReads(
 
 Deno.test(
     'a refused claim whose re-read fails keeps focus on the'
-    + ' switch',
+    + ' button',
     async () => {
         await withAdminPage(browser.get(), async (page, origin) => {
             await openWorkbox(page, origin);
             await openRow(page, DATA_CAPTURE);
             await staleTheBoxHead(origin);
             await holdBoxReads(page, async (hold) => {
-                await page.click('#work-order-claim-switch');
+                await page.click('#work-order-claim-btn');
                 await hold.fail(await hold.next());
                 assert(await page.until<boolean>(
                     `[...document.querySelectorAll('.toast')]`
@@ -725,7 +725,7 @@ Deno.test(
             });
             assertStrictEquals(
                 await page.evaluate<string>(FOCUSED_ID),
-                'work-order-claim-switch',
+                'work-order-claim-btn',
             );
         });
     },
@@ -741,11 +741,11 @@ Deno.test(
             await staleTheBoxHead(origin);
             await page.evaluate(
                 `document.getElementById(`
-                + `'work-order-claim-switch')`
+                + `'work-order-claim-btn')`
                 + `.dataset.painted = 'before'`,
             );
             await holdBoxReads(page, async (hold) => {
-                await page.click('#work-order-claim-switch');
+                await page.click('#work-order-claim-btn');
                 const reread = await hold.next();
                 // Opening the row scrolled the search box
                 // off the top: a click there lands on
@@ -760,11 +760,11 @@ Deno.test(
             assert(await page.until<boolean>(
                 `(() => {
                     const s = document.getElementById(
-                        'work-order-claim-switch');
+                        'work-order-claim-btn');
                     return s !== null
                         && s.dataset.painted === undefined;
                 })()`,
-                'the re-read switch painted',
+                'the re-read button painted',
             ));
             assertStrictEquals(
                 await page.evaluate<string>(FOCUSED_ID),
@@ -785,7 +785,7 @@ Deno.test(
                 `*/work-orders/${DATA_CAPTURE}/claim`,
                 (request) => request.method === 'PUT',
                 async (hold) => {
-                    await page.click('#work-order-claim-switch');
+                    await page.click('#work-order-claim-btn');
                     const claim = await hold.next();
                     // Opening the row scrolled the search box
                     // off the top: a click there lands on
@@ -800,7 +800,7 @@ Deno.test(
                 },
             );
             assert(await page.until<boolean>(
-                switchChecked('true'), 'the switch on',
+                claimOffers('release'), 'Release offered',
             ));
             assertStrictEquals(
                 await page.evaluate<string>(FOCUSED_ID),
@@ -845,3 +845,85 @@ Deno.test(
         });
     },
 );
+
+const FIRST_ROWS = `[...document.querySelectorAll(`
+    + `'[data-work-order-card]')].slice(0, 2)`
+    + `.map(c => c.dataset.workOrderCard)`;
+
+function rowFocused(id: string): string {
+    return `document.activeElement?.closest(`
+        + `'[data-work-order-card]')`
+        + `?.dataset.workOrderCard === ${JSON.stringify(id)}`;
+}
+
+Deno.test('the arrow keys walk the rows and open them', async () => {
+    await withAdminPage(browser.get(), async (page, origin) => {
+        await openWorkbox(page, origin);
+        const [first, second] = await page.evaluate<
+            [string, string]
+        >(FIRST_ROWS);
+        await openRow(page, first);
+        await page.key('ArrowDown');
+        await untilBoxHolds(page, second);
+        assert(await page.evaluate<boolean>(rowFocused(second)));
+        assertStrictEquals(await addressId(page), second);
+        await page.key('ArrowUp');
+        await untilBoxHolds(page, first);
+        // The top row is where up stops.
+        await page.key('ArrowUp');
+        assert(await page.evaluate<boolean>(rowFocused(first)));
+        assertStrictEquals(await addressId(page), first);
+    });
+});
+
+Deno.test('the arrow keys keep typed values', async () => {
+    await withAdminPage(browser.get(), async (page, origin) => {
+        await openWorkbox(page, origin);
+        await openRow(page, DATA_CAPTURE);
+        await page.click('#work-order-claim-btn');
+        await page.until(
+            claimOffers('release') + ' && ' + submitDisabled(false),
+            'claimed',
+        );
+        const input = `document.querySelector(`
+            + `'[data-attribute-id="${COMPANY_NAME_ID}"]')`;
+        await page.evaluate(`${input}.value = 'Typed Co'`);
+        const link = JSON.stringify(
+            cardSelector(DATA_CAPTURE) + ' a[href]',
+        );
+        await page.evaluate(
+            `document.querySelector(${link}).focus()`,
+        );
+        await page.key('ArrowDown');
+        assert(await page.evaluate<boolean>(
+            `!(${rowFocused(DATA_CAPTURE)})`,
+        ));
+        assertStrictEquals(await addressId(page), DATA_CAPTURE);
+        assertStrictEquals(
+            await page.evaluate<string>(`${input}.value`),
+            'Typed Co',
+        );
+    });
+});
+
+// 12rem, the title's floor before the controls wrap.
+const TITLE_MIN_WIDTH = 192;
+
+Deno.test('on a phone a claim leaves the title its width', async () => {
+    await withAdminPage(browser.get(), async (page, origin) => {
+        await page.setViewport(PHONE_WIDTH, PHONE_HEIGHT, true);
+        await openWorkbox(page, origin);
+        await openRow(page, DATA_CAPTURE);
+        await page.click('#work-order-claim-btn');
+        await page.until(claimOffers('release'), 'claimed');
+        const width = await page.evaluate<number>(
+            `document.querySelector('.work-order-title')`
+            + `.getBoundingClientRect().width`,
+        );
+        assert(
+            width >= TITLE_MIN_WIDTH,
+            `the title is ${width}px wide`,
+        );
+    });
+});
+
