@@ -408,7 +408,7 @@ Deno.test('the binding badge links to its instance', () => {
     );
     assert(badge !== null, 'the bound badge is an <a>');
     const [, attributes, text] = badge;
-    const href = escapeForHtml(buildPageUrl('record-detail', {
+    const href = escapeForHtml(buildPageUrl('records', {
         id: 'rt-cust',
         instance: 'inst-xyz',
     }));

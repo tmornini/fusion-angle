@@ -1121,7 +1121,7 @@ Off the critical path; each with its oracle.
   (`web-app/ideas/detail.ts`, `web-app/ideas/index.ts`,
   `web-app/projects/detail.ts`,
   `web-app/projects/index.ts`,
-  `web-app/records/detail.ts`,
+  `web-app/records/record-panel.ts`,
   `web-app/records/index.ts`,
   `web-app/organization/index.ts`, and the PII hop of
   `putHumanMember` in `client/members.ts`), so every
@@ -1282,7 +1282,7 @@ Off the critical path; each with its oracle.
   it, and the jumped-to row from its siblings
 - A failed first load skips the `?instance=` scroll.
   `init` scrolls once, after the first `load`
-  (`web-app/records/detail.ts:103-107`); when that load
+  (`web-app/records/record-panel.ts:103-107`); when that load
   fails, the Try Again render (`retry` at `:221`) draws
   the rows and nothing scrolls to the linked one.
   Oracle: a Layer 2 test fails the first instances read,
@@ -2637,7 +2637,7 @@ Off the critical path; each with its oracle.
     (`web-app/app/presenters/record-detail.ts:120`) —
     Layer 1, zero tests; it builds the
     id-plus-readable-values projection
-    `records/detail.ts:145` reads for R16's Instances
+    `records/record-panel.ts:145` reads for R16's Instances
     list
   - The exact conflict-notice text (R17, R19) — Layer 1,
     importing `INSTANCE_CONFLICT_NOTICE` in
@@ -3049,7 +3049,7 @@ Off the critical path; each with its oracle.
   (`web-app/app/presenters/ai-member-detail.ts:22`,
   `presenters/member.ts:25`) read the provider-model
   catalog (`api/provider-models.ts`); and the records
-  detail page (`web-app/records/detail.ts:62`) derives
+  detail page (`web-app/records/record-panel.ts:62`) derives
   claim roles (`api/authorization.ts`) — the two `api/`
   modules the page graph reaches today. The catalog and
   the claim-role derivation are both sides' and belong

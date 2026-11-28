@@ -1,5 +1,4 @@
-import { $, $required } from '../app/dom.ts';
-import { createPageAbort } from '../app/page-lifecycle.ts';
+import { $, createElement } from '../app/dom.ts';
 import { setHtml } from '../app/safe-html.ts';
 import { showToast } from '../app/toast.ts';
 import { reportFault } from '../app/error-helpers.ts';
@@ -61,7 +60,11 @@ import {
     projectClaimRolesForOrganization,
 } from '../../api/authorization.ts';
 
-const { signal } = createPageAbort();
+// The Records page's right side: one record at a time,
+// read and painted in place beside the list. Each open
+// takes a new host element, so a read that lands after
+// another record was opened paints into a detached node
+// and changes nothing.
 
 type PageState =
     | { kind: 'reading' }
@@ -87,29 +90,56 @@ let saveInProgress = false;
 let pendingDeleteInstanceId: string | null = null;
 let loadedInstances: RecordInstance[] = [];
 
-export async function init(
-    params?: Record<string, string>,
-): Promise<void> {
-    const id = params?.id;
-    if (!id) {
-        navigateTo('records');
-        return;
-    }
-    recordId = id;
-    const root = $required(
-        '#page-root', document,
-    );
+let panelEl: HTMLElement | null = null;
+let host: HTMLElement | null = null;
 
-    await load(root);
-    const instance = params?.instance;
-    if (instance) {
-        scrollToInstance(root, instance);
-    }
+// The events are bound once, to the panel no repaint
+// replaces.
+export function initRecordPanel(
+    panel: HTMLElement, signal: AbortSignal,
+): void {
+    panelEl = panel;
+    host = null;
+    recordId = null;
+    bindActions(panel, signal);
     subscribeRecordChanges(() => {
-        if (pageState.kind === 'reading') {
-            void load(root);
+        if (pageState.kind === 'reading' && host !== null) {
+            void load(host);
         }
     });
+}
+
+export function openRecordId(): string | null {
+    return recordId;
+}
+
+// Whether a form is open whose typed values opening another
+// record would drop.
+export function recordIsEditing(): boolean {
+    return pageState.kind !== 'reading';
+}
+
+export async function openRecord(
+    id: string, instanceId?: string,
+): Promise<void> {
+    if (panelEl === null) {
+        throw new Error('records: a record opened before the panel');
+    }
+    recordId = id;
+    pageState = { kind: 'reading' };
+    currentView = null;
+    pendingDeleteInstanceId = null;
+    loadedInstances = [];
+    const next = createElement('div');
+    host = next;
+    panelEl.replaceChildren(next);
+    // A record opens at its top, wherever the panel's own
+    // scroll left the last one.
+    panelEl.scrollTop = 0;
+    await load(next);
+    if (instanceId && host === next) {
+        scrollToInstance(next, instanceId);
+    }
 }
 
 // A linked instance may have been deleted since the link was
@@ -220,6 +250,7 @@ async function load(
         },
         retry: () => load(root),
         onData: loaded => {
+            if (root !== host) return;
             loadedInstances = [...loaded.instances];
             currentView = composeView({
                 record: loaded.record,
@@ -229,7 +260,6 @@ async function load(
                 roles: heldRoles(),
             });
             render(root);
-            bindActions(root);
         },
     });
 }
@@ -259,33 +289,45 @@ function render(root: HTMLElement): void {
     setHtml(root, presenter.buildPage());
 }
 
-function bindActions(root: HTMLElement): void {
-    root.addEventListener(
+function bindActions(
+    panel: HTMLElement, signal: AbortSignal,
+): void {
+    panel.addEventListener(
         'click',
-        e => onClick(root, e),
+        e => onClick(requireHost(), e),
         { signal },
     );
-    root.addEventListener(
+    panel.addEventListener(
         'change',
-        e => onChange(root, e),
+        e => onChange(requireHost(), e),
         { signal },
     );
-    root.addEventListener(
+    panel.addEventListener(
         'input',
         e => onInput(e),
         { signal },
     );
-    root.addEventListener(
+    panel.addEventListener(
         'keydown',
-        e => onKeydown(root, e),
+        e => onKeydown(requireHost(), e),
         { signal },
     );
-    // Delete confirm lives outside #page-root.
+    // The confirm dialogs live outside the panel.
     document.addEventListener(
         'click',
-        e => onDocumentClick(root, e),
+        e => {
+            if (host !== null) onDocumentClick(host, e);
+        },
         { signal },
     );
+}
+
+// The panel's events fire only on a record it holds.
+function requireHost(): HTMLElement {
+    if (host === null) {
+        throw new Error('records: a gesture before any record');
+    }
+    return host;
 }
 
 function onDocumentClick(
@@ -339,7 +381,6 @@ function onKeydown(
     e.preventDefault();
     commitPendingAttribute();
     render(root);
-    bindActions(root);
     const next = $(
         '#record-pending-attribute-name', root,
     );
@@ -388,15 +429,9 @@ function onClick(
         });
         return;
     }
-    if (btn.id === 'record-back-btn'
-        || btn.id === 'record-cancel-btn') {
-        if (pageState.kind === 'editing') {
-            pageState = { kind: 'reading' };
-            render(root);
-            bindActions(root);
-            return;
-        }
-        navigateTo('records');
+    if (btn.id === 'record-cancel-btn') {
+        pageState = { kind: 'reading' };
+        render(root);
         return;
     }
     if (btn.id === 'record-edit-btn') {
@@ -415,7 +450,6 @@ function onClick(
             pendingAttributeName: '',
         };
         render(root);
-        bindActions(root);
         return;
     }
     if (btn.id === 'record-save-btn') {
@@ -430,7 +464,6 @@ function onClick(
         }
         commitPendingAttribute();
         render(root);
-        bindActions(root);
         return;
     }
     if (btn.id === 'record-new-instance-btn') {
@@ -446,7 +479,6 @@ function onClick(
     ) {
         pageState = { kind: 'reading' };
         render(root);
-        bindActions(root);
         return;
     }
     const action = btn.getAttribute(
@@ -473,7 +505,6 @@ function onClick(
         if (!id) return;
         removeAttribute(id);
         render(root);
-        bindActions(root);
         return;
     }
     if (action === 'remove-constraint') {
@@ -500,7 +531,6 @@ function onClick(
         }
         removeConstraint(attrId, idx);
         render(root);
-        bindActions(root);
     }
 }
 
@@ -551,6 +581,7 @@ async function handleNewInstance(
             currentView.attributes,
             created.values,
         );
+        if (root !== host) return;
         pageState = {
             kind: 'instances-editing',
             instance: created,
@@ -560,7 +591,6 @@ async function handleNewInstance(
         };
         loadedInstances = [...loadedInstances, created];
         render(root);
-        bindActions(root);
     } catch (err) {
         reportFault(
             ctx, 'Failed to create instance', err,
@@ -581,6 +611,7 @@ async function handleEditInstance(
         const instance = await getRecordInstance(
             ctx, recordId, instanceId,
         );
+        if (root !== host) return;
         const fields = fieldsFromAttributes(
             currentView.attributes,
             instance.values,
@@ -593,7 +624,6 @@ async function handleEditInstance(
             conflictNotice: null,
         };
         render(root);
-        bindActions(root);
     } catch (err) {
         reportFault(
             ctx, 'Failed to load instance', err,
@@ -670,7 +700,6 @@ async function handleInstanceSave(
                         INSTANCE_CONFLICT_NOTICE,
                 };
                 render(root);
-                bindActions(root);
                 showToast(
                     INSTANCE_CONFLICT_NOTICE,
                     'warning',
@@ -840,7 +869,6 @@ function onChange(
             ],
         );
         render(root);
-        bindActions(root);
         return;
     }
     if (action === 'constraint-kind'
@@ -853,7 +881,6 @@ function onChange(
         );
         target.value = '';
         render(root);
-        bindActions(root);
     }
 }
 
@@ -1100,7 +1127,6 @@ async function handleSave(
     if (!attributesChanged && !recordChanged) {
         pageState = { kind: 'reading' };
         render(root);
-        bindActions(root);
         return;
     }
     const ctx = sessionContext();

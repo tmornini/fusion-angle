@@ -171,18 +171,6 @@ export const PAGE_REGISTRY: Record<
         cssBundles: ['pages-records'],
         loader: () => import('../records/create.ts'),
     },
-    'record-detail': {
-        organizationScoped: true,
-        title: 'Record',
-        layout: 'sidebar',
-        sidebarKey: 'records',
-        sourceDir: 'records',
-        sourceFile: 'detail',
-        icon: iconDatabase,
-        searchable: false,
-        cssBundles: ['pages-records'],
-        loader: () => import('../records/detail.ts'),
-    },
     flows: {
         organizationScoped: true,
         title: 'Flows',

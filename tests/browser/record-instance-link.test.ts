@@ -18,9 +18,9 @@ async function openRecordDetail(
     page: Page, baseUrl: string, query: string,
 ): Promise<void> {
     await page.navigate(
-        registryUrl(baseUrl, 'record-detail', query),
+        registryUrl(baseUrl, 'records', query),
     );
-    await page.ready('record-detail');
+    await page.ready('records');
     await page.waitFor(ROW);
 }
 

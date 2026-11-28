@@ -25,8 +25,69 @@
         ></div>
     </div>
 
-    <div
-        id="records-list"
-        class="flex flex-col gap-3"
-    ></div>
+    <div class="records-columns">
+        <div
+            id="records-list"
+            class="flex flex-col gap-3 min-w-0"
+        ></div>
+        <section
+            id="record-panel"
+            class="record-panel min-w-0"
+            aria-label="Record"
+        ></section>
+    </div>
 </div>
+
+<dialog id="confirm-delete-instance-dialog"
+    class="dialog dialog-narrow"
+    role="alertdialog"
+    aria-labelledby="confirm-delete-instance-title"
+    aria-describedby="confirm-delete-instance-message">
+    <div class="dialog-header">
+        <h3 id="confirm-delete-instance-title"
+            class="dialog-title">
+            Delete instance?</h3>
+    </div>
+    <p id="confirm-delete-instance-message"
+        class="text-sm text-muted">
+        This removes the instance. The address
+        stays spent and cannot be recreated.
+    </p>
+    <div class="dialog-footer">
+        <button class="btn btn-outline"
+            data-dialog-cancel="confirm-delete-instance">
+            Cancel
+        </button>
+        <button class="btn btn-destructive"
+            data-action="confirm-delete-instance">
+            Delete
+        </button>
+    </div>
+</dialog>
+
+<dialog id="confirm-archive-dialog"
+    class="dialog dialog-narrow"
+    role="alertdialog"
+    aria-labelledby="confirm-archive-title"
+    aria-describedby="confirm-archive-message">
+    <div class="dialog-header">
+        <h3 id="confirm-archive-title"
+            class="dialog-title">
+            Archive Record?</h3>
+    </div>
+    <p id="confirm-archive-message"
+        class="text-sm text-muted">
+        The Record leaves the Active list; its
+        instances and history stay readable.
+    </p>
+    <div class="dialog-footer">
+        <button class="btn btn-outline"
+            data-dialog-cancel="confirm-archive">
+            Cancel
+        </button>
+        <button class="btn btn-primary"
+            data-action="confirm-archive">
+            Archive
+        </button>
+    </div>
+</dialog>

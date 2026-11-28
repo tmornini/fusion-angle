@@ -74,9 +74,6 @@
     "record-create": {
         "readyMs": 37
     },
-    "record-detail": {
-        "readyMs": 92
-    },
     "records": {
         "readyMs": 42
     },

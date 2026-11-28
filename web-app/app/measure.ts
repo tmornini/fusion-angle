@@ -85,7 +85,6 @@ const DETAIL_FROM_LIST: Record<string, string> = {
     'idea-detail': 'ideas',
     'project-detail': 'projects',
     'flow-detail': 'flows',
-    'record-detail': 'records',
     'member-detail': 'members',
     'identity-detail': 'identities',
 };

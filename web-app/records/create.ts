@@ -62,5 +62,5 @@ async function handleSubmit(): Promise<void> {
         attributes: [],
         initialState: 'active',
     });
-    navigateTo('record-detail', { id });
+    navigateTo('records', { id });
 }

@@ -1,5 +1,5 @@
 import {
-    $, $required, getRequiredAttribute,
+    $, $$, $required, getRequiredAttribute,
     populateIcons,
 } from '../app/dom.ts';
 import {
@@ -13,6 +13,16 @@ import {
     iconPlus, iconDatabase,
 } from '../app/icons.ts';
 import { navigateTo } from '../app/navigation.ts';
+import { showToast } from '../app/toast.ts';
+import { getHref, putAddress } from
+    '../app/adapters/location.ts';
+import { recordAddress } from '../app/record-address.ts';
+import {
+    initRecordPanel,
+    openRecord,
+    openRecordId,
+    recordIsEditing,
+} from './record-panel.ts';
 import { createPageAbort } from '../app/page-lifecycle.ts';
 import {
     getRecords,
@@ -39,18 +49,29 @@ const { signal } = createPageAbort();
 let recordState: RecordListState | null = null;
 let listEl: HTMLElement | null = null;
 let badgesEl: HTMLElement | null = null;
+let panelEl: HTMLElement | null = null;
 
-export async function init(): Promise<void> {
+const MOBILE_MEDIA_QUERY = '(max-width: 767px)';
+const EDITING_NOTICE = 'Save or cancel your changes first';
+
+export async function init(
+    params?: Record<string, string>,
+): Promise<void> {
     const recordsListEl = $required(
         '#records-list', document,
     );
+
+    panelEl = $required('#record-panel', document);
+    // The first record's read, so the page is ready once
+    // both sides have painted.
+    let opened: Promise<void> = Promise.resolve();
 
     const ctx = sessionContext();
     await loadInto({
         container: recordsListEl,
         skeleton: buildSkeleton('card-list', 4),
         fetch: () => getRecords(ctx),
-        retry: init,
+        retry: () => init(params),
         emptyState: {
             icon: iconDatabase(ICON_SIZE['2xl'], ''),
             title: 'No Records Yet',
@@ -62,6 +83,7 @@ export async function init(): Promise<void> {
                 href: 'create.html',
             },
             onEmpty: () => {
+                panelEl?.classList.add('hidden');
                 $(
                     '#create-record-btn',
                     document,
@@ -72,9 +94,11 @@ export async function init(): Promise<void> {
                 );
             },
         },
-        onData: records => onRecordsLoaded(
-            records, recordsListEl,
-        ),
+        onData: records => {
+            opened = onRecordsLoaded(
+                records, recordsListEl, params,
+            );
+        },
     });
 
     populateIcons([
@@ -87,12 +111,16 @@ export async function init(): Promise<void> {
             () => navigateTo('record-create'),
             { signal },
         );
+    await opened;
 }
 
+// The address names the record to open; with none named,
+// the first one listed opens.
 function onRecordsLoaded(
     records: RecordWithCounts[],
     recordsListEl: HTMLElement,
-): void {
+    params: Record<string, string> | undefined,
+): Promise<void> {
     // The button is static markup: the empty render hides it
     // (onEmpty) and a populated one shows it again, so the
     // empty→populated re-init keeps its CTA.
@@ -114,6 +142,13 @@ function onRecordsLoaded(
         'click', onCardClick,
         { signal },
     );
+    listEl.addEventListener(
+        'keydown', onCardKey,
+        { signal },
+    );
+    const panel = $required('#record-panel', document);
+    panel.classList.remove('hidden');
+    initRecordPanel(panel, signal);
 
     subscribeRecordChanges(async () => {
         if (!recordState || !listEl) return;
@@ -155,6 +190,14 @@ function onRecordsLoaded(
             );
         },
     );
+
+    const first = new RecordListPresenter(recordState)
+        .firstId();
+    const id = params?.id ?? first;
+    if (id === null) return Promise.resolve();
+    const opened = openRecord(id, params?.instance);
+    markOpenRecord();
+    return opened;
 }
 
 function rerenderRecords(): void {
@@ -165,6 +208,21 @@ function rerenderRecords(): void {
         presenter.renderBadges(badgesEl);
     }
     presenter.renderList(listEl);
+    markOpenRecord();
+}
+
+// The card whose record the panel holds carries
+// aria-current; no other card does.
+function markOpenRecord(): void {
+    if (!listEl) return;
+    const openId = openRecordId();
+    for (const card of $$('[data-record-card]', listEl)) {
+        if (card.getAttribute('data-record-card') === openId) {
+            card.setAttribute('aria-current', 'true');
+        } else {
+            card.removeAttribute('aria-current');
+        }
+    }
 }
 
 function onBadgeClick(e: MouseEvent): void {
@@ -187,22 +245,78 @@ function onBadgeClick(e: MouseEvent): void {
     rerenderRecords();
 }
 
+// A plain click opens the card's record in the panel; a
+// modified click on its title follows the link, as any
+// link does.
 function onCardClick(e: MouseEvent): void {
     if (
         !(e.target instanceof Element)
     ) return;
-    // Real links navigate themselves, and
-    // the reorder handle is not navigation.
-    if (e.target.closest(
-        'a[href], .drag-handle',
-    )) return;
+    // The reorder handle is not navigation.
+    if (e.target.closest('.drag-handle')) return;
     const card = e.target.closest<HTMLElement>(
         '[data-record-card]',
     );
     if (!card) return;
-    navigateTo('record-detail', {
-        id: getRequiredAttribute(
-            card, 'data-record-card',
-        ),
-    });
+    if (e.target.closest('a[href]') && isModified(e)) {
+        return;
+    }
+    e.preventDefault();
+    // The arrow keys walk on from the card that holds focus.
+    focusCard(card, { preventScroll: true });
+    selectRecord(
+        getRequiredAttribute(card, 'data-record-card'),
+    );
+}
+
+// An open form is never dropped by picking another record.
+function selectRecord(id: string): void {
+    if (id !== openRecordId()) {
+        if (recordIsEditing()) {
+            showToast(EDITING_NOTICE, 'info');
+            return;
+        }
+        void openRecord(id);
+        putAddress(recordAddress(getHref(), id));
+        markOpenRecord();
+    }
+    if (matchMedia(MOBILE_MEDIA_QUERY).matches) {
+        panelEl?.scrollIntoView({ block: 'start' });
+    }
+}
+
+// Up and down walk the cards as listed, stopping at either
+// end. Each step opens its record, except where that would
+// cost the person something: an open form, or a phone's
+// scroll away from the list. There only focus moves, and
+// Enter opens.
+function onCardKey(e: KeyboardEvent): void {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    if (isModified(e) || !listEl) return;
+    if (!(e.target instanceof Element)) return;
+    const card = e.target.closest('[data-record-card]');
+    if (!card) return;
+    e.preventDefault();
+    const cards = $$('[data-record-card]', listEl);
+    const at = cards.findIndex((each) => each === card);
+    const next = cards[at + (e.key === 'ArrowDown' ? 1 : -1)];
+    if (next === undefined) return;
+    focusCard(next, {});
+    if (
+        matchMedia(MOBILE_MEDIA_QUERY).matches
+        || recordIsEditing()
+    ) {
+        return;
+    }
+    selectRecord(
+        getRequiredAttribute(next, 'data-record-card'),
+    );
+}
+
+function focusCard(card: Element, options: FocusOptions): void {
+    card.querySelector<HTMLElement>('a[href]')?.focus(options);
+}
+
+function isModified(e: MouseEvent | KeyboardEvent): boolean {
+    return e.metaKey || e.ctrlKey || e.shiftKey || e.altKey;
 }

@@ -500,7 +500,7 @@ export class WorkboxDetailPresenter {
             return html``;
         }
         return html`<a
-            href="${buildPageUrl('record-detail', {
+            href="${buildPageUrl('records', {
                 id: bind.recordTypeId,
                 instance: bind.instanceId,
             })}"

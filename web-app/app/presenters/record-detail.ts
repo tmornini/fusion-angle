@@ -4,7 +4,6 @@ import { idLabel } from './id-label.ts';
 import {
     ICON_SIZE,
     iconArchive,
-    iconArrowLeft,
     iconEdit,
     iconCheck,
     iconX,
@@ -464,36 +463,24 @@ export class RecordDetailPresenter {
         const cfg = RECORD_STATE_CONFIG[state];
         return html`<div class="entity">
             <div class="${
-                'flex items-start'
-                + ' justify-between gap-4 mb-6'
+                'record-panel-head flex flex-wrap'
+                + ' items-start justify-between gap-4'
+                + ' mb-6'
             }">
-                <div class="${
-                    'flex items-center gap-4'
-                }">
-                    <button
-                        id="record-back-btn"
-                        class="${
-                            'btn btn-ghost'
-                            + ' btn-icon'
-                        }"
-                        aria-label="Back">
-                        ${iconArrowLeft(ICON_SIZE.xl, '')}
-                    </button>
-                    <div>
-                        <h1 class="${
-                            'text-2xl'
-                            + ' font-display'
-                            + ' font-bold'
-                        }">${
-                            this.#view.record
-                                .nameText()
-                        }</h1>
-                        <span class="${
-                            'badge '
-                        }${
-                            cfg.className
-                        }">${cfg.label}</span>
-                    </div>
+                <div class="min-w-0">
+                    <h2 class="${
+                        'text-2xl'
+                        + ' font-display'
+                        + ' font-bold'
+                    }">${
+                        this.#view.record
+                            .nameText()
+                    }</h2>
+                    <span class="${
+                        'badge '
+                    }${
+                        cfg.className
+                    }">${cfg.label}</span>
                 </div>
                 <div class="flex gap-2">
                     ${this.#buildAdminActions()}
@@ -695,12 +682,12 @@ export class RecordDetailEditPresenter {
     buildPage(): SafeHtml {
         return html`<div class="entity">
             <div class="${
-                'flex items-start'
+                'record-panel-head flex items-start'
                 + ' justify-between gap-4 mb-6'
             }">
                 <div class="${
                     'flex items-center gap-4'
-                    + ' flex-1'
+                    + ' flex-1 min-w-0'
                 }">
                     <button
                         id="record-cancel-btn"

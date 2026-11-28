@@ -698,16 +698,16 @@ under `SHA_RESULT_CACHE_ROOT`.
 - [ ] **A1** Run `./bin/build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-angle-${SHA}.zip`.
   Pin: exploratory — the exit code and the ZIP
        file appearing on disk
-- [ ] **A2** Unzip the A1 ZIP (or run `./bin/build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains the `fusion-angle` executable and `site/` with content-hashed assets — `assets/app.<hash>.js` (plus its code-split chunks), `assets/styles.<hash>.css`, the `pages-*.<hash>.css` bundles, and the `*.<hash>.woff2` fonts, where each `<hash>` is sixteen lowercase hex digits that change with the file's content, so read a build's names from its `site/asset-manifest.json` rather than expecting fixed ones — 18 page directories (`api-documentation`, `auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `workbox`) with 28 HTML page files (including `api-documentation/index.html`, `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`. The samples under `api-documentation/samples/` are generated JSON, not PAGE_REGISTRY pages — do not count them as the 28.
-  The 28 are the `PAGE_REGISTRY` HTML files; do
-  **not** count root `index.html` inside the 28
+- [ ] **A2** Unzip the A1 ZIP (or run `./bin/build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains the `fusion-angle` executable and `site/` with content-hashed assets — `assets/app.<hash>.js` (plus its code-split chunks), `assets/styles.<hash>.css`, the `pages-*.<hash>.css` bundles, and the `*.<hash>.woff2` fonts, where each `<hash>` is sixteen lowercase hex digits that change with the file's content, so read a build's names from its `site/asset-manifest.json` rather than expecting fixed ones — 18 page directories (`api-documentation`, `auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `workbox`) with 27 HTML page files (including `api-documentation/index.html`, `flows/stats.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`. The samples under `api-documentation/samples/` are generated JSON, not PAGE_REGISTRY pages — do not count them as the 27.
+  The 27 are the `PAGE_REGISTRY` HTML files; do
+  **not** count root `index.html` inside the 27
   (it stays the separate "plus root `index.html`");
   do **not** count the samples under
   `api-documentation/samples/`.
-  Pin: tests/page-registry.test.ts 'PAGE_REGISTRY is 28
+  Pin: tests/page-registry.test.ts 'PAGE_REGISTRY is 27
        HTML page files including the api-documentation
        index'; exploratory — that a real `./bin/build` run
-       actually emits those 28 files (the eight named
+       actually emits those 27 files (the seven named
        above included) into `site/`, the 18
        directories, the `fusion-angle` executable,
        the hashed `site/assets/app.<hash>.js` and
@@ -4775,7 +4775,7 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   address. Reload with `?id=<id>`. PASS: that work order
   opens. Cmd/Ctrl-click a row's title. PASS: a new tab
   opens `workbox/index.html?id=<id>` with it open. From
-  Customer Profile's record detail, click a work order
+  Customer Profile on the Records page, click a work order
   link. PASS: the workbox opens it in the box.
   Pin: tests/browser/workbox-box.test.ts 'opening a row
        fills the box, marks the row, and sets the id';
@@ -5002,7 +5002,7 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   WB11–WB13. Drive before WB14. If the WO is already
   archived, DEFERRED on WB14 — not FAIL. With a bound
   WO open in the box, PATCH the same
-  instance from the record detail UI (save) so the
+  instance from the Records page (save) so the
   head advances; then attempt a value-bearing
   transition in the stale box. PASS: same 412
   recovery shape as WB19a. Conversely, after a successful
@@ -7385,7 +7385,9 @@ K30 only describes.
 - [ ] **R1** Sidebar shows a Records entry; click navigates
   to `records/`. PASS: under the active org (Stark, org 1)
   the list renders Customer Profile; Project Brief is
-  seeded under org 2 and is correctly hidden here.
+  seeded under org 2 and is correctly hidden here. The
+  first listed record is open in the panel beside the
+  list, its card outlined (`aria-current="true"`).
   Pin: exploratory — the sidebar entry, the live
        navigation, and the org-scoped list contents
 - [ ] **R2** Click "Add Record" (desktop) / "New Record"
@@ -7393,7 +7395,7 @@ K30 only describes.
   (`records/create.html`) with Name and Description
   fields (not a dialog). Type values, click "Create Record".
   PASS: new Record appears at the bottom of the list and the
-  app navigates to its detail page.
+  app opens it on the Records page.
   Pin: tests/adapters-records.test.ts 'postRecordChange
        create writes the row and the initial state
        event'; tests/adapters-refresh-mutex.test.ts 'a
@@ -7407,8 +7409,9 @@ K30 only describes.
        exchanges it back to Stark'; exploratory — the
        create page's fields, the live navigation, and
        the new card's position at the bottom of the
-       list
-- [ ] **R3** Open Customer Profile detail. PASS: read mode
+       list; tests/browser/records.test.ts 'creating a
+       record opens it'
+- [ ] **R3** Open Customer Profile. PASS: read mode
   shows name + description + attribute table sorted by
   sort_order + Bound flows (Customer Onboarding, Lead-to-
   Close) + Work orders using this Record list.
@@ -7493,7 +7496,9 @@ K30 only describes.
   Pin: tests/adapters-records.test.ts 'postRecordChange
        edit replaces removed attributes with new ones';
        tests/adapters-records.test.ts 'putRecord
-       overwrites an existing row'; exploratory — the
+       overwrites an existing row';
+       tests/browser/records.test.ts 'saving in the panel
+       renames the card'; exploratory — the
        live return to read mode and the rendered
        constraint summaries
 - [ ] **R10a** Save a Record edit and watch the toast.
@@ -7598,8 +7603,8 @@ K30 only describes.
        with one collectable input per option';
        exploratory — the live selection and the
        transition that records the value
-- [ ] **R15** Open the R2-created Record's detail
-  page — never Customer Profile (R16–R20 read it).
+- [ ] **R15** Open the R2-created Record — never
+  Customer Profile (R16–R20 read it).
   Click Archive; confirm in the house dialog
   (`data-dialog-open="confirm-archive"`). PASS: a
   "Record archived" toast appears, the header badge
@@ -7616,7 +7621,7 @@ K30 only describes.
        on GET'; exploratory — the toast, the
        records/ card and chip rendering, and the
        chip's live toggle
-- [ ] **R16** Open Customer Profile detail. PASS: an
+- [ ] **R16** Open Customer Profile. PASS: an
   Instances section lists at least one
   instance (id + readable values) and a "New instance"
   control. The genesis Company Name is "Acme Corp";
@@ -7681,8 +7686,10 @@ K30 only describes.
   (spent id).
   Pin: tests/adapters-record-instances.test.ts 'instance
        create → list → patch → 412 → retry → delete →
-       history'; exploratory — the live confirm dialog
-       and the list's removal
+       history'; tests/browser/records.test.ts 'an
+       instance is saved and deleted in the panel';
+       exploratory — the live confirm dialog and the
+       list's removal
 - [ ] **R21** ACL projection (member vs admin). The New
   instance form's per-attribute access
   (`data-access="writable"` / `"readonly"` / omitted)
@@ -7751,6 +7758,51 @@ K30 only describes.
        form surfaces 412 conflict notice';
        exploratory — the two live tabs, the re-GET
        repaint, and the toast
+
+- [ ] **R23 — One page.** Click another record's card.
+  PASS: the panel holds that record, its card is the one
+  outlined, the address gains `?id=<id>` beside
+  `organization=`, and the page does not navigate. Reload.
+  PASS: the same record opens. Cmd/Ctrl-click a card's
+  title. PASS: a new tab opens the Records page on it.
+  Pin: tests/browser/records.test.ts 'the records page
+       opens the first record beside the list';
+       tests/browser/records.test.ts 'picking a record
+       fills the panel and names it in the address';
+       tests/record-address.test.ts 'naming a record keeps
+       the other parameters'; exploratory — the modified
+       click's new tab
+- [ ] **R24 — An open form keeps its record.** Press
+  Edit, then click another record's card. PASS: a toast
+  reads "Save or cancel your changes first" and the form
+  stays with its typed values. Cancel, then click the
+  card. PASS: it opens. The same holds while an instance
+  is being edited.
+  Pin: tests/browser/records.test.ts 'an open record form
+       keeps its record'; tests/browser/records.test.ts
+       'after switching records one press adds one
+       attribute'; exploratory — the instance form
+- [ ] **R25 — Heading and widths.** At 1280×500 scroll
+  the panel. PASS: the record's name, state, and buttons
+  stay put. At 1024, 900, and 320 pixels wide, reading
+  and editing, nothing scrolls sideways; below 1024 the
+  list sits above the record, and on a phone picking a
+  card scrolls to the record.
+  Pin: tests/browser/records.test.ts 'the record heading
+       stays while the panel scrolls';
+       tests/browser/records.test.ts 'the records page
+       fits a 900px viewport'; exploratory — the phone
+       scroll
+
+- [ ] **R26 — Arrow keys.** Click a card, then press
+  Down and Up. PASS: focus and the open record move one
+  card at a time and stop at either end. Press Edit,
+  focus a card, and press Down. PASS: focus moves and the
+  form stays. On a phone the arrows move focus only.
+  Pin: tests/browser/records.test.ts 'the arrow keys walk
+       the cards and open them';
+       tests/browser/records.test.ts 'the arrow keys leave
+       an open form alone'; exploratory — the phone width
 
 ## J. Teardown
 

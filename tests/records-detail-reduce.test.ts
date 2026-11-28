@@ -1,6 +1,6 @@
 import { assertEquals } from '@std/assert';
 import type { RecordInstance } from '../client/index.ts';
-import { instanceToDelete } from '../web-app/records/detail.ts';
+import { instanceToDelete } from '../web-app/records/record-panel.ts';
 import { responseMessage } from './fixtures/response-message.ts';
 
 const TYPE_ID = 'rbfHGatkwQzGZJVXKJEeyw';

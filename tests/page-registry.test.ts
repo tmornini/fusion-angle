@@ -63,11 +63,11 @@ Deno.test('dashboard is gated and landing is public',
 });
 
 Deno.test(
-    'PAGE_REGISTRY is 28 HTML page files including '
+    'PAGE_REGISTRY is 27 HTML page files including '
     + 'the api-documentation index',
     () => {
         const keys = Object.keys(PAGE_REGISTRY);
-        assertStrictEquals(keys.length, 28);
+        assertStrictEquals(keys.length, 27);
         const files = new Set(
             Object.values(PAGE_REGISTRY).map(
                 (e) =>
@@ -75,7 +75,7 @@ Deno.test(
                     + e.sourceFile + '.html',
             ),
         );
-        assertStrictEquals(files.size, 28);
+        assertStrictEquals(files.size, 27);
         assertStrictEquals(
             files.has('api-documentation/index.html'),
             true,
@@ -93,7 +93,7 @@ const ORGANIZATION_SCOPED = [
     'ideas', 'identities', 'identity-detail',
     'member-detail', 'members', 'organization',
     'project-detail', 'projects', 'record-create',
-    'record-detail', 'records', 'workbox',
+    'records', 'workbox',
 ];
 
 Deno.test('organization-scoped pages are the fenced ones',

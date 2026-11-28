@@ -1,4 +1,70 @@
-/* Records: attribute rows, instance editor, conflict banner. */
+/* Records: the list beside the open record, attribute rows,
+   instance editor, conflict banner. */
+
+.records-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-6);
+}
+
+[data-record-card][aria-current="true"] {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: -2px;
+}
+
+/* The record's name, state, and buttons stay in view while
+    the rest of it scrolls. */
+.record-panel-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding-bottom: var(--space-3);
+    background: hsl(var(--background));
+    border-bottom: 1px solid hsl(var(--border));
+}
+
+/* The panel's own width, not the window's, decides when an
+    attribute's editor stacks. */
+.record-panel {
+    container-type: inline-size;
+}
+
+/* Wide enough for both sides: the panel stays under
+    layout.css's 4rem sticky .top-header and scrolls on its
+    own when a record is taller than the window. */
+@media (min-width: 1024px) {
+    .records-columns {
+        grid-template-columns:
+            minmax(0, min(24rem, 38%)) minmax(0, 1fr);
+    }
+
+    .record-panel {
+        position: sticky;
+        top: calc(4rem + var(--space-8));
+        align-self: start;
+        max-height: calc(100vh - 4rem - 2 * var(--space-8));
+        overflow-y: auto;
+    }
+}
+
+/* Stacked, the page scrolls: the heading sticks under the
+    top header, 4rem, or the phone's 3.5rem. */
+@media (max-width: 1023px) {
+    .record-panel-head {
+        top: 4rem;
+        padding-top: var(--space-2);
+    }
+}
+
+@media (max-width: 767px) {
+    .record-panel-head {
+        top: 3.5rem;
+    }
+
+    .record-panel {
+        scroll-margin-top: calc(3.5rem + var(--space-2));
+    }
+}
 
 .record-attribute-row {
     display: grid;
@@ -171,4 +237,10 @@
 
 .record-instance-readonly {
     color: hsl(var(--foreground));
+}
+
+@container (max-width: 40rem) {
+    .record-attribute-edit-row {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
 }

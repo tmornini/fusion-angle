@@ -141,11 +141,6 @@ export class RecordPresenter {
             }</button>` : html``}
             <div class="flex-fill min-w-0">
                 ${this.#buildHeading()}
-            </div>
-            <div class="${
-                'flex flex-col items-end'
-                + ' gap-2 ml-6'
-            }">
                 ${this.#buildMetadata()}
             </div>
         </div>
@@ -164,7 +159,7 @@ export class RecordPresenter {
         }">
             <a href="${
                 buildPageUrl(
-                    'record-detail',
+                    'records',
                     {
                         id: this.#record
                             .idForLink(),
@@ -192,26 +187,21 @@ export class RecordPresenter {
     #buildMetadata(): SafeHtml {
         return html`
         <div class="${
-            'text-xs text-muted'
-            + ' text-right'
+            'flex flex-wrap gap-3'
+            + ' text-xs text-muted mt-2'
         }">
-            ${String(this.#attributeCount)}
+            <span>${String(this.#attributeCount)}
             attribute${
                 this.#attributeCount === 1
                     ? ''
                     : 's'
-            }
-        </div>
-        <div class="${
-            'text-xs text-muted'
-            + ' text-right'
-        }">
-            ${String(this.#boundFlowCount)}
+            }</span>
+            <span>${String(this.#boundFlowCount)}
             bound flow${
                 this.#boundFlowCount === 1
                     ? ''
                     : 's'
-            }
+            }</span>
         </div>`;
     }
 }
@@ -249,6 +239,21 @@ export class RecordListPresenter {
         container: HTMLElement,
     ): void {
         setHtml(container, this.#buildList());
+    }
+
+    // The card the list draws first: none when the pressed
+    // badge leaves no card.
+    firstId(): string | null {
+        const filter = this.#filter;
+        const [first] = this.#records
+            .filter((r) => filter.kind === 'all'
+                || r.matchesState(filter.status))
+            .toSorted(
+                (a, b) =>
+                    a.positionSortKey()
+                    - b.positionSortKey(),
+            );
+        return first === undefined ? null : first.idForLink();
     }
 
     #buildBadges(): SafeHtml {

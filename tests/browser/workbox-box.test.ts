@@ -391,10 +391,10 @@ Deno.test(
     async () => {
         await withAdminPage(browser.get(), async (page, origin) => {
             await page.navigate(registryUrl(
-                origin.baseUrl, 'record-detail',
+                origin.baseUrl, 'records',
                 'id=' + SEED_RECORD_TYPE_ID,
             ));
-            await page.ready('record-detail');
+            await page.ready('records');
             await page.waitFor('.record-wo-link');
             const id = await page.evaluate<string>(
                 `document.querySelector('.record-wo-link')`
