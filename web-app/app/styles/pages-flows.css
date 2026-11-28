@@ -1,0 +1,100 @@
+/* Flows: the list beside the open flow, its problems, and
+   the drawing of it. */
+
+.flows-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-6);
+}
+
+[data-flow-card][aria-current="true"] {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: -2px;
+}
+
+/* The flow's name, readiness, and buttons stay in view while
+    the rest of it scrolls. */
+.flow-panel-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding-bottom: var(--space-3);
+    background: hsl(var(--background));
+    border-bottom: 1px solid hsl(var(--border));
+}
+
+.flow-panel-problems {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    font-size: var(--text-sm);
+    color: hsl(var(--warning-text));
+}
+
+/* The drawing is read-only: it fills its box and passes the
+    pointer through, so the page scrolls over it. */
+.flow-preview {
+    height: max(22rem, 55vh);
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.flow-preview-canvas {
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.flow-preview-canvas svg {
+    display: block;
+}
+
+.flow-preview-canvas [data-connect-port] {
+    display: none;
+}
+
+/* Wide enough for both sides: the panel stays under
+    layout.css's 4rem sticky .top-header and scrolls on its
+    own when a flow is taller than the window. */
+@media (min-width: 1024px) {
+    .flows-columns {
+        grid-template-columns:
+            minmax(0, min(24rem, 38%)) minmax(0, 1fr);
+    }
+
+    .flow-panel {
+        position: sticky;
+        top: calc(4rem + var(--space-8));
+        align-self: start;
+        max-height: calc(100vh - 4rem - 2 * var(--space-8));
+        overflow-y: auto;
+    }
+
+    .flow-preview {
+        height: max(22rem, calc(100vh - 4rem - 2 * var(--space-8) - 9rem));
+    }
+}
+
+/* Stacked, the page scrolls: the heading sticks under the
+    top header, 4rem, or the phone's 3.5rem. */
+@media (max-width: 1023px) {
+    .flow-panel-head {
+        top: 4rem;
+        padding-top: var(--space-2);
+    }
+}
+
+@media (max-width: 767px) {
+    .flow-panel-head {
+        top: 3.5rem;
+    }
+
+    .flow-panel {
+        scroll-margin-top: calc(3.5rem + var(--space-2));
+    }
+
+    .flow-preview {
+        height: 20rem;
+    }
+}

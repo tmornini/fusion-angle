@@ -194,6 +194,7 @@ export const PAGE_REGISTRY: Record<
         keywords:
             'flow, process,'
             + ' state machine',
+        cssBundles: ['pages-flows'],
         loader: () => import('../flows/index.ts'),
     },
     'flow-detail': {

@@ -7,7 +7,6 @@ import {
     iconBarChart,
     iconCircle,
     iconShare,
-    iconChevronRight,
     iconFolderKanban,
 } from '../icons.ts';
 import type {
@@ -64,8 +63,8 @@ export class FlowPresenter {
                     'font-semibold mb-1'
                 }"><a href="${
                     buildPageUrl(
-                        'flow-detail',
-                        { flowId: f.id },
+                        'flows',
+                        { id: f.id },
                     )
                 }">${f.name}</a></h3>
                 <div class="${
@@ -116,12 +115,7 @@ export class FlowPresenter {
                 aria-label="Flow statistics"
                 >${
                 iconBarChart(ICON_SIZE.base, '')
-            }</button>${
-                iconChevronRight(
-                    ICON_SIZE.xl,
-                    'text-muted',
-                )
-            }</div>
+            }</button></div>
         </div>
     </div>`;
     }

@@ -281,6 +281,21 @@ svg.flow-canvas [data-node-id]:hover {
     opacity: 0.85;
 }
 
+/* While a state holds focus (flow-focus.ts), what does not
+    touch it fades so its own transitions read clearly. */
+svg.flow-canvas .flow-node,
+svg.flow-canvas .flow-edge {
+    transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+svg.flow-canvas.flow-focusing .flow-node:not(.flow-lit) {
+    opacity: 0.3;
+}
+
+svg.flow-canvas.flow-focusing .flow-edge:not(.flow-lit) {
+    opacity: 0.12;
+}
+
 svg.flow-canvas [data-connect-port] {
     cursor: crosshair;
 }

@@ -33,6 +33,11 @@ import {
 } from '../../client/index.ts';
 import { sessionContext } from '../app/client.ts';
 import { getRenderableFlowGraph } from '../app/flow-graph-layout.ts';
+import {
+    applyStepFocus,
+    focusedStepOf,
+    stepFocusOf,
+} from '../app/flow-focus.ts';
 import type {
     FlowWithGraph,
     GraphEdge,
@@ -976,6 +981,7 @@ async function leaveTo(
 
 function bindBackButton(
     container: HTMLElement,
+    flowId: string,
     signal: AbortSignal,
 ): void {
     $required('#flow-back-btn', container)
@@ -990,11 +996,63 @@ function bindBackButton(
                         { projectId: pid },
                     );
                 } else {
-                    void leaveTo('flows');
+                    // The list reopens on the flow left.
+                    void leaveTo('flows', { id: flowId });
                 }
             },
             { signal },
         );
+}
+
+// Hovering a state, focusing it, or selecting it alone
+// fades what it does not touch (flow-focus.ts). The canvas
+// is rebuilt on every repaint, so the marks are put back
+// each time the host's svg is replaced.
+function bindStepFocus(
+    container: HTMLElement,
+    signal: AbortSignal,
+): void {
+    const host = $required('.flow-canvas-host', container);
+    let hovered: string | null = null;
+    let keyboard: string | null = null;
+    const stepAt = (target: EventTarget | null): string | null =>
+        target instanceof Element
+            ? target.closest('[data-node-id]')
+                ?.getAttribute('data-node-id') ?? null
+            : null;
+    const paint = (): void => {
+        const svg = host.querySelector('svg.flow-canvas');
+        if (svg === null) return;
+        const snap = pageState.presenter().snapshot();
+        const id = focusedStepOf(
+            hovered, keyboard, snap.interaction.selection,
+        );
+        applyStepFocus(
+            svg, id === null ? null : stepFocusOf(snap.edges, id),
+        );
+    };
+    host.addEventListener('pointerover', (e) => {
+        hovered = stepAt(e.target);
+        paint();
+    }, { signal });
+    host.addEventListener('pointerleave', () => {
+        hovered = null;
+        paint();
+    }, { signal });
+    host.addEventListener('focusin', (e) => {
+        keyboard = stepAt(e.target);
+        paint();
+    }, { signal });
+    host.addEventListener('focusout', () => {
+        keyboard = null;
+        paint();
+    }, { signal });
+    const rebuilt = new MutationObserver(paint);
+    rebuilt.observe(host, { childList: true });
+    signal.addEventListener(
+        'abort', () => rebuilt.disconnect(), { once: true },
+    );
+    paint();
 }
 
 // Navigate to the stats page for the current
@@ -1659,12 +1717,13 @@ function onFlowLoaded(
     bindBindingDropdown(
         container, flowId, signal,
     );
-    bindBackButton(container, signal);
+    bindBackButton(container, flowId, signal);
     bindStatsButton(container, flowId, signal);
     bindCanvasInteractions(
         container, presenter,
         panelStateRef, signal,
     );
+    bindStepFocus(container, signal);
     bindToolbarActions(
         container, signal,
     );

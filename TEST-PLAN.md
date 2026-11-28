@@ -528,7 +528,7 @@ limit that note already names.
 | C. Core: Dashboard | 9 |
 | D. Core: Ideas Workflow | 38 |
 | E. Core: Projects | 12 |
-| F. Tools | 73 |
+| F. Tools | 75 |
 | F2. Workbox | 39 |
 | FS. Flow Statistics | 9 |
 | G. Admin Pages | 41 |
@@ -538,15 +538,15 @@ limit that note already names.
 | R. Records | 26 |
 | J. Teardown | 3 |
 | SV. Server (Deno + Postgres) | 9 |
-| **Total** | **401** |
+| **Total** | **403** |
 
 A3 **is** SV1 — counted once, in A. The explorer
-skips SV1. F is 73 (F1–F75 less F4–F6 and F41–F44,
+skips SV1. F is 75 (F1–F77 less F4–F6 and F41–F44,
 plus F37a, F37b, F38a, F38b, F57a).
 
 ### Combined Totals (CLI + Browser)
 
-The per-section table above counts 401 distinct
+The per-section table above counts 403 distinct
 TEST-PLAN cases (A3 is SV1; not counted twice). The
 CLI count is what the most recent `./bin/test` (AT2)
 printed: the summary line of each of its two passes,
@@ -2908,7 +2908,8 @@ rather than looking for the reminders here.
 ### Flow List (`flows/`)
 
 - [ ] **F1** Navigate to `flows/`. PASS: the page lists
-  flow cards, each with the flow name, a project-name
+  flow cards beside the open flow (above it below
+  1024px), each with the flow name, a project-name
   badge, and state/transition counts. At least the four
   seeded Stark flows appear — Customer Onboarding, Fusion
   Angle Flow, Lead-to-Close, and Layout Test: Proposal
@@ -2934,14 +2935,45 @@ rather than looking for the reminders here.
   a flow-list search UI is added later.
   Pin: exploratory — confirming the list page renders no
        search input
-- [ ] **F3** Click a flow card. PASS: navigates
-  to `flows/detail.html?flowId=<id>`.
-  Pin: tests/presenter-misc.test.ts 'FlowPresenter
-       renders the flow name and a data-flow-card hook'
-       (decides the card carries the
-       `data-flow-card="<id>"` hook the list's click
-       handler reads); exploratory — the live click and
-       the resulting URL
+- [ ] **F3** Click a flow card. PASS: the flow opens in
+  the panel beside the list, the card is outlined, and the
+  address reads `flows/index.html?id=<id>`; the page does
+  not change. Cmd-click the card's title. PASS: it opens in
+  a new tab on the same address. Click "Open in designer".
+  PASS: navigates to `flows/detail.html?flowId=<id>`.
+  Pin: tests/browser/flows.test.ts 'a card click opens its
+       flow in the panel and names it in the address';
+       tests/presenter-flow-panel.test.ts 'a flow card's
+       title links to the Flows page naming the flow';
+       tests/browser/flows.test.ts 'the address names the
+       flow the panel opens, drawn read-only with its
+       readiness' (decides the designer link);
+       exploratory — the modified click
+- [ ] **F76 — The open flow.** Navigate to `flows/`. PASS:
+  the first card's flow opens beside the list. Its name,
+  a readiness badge, the project, the counts, the bound
+  record (or "No record bound"), Statistics and Open in
+  designer stay in view while the rest scrolls. On Layout
+  Test the badge reads "15 states need attention" and a
+  line names them after "No members:". Below, the flow is
+  drawn read-only in the designer's colours, without
+  ports, and nothing in it takes Tab focus. Navigate to
+  `flows/index.html?id=<id>` with another flow's id.
+  PASS: that flow opens. Open a designer and press its
+  back arrow (from the Flows page, not a project). PASS:
+  the list reopens on that flow.
+  Pin: tests/browser/flows.test.ts 'the flows page opens
+       the first flow beside the list';
+       tests/browser/flows.test.ts 'the address names the
+       flow the panel opens, drawn read-only with its
+       readiness'; tests/browser/flows.test.ts 'the
+       designer's back button reopens the list on its
+       flow'; tests/presenter-flow-panel.test.ts 'a flow
+       that is not ready counts its states and names them
+       by problem, in the flow's order';
+       tests/flow-address.test.ts 'opening names the flow
+       beside the organization'; exploratory — the sticky
+       heading while scrolling, and the phone layout
 
 ### Flow Designer (`flows/detail.html?flowId=...`)
 
@@ -4474,6 +4506,22 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        a camera op, never an auto-layout); exploratory —
        the `getBBox` measurement itself and the painted
        margins
+- [ ] **F77 — Step focus.** Open Layout Test and hover
+  Deep Review. PASS: Deep Review, Triage and the four
+  panels stay bright with the five transitions between
+  them; every other state and transition fades. Move off
+  the states. PASS: everything returns. Click Deep Review
+  so its panel opens, then move the pointer away. PASS:
+  the fade stays while it is the one state selected. Tab
+  to a state. PASS: the fade follows keyboard focus.
+  Pin: tests/browser/flows.test.ts 'hovering a state in
+       the designer fades what it does not touch';
+       tests/flow-focus.test.ts 'a focused state lights
+       itself, its transitions in and out, and the states
+       at their other ends'; tests/flow-focus.test.ts 'the
+       pointer wins, then keyboard focus, then a lone
+       selected state'; exploratory — the selection and
+       keyboard fades, and the fade's easing
 
 ---
 

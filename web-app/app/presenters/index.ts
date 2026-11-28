@@ -67,6 +67,11 @@ export {
     FlowPresenter,
 } from './flow.ts';
 export {
+    buildFlowPanel,
+    type FlowPanelProblem,
+    type FlowPanelView,
+} from './flow-panel.ts';
+export {
     ProjectDetailPresenter,
     ProjectDetailEditPresenter,
     projectDraftFromView,
